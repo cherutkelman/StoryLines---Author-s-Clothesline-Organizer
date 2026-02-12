@@ -1,0 +1,18 @@
+
+{
+  "name": "StoryLines Author Tool",
+  "short_name": "StoryLines",
+  "description": "ארגון עלילה ויזואלי לסופרים",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fdf6e3",
+  "theme_color": "#78350f",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

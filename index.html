@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StoryLines - מארגן עלילה לסופרים</title>
+    <meta name="theme-color" content="#78350f">
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600;700&family=Amatic+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -30,5 +32,12 @@
 </head>
 <body class="overflow-x-hidden">
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
 </body>
 </html>

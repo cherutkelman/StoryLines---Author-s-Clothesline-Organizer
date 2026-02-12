@@ -9,7 +9,8 @@ import {
   Download,
   Eye,
   EyeOff,
-  Settings2
+  Settings2,
+  MonitorSmartphone
 } from 'lucide-react';
 import { Scene, Plotline, Project } from './types';
 import Board from './components/Board';
@@ -40,10 +41,27 @@ const App: React.FC = () => {
   const [showEditor, setShowEditor] = useState(true);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>(project.plotlines.map(p => p.id));
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
   }, [project]);
+
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    });
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstallPrompt(null);
+    }
+  };
 
   const handleAiRefine = async (sceneId: string) => {
     const scene = project.scenes.find(s => s.id === sceneId);
@@ -179,6 +197,18 @@ const App: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-64 border-l border-amber-100 bg-white p-6 overflow-y-auto hidden lg:block">
+          {installPrompt && (
+            <div className="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+              <button 
+                onClick={handleInstall}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm"
+              >
+                <MonitorSmartphone size={14} />
+                <span>התקן על המחשב</span>
+              </button>
+            </div>
+          )}
+
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4 border-b pb-2">
               <h3 className="text-xs font-bold text-amber-900 uppercase tracking-widest">קווי עלילה</h3>
@@ -209,6 +239,18 @@ const App: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-auto pt-4 border-t border-amber-50">
+             <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
+                <div className="flex items-center gap-2 mb-2 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
+                  <Wand2 size={14} />
+                  <span>עוזר AI</span>
+                </div>
+                <p className="text-[10px] text-amber-700 leading-relaxed italic">
+                  "הסדר משתנה בלוח? הטקסט למטה זז יחד איתו."
+                </p>
+              </div>
           </div>
         </aside>
 

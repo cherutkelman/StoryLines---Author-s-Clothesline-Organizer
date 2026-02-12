@@ -1,20 +1,25 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# StoryLines - מארגן עלילה לסופרים
 
-This contains everything you need to run your app locally.
+כלי ויזואלי המבוסס על "חבל כביסה" לארגון סצנות וקווי עלילה בצורה אינטראקטיבית וסנכרון מלא עם עורך הטקסט.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1e1qtqkYfRLFWbuea97NHjeTX24ddFE5T
+## תכונות עיקריות
+- **חבל כביסה ויזואלי**: ניהול סצנות כריבועים תלויים על חבל.
+- **קווי עלילה מרובים**: הוספת עלילות משנה בצבעים שונים.
+- **סנכרון זמן אמת**: שינוי סדר הסצנות בלוח משנה אוטומטית את סדר הטקסט בעורך.
+- **עוזר AI**: שימוש ב-Gemini API להרחבת סצנות וקבלת השראה.
+- **מצב אופליין**: עבודה ללא אינטרנט לאחר הטעינה הראשונה.
+- **התקנה על המחשב (PWA)**: ניתן להתקין כאפליקציה עצמאית דרך הדפדפן.
 
-## Run Locally
+## הוראות התקנה על המחשב
+1. פתחו את האפליקציה בדפדפן (Chrome או Edge מומלצים).
+2. בתפריט הצדדי, לחצו על הכפתור **"התקן על המחשב"**.
+3. האפליקציה תתווסף לשולחן העבודה שלכם ותפעל כיישום נפרד.
 
-**Prerequisites:**  Node.js
+## שימוש למפתחים
+1. שכפלו את המאגר: `git clone <repository-url>`
+2. התקינו תלויות (אם רלוונטי): `npm install`
+3. הריצו: `npm start`
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+נבנה עבור סופרים שרוצים לראות את העלילה שלהם פרוסה מול העיניים.
