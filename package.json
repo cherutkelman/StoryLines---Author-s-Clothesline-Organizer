@@ -42,7 +42,7 @@
       "main.js"
     ],
     "win": {
-      "target": "portable",
+      "target": "nsis",
       "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
     },
     "mac": {
