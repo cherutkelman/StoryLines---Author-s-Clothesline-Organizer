@@ -12,20 +12,26 @@ import {
   MonitorSmartphone,
   Save,
   FileJson,
-  Type,
+  // Renamed to avoid collision with GoogleGenAI.Type
+  Type as LucideType,
   ChevronRight,
   Library,
   Book as BookIcon,
   Pencil,
   CopyPlus,
-  X
+  X,
+  FileText,
+  Sparkles,
+  Loader2,
+  ListChecks
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
-import { GoogleGenAI } from "@google/genai";
+import Questionnaires from './components/Questionnaires';
+import { GoogleGenAI, Type } from "@google/genai";
 
-const STORAGE_KEY = 'storylines_library_v1';
+const STORAGE_KEY = 'storylines_library_v2'; // Bumped version for new schema
 
 const DEFAULT_PROJECT_DATA = {
   plotlines: [
@@ -36,7 +42,10 @@ const DEFAULT_PROJECT_DATA = {
     { id: 's1', plotlineId: 'p1', title: 'התחלה', content: 'הגיבור יוצא לדרך...', position: 0, isCompleted: true },
     { id: 's2', plotlineId: 'p2', title: 'מזימה', content: 'הנבל מתכנן משהו...', position: 1, isCompleted: false },
     { id: 's3', plotlineId: 'p1', title: 'מכשול ראשון', content: 'הדרך נחסמת...', position: 2, isCompleted: false }
-  ]
+  ],
+  characters: [],
+  places: [],
+  periods: []
 };
 
 const createNewBook = (title: string): Book => ({
@@ -60,16 +69,19 @@ const App: React.FC = () => {
   });
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0].id);
-  const [activeView, setActiveView] = useState<'board' | 'editor'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires'>('board');
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   
-  // Bulk Add Modal state
+  // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
+  const [isImportTextOpen, setIsImportTextOpen] = useState(false);
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
+  const [importLongText, setImportLongText] = useState('');
+  const [isSplittingAi, setIsSplittingAi] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,6 +140,84 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAiTextSplit = async () => {
+    if (!importLongText.trim() || !process.env.API_KEY) return;
+    setIsSplittingAi(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Split the following long text into logical scenes. For each scene, provide a short descriptive title and the relevant text content. 
+        Text: ${importLongText.substring(0, 15000)}`, // Limit to avoid token overflow
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            // Using Type from @google/genai directly as per guidelines
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: "Descriptive title for the scene" },
+                content: { type: Type.STRING, description: "The content of the scene" }
+              },
+              required: ["title", "content"]
+            }
+          }
+        }
+      });
+
+      const scenes = JSON.parse(response.text || '[]');
+      if (Array.isArray(scenes) && scenes.length > 0) {
+        const startPos = activeBook.scenes.length;
+        const newScenesToAdd: Scene[] = scenes.map((s: any, idx: number) => ({
+          id: `s-ai-${Date.now()}-${idx}`,
+          plotlineId: bulkPlotlineId,
+          title: s.title || 'סצנה חדשה',
+          content: s.content || '',
+          position: startPos + idx,
+          isCompleted: false
+        }));
+
+        updateActiveBook({
+          scenes: [...activeBook.scenes, ...newScenesToAdd].map((s, idx) => ({ ...s, position: idx }))
+        });
+        setIsImportTextOpen(false);
+        setImportLongText('');
+      }
+    } catch (error) {
+      console.error("AI Split failed", error);
+      alert("נכשלה חלוקת הטקסט באמצעות AI. נסה חלוקה ידנית.");
+    } finally {
+      setIsSplittingAi(false);
+    }
+  };
+
+  const handleManualSplit = () => {
+    const delimiter = prompt("הזן תו מפריד (למשל ###) או השאר ריק לחלוקה לפי פסקאות כפולות", "###");
+    const parts = delimiter 
+      ? importLongText.split(delimiter).filter(p => p.trim()) 
+      : importLongText.split('\n\n').filter(p => p.trim());
+    
+    if (parts.length > 0) {
+      const startPos = activeBook.scenes.length;
+      const newScenesToAdd: Scene[] = parts.map((content, idx) => ({
+        id: `s-manual-${Date.now()}-${idx}`,
+        plotlineId: bulkPlotlineId,
+        title: `סצנה ${startPos + idx + 1}`,
+        content: content.trim(),
+        position: startPos + idx,
+        isCompleted: false
+      }));
+
+      updateActiveBook({
+        scenes: [...activeBook.scenes, ...newScenesToAdd].map((s, idx) => ({ ...s, position: idx }))
+      });
+      setIsImportTextOpen(false);
+      setImportLongText('');
+    }
+  };
+
   const addPlotline = () => {
     const newP: Plotline = {
       id: `p-${Date.now()}`,
@@ -169,36 +259,6 @@ const App: React.FC = () => {
     updateActiveBook({
       scenes: newScenes.map((s, idx) => ({ ...s, position: idx }))
     });
-  };
-
-  const addMultipleScenes = (plotlineId: string, titles: string[]) => {
-    if (titles.length === 0) return;
-    
-    const startPos = activeBook.scenes.length;
-    const newScenesToAdd: Scene[] = titles.map((title, idx) => ({
-      id: `s-${Date.now()}-${idx}`,
-      plotlineId,
-      title: title.trim() || 'סצנה חדשה',
-      content: '',
-      position: startPos + idx,
-      isCompleted: false
-    }));
-
-    updateActiveBook({
-      scenes: [...activeBook.scenes, ...newScenesToAdd].map((s, idx) => ({ ...s, position: idx }))
-    });
-  };
-
-  const handleBulkSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const titlesArray = bulkTitles.split('\n').filter(t => t.trim().length > 0);
-    if (titlesArray.length === 0) {
-      addMultipleScenes(bulkPlotlineId, ['סצנה חדשה']);
-    } else {
-      addMultipleScenes(bulkPlotlineId, titlesArray);
-    }
-    setBulkTitles('');
-    setIsBulkAddOpen(false);
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
@@ -296,271 +356,130 @@ const App: React.FC = () => {
     setBooks(prev => prev.map(b => b.id === id ? { ...b, title } : b));
   };
 
+  const updateEntries = (category: 'characters' | 'places' | 'periods', entries: QuestionnaireEntry[]) => {
+    updateActiveBook({ [category]: entries });
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#fdf6e3] text-[#4a4a4a] overflow-hidden">
       <header className="flex-shrink-0 bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between shadow-sm z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <div className="bg-amber-800 p-2 rounded-lg text-white">
+            <div className="bg-amber-800 p-2 rounded-lg text-white transition-transform hover:scale-110">
               <BookOpen size={20} />
             </div>
-            <h1 className="text-xl font-bold text-amber-900 handwritten text-2xl">StoryLines</h1>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-[10px] text-amber-900/40 font-bold uppercase tracking-wider bg-amber-50 px-3 py-1 rounded-full">
-            <Save size={12} />
-            <span>נשמר אוטומטית: {lastSaved.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
+            <h1 className="text-xl font-bold text-amber-900 handwritten text-3xl select-none">StoryLines</h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-100/50">
+        <div className="flex items-center gap-1 bg-amber-50 p-1.5 rounded-2xl border border-amber-100/50 shadow-inner">
           <button 
             onClick={() => setActiveView('board')} 
-            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
             <Layout size={18} />
-            <span>לוח עלילה</span>
+            <span className="hidden sm:inline">לוח עלילה</span>
           </button>
           <button 
             onClick={() => setActiveView('editor')} 
-            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
-            <Type size={18} />
-            <span>עורך טקסט</span>
+            <LucideType size={18} />
+            <span className="hidden sm:inline">עורך טקסט</span>
+          </button>
+          <button 
+            onClick={() => setActiveView('questionnaires')} 
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+          >
+            <ListChecks size={18} />
+            <span className="hidden sm:inline">שאלונים</span>
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => {
-              setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
-              setIsBulkAddOpen(true);
-            }} 
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white border border-indigo-700 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-bold shadow-sm"
-          >
-            <CopyPlus size={16} />
-            <span className="hidden sm:inline">הוספה מהירה</span>
-          </button>
-          <button onClick={exportManuscript} className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-900 border border-amber-200 rounded-lg hover:bg-amber-200 transition-colors text-sm font-bold" title="ייצוא הטקסט לקובץ TXT">
+          <button onClick={exportManuscript} className="flex items-center gap-2 px-4 py-2.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-xl hover:bg-amber-200 transition-all text-sm font-bold">
             <Download size={16} />
-            <span className="hidden sm:inline">ייצוא טקסט</span>
+            <span className="hidden sm:inline">ייצוא</span>
           </button>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Library & Plotlines Sidebar */}
-        <aside className="w-72 border-l border-amber-100 bg-white overflow-y-auto hidden lg:flex flex-col">
-          <div className="p-6 border-b border-amber-50">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="flex items-center gap-2 text-xs font-bold text-amber-900 uppercase tracking-widest">
-                <Library size={14} />
-                <span>הספרים שלי</span>
-              </h3>
-              <button onClick={addNewBookToLibrary} className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-50 transition-colors">
-                <Plus size={18} />
-              </button>
+        <aside className="w-80 border-l border-amber-100 bg-white overflow-y-auto hidden lg:flex flex-col shadow-xl z-20">
+          <div className="p-8 border-b border-amber-50">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">הספרים שלי</h3>
+              <button onClick={addNewBookToLibrary} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               {books.map(book => (
-                <div 
-                  key={book.id} 
-                  className={`group relative flex flex-col p-3 rounded-xl transition-all cursor-pointer border ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`}
-                  onClick={() => setActiveBookId(book.id)}
-                >
+                <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
                   <div className="flex items-center gap-3">
-                    <BookIcon size={16} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-400'} />
-                    <input 
-                      value={book.title}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => renameBook(book.id, e.target.value)}
-                      className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/60'}`}
-                    />
-                    {books.length > 1 && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteBook(book.id); }} 
-                        className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    <BookIcon size={18} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-200'} />
+                    <input value={book.title} onClick={(e) => e.stopPropagation()} onChange={(e) => renameBook(book.id, e.target.value)} className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} />
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-[10px] text-amber-900/40">
-                    <span>{book.scenes.length} סצנות</span>
-                    <span>{new Date(book.lastModified).toLocaleDateString('he-IL')}</span>
-                  </div>
-                  {activeBookId === book.id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-800 rounded-r-full" />
-                  )}
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-amber-900 uppercase tracking-widest">קווי עלילה בספר</h3>
-              <button onClick={addPlotline} className="text-amber-600 hover:text-amber-800">
-                <Plus size={18} />
+          <div className="p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em]">ניהול נתונים</h3>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={exportDataBackup} className="flex items-center gap-3 px-4 py-3 bg-white border border-amber-200 text-amber-800 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm">
+                <FileJson size={16} className="text-amber-500" />
+                <span>גיבוי מלא</span>
               </button>
             </div>
-            <div className="space-y-3">
-              {activeBook.plotlines.map(p => (
-                <div key={p.id} className="group space-y-2 p-2 rounded-lg hover:bg-amber-50/50 transition-all">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      checked={visiblePlotlines.includes(p.id)}
-                      onChange={(e) => setVisiblePlotlines(prev => e.target.checked ? [...prev, p.id] : prev.filter(id => id !== p.id))}
-                      className="w-4 h-4 rounded border-amber-300 text-amber-800 focus:ring-amber-500"
-                    />
-                    <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: p.color }} />
-                    <input 
-                      value={p.name}
-                      onChange={(e) => updatePlotlineName(p.id, e.target.value)}
-                      className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-amber-900"
-                    />
-                    <button onClick={() => deletePlotline(p.id)} className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-auto p-6 space-y-4">
-            <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
-              <div className="flex items-center gap-2 mb-2 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
-                <Settings2 size={14} />
-                <span>גיבוי ושיחזור</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                <button 
-                  onClick={exportDataBackup}
-                  className="flex items-center gap-2 px-3 py-2 bg-white border border-amber-200 text-amber-800 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition-all"
-                >
-                  <FileJson size={14} className="text-amber-600" />
-                  <span>ייצוא גיבוי JSON</span>
-                </button>
-                <button 
-                  onClick={handleImportClick}
-                  className="flex items-center gap-2 px-3 py-2 bg-white border border-amber-200 text-amber-800 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition-all"
-                >
-                  <Upload size={14} className="text-amber-600" />
-                  <span>ייבוא ספר חדש</span>
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={importDataBackup} 
-                  accept=".json" 
-                  className="hidden" 
-                />
-              </div>
-            </div>
-
-            {installPrompt && (
-              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
-                <button 
-                  onClick={handleInstall}
-                  className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm"
-                >
-                  <MonitorSmartphone size={14} />
-                  <span>התקן על המחשב</span>
-                </button>
-              </div>
-            )}
           </div>
         </aside>
 
         <main className="flex-1 relative overflow-hidden bg-[#fdf6e3]">
-          {/* Board View */}
-          <div 
-            className={`absolute inset-0 transition-all duration-500 ease-in-out transform ${activeView === 'board' ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
-          >
-            <div className="h-full overflow-auto">
-              <Board 
-                project={activeBook} 
-                onAddScene={addScene}
-                onMoveScene={moveScene}
-                updateScene={updateScene}
-                onBulkAdd={(pid) => {
-                  setBulkPlotlineId(pid);
-                  setIsBulkAddOpen(true);
-                }}
+          {activeView === 'board' && (
+            <div className="absolute inset-0">
+              <Board project={activeBook} onAddScene={addScene} onMoveScene={moveScene} updateScene={updateScene} onBulkAdd={() => setIsBulkAddOpen(true)} />
+            </div>
+          )}
+          {activeView === 'editor' && (
+            <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
+              <Editor project={activeBook} visiblePlotlines={visiblePlotlines} onUpdateScene={updateScene} onAiRefine={handleAiRefine} isAiLoading={isAiLoading} onOpenBulkAdd={() => setIsBulkAddOpen(true)} />
+            </div>
+          )}
+          {activeView === 'questionnaires' && (
+            <div className="absolute inset-0 overflow-auto">
+              <Questionnaires 
+                characters={activeBook.characters || []}
+                places={activeBook.places || []}
+                periods={activeBook.periods || []}
+                onUpdateCharacters={(e) => updateEntries('characters', e)}
+                onUpdatePlaces={(e) => updateEntries('places', e)}
+                onUpdatePeriods={(e) => updateEntries('periods', e)}
               />
             </div>
-          </div>
-
-          {/* Editor View */}
-          <div 
-            className={`absolute inset-0 transition-all duration-500 ease-in-out transform ${activeView === 'editor' ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
-          >
-            <div className="h-full overflow-auto bg-white shadow-inner">
-              <Editor 
-                project={activeBook} 
-                visiblePlotlines={visiblePlotlines}
-                onUpdateScene={updateScene}
-                onAiRefine={handleAiRefine}
-                isAiLoading={isAiLoading}
-                onOpenBulkAdd={() => setIsBulkAddOpen(true)}
-              />
-            </div>
-          </div>
+          )}
         </main>
       </div>
 
-      {/* Bulk Add Modal */}
-      {isBulkAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[#fdf6e3] w-full max-w-lg rounded-2xl shadow-2xl border border-amber-200 overflow-hidden">
-            <div className="bg-white border-b border-amber-100 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-amber-900 handwritten text-2xl">הוספת סצנות מרובות</h2>
-              <button onClick={() => setIsBulkAddOpen(false)} className="text-amber-400 hover:text-amber-800 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleBulkSubmit} className="p-6 space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-amber-900/60 uppercase tracking-widest mb-2">לאיזה קו עלילה?</label>
-                <select 
-                  value={bulkPlotlineId}
-                  onChange={(e) => setBulkPlotlineId(e.target.value)}
-                  className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 transition-all outline-none"
-                >
-                  {activeBook.plotlines.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-amber-900/60 uppercase tracking-widest mb-2">כותרות הסצנות (אחת בכל שורה)</label>
-                <textarea 
-                  autoFocus
-                  value={bulkTitles}
-                  onChange={(e) => setBulkTitles(e.target.value)}
-                  placeholder="התחלה&#10;המפגש הראשון&#10;המשבר&#10;הפתרון..."
-                  className="w-full h-48 bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-amber-500 transition-all outline-none resize-none leading-relaxed"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
-                <button 
-                  type="submit"
-                  className="flex-1 bg-amber-800 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-amber-900 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  צור {bulkTitles.split('\n').filter(t => t.trim()).length || 1} סצנות חדשות
+      {isImportTextOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
+          <div className="bg-[#fdf6e3] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-amber-200 p-8">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold handwritten text-3xl">ייבוא טקסט ארוך</h2>
+                <button onClick={() => setIsImportTextOpen(false)} className="text-amber-300 hover:text-amber-800"><X size={28} /></button>
+             </div>
+             <textarea 
+               value={importLongText} 
+               onChange={(e) => setImportLongText(e.target.value)} 
+               className="w-full h-80 bg-white border-2 border-amber-100 rounded-2xl p-6 mb-6"
+               placeholder="הדבק טקסט..."
+             />
+             <div className="flex gap-4">
+                <button onClick={handleAiTextSplit} className="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
+                   {isSplittingAi ? <Loader2 className="animate-spin" /> : <Sparkles />} פירוק AI
                 </button>
-                <button 
-                  type="button"
-                  onClick={() => setIsBulkAddOpen(false)}
-                  className="px-6 py-3 border border-amber-200 text-amber-800 font-bold rounded-xl hover:bg-amber-50 transition-all"
-                >
-                  ביטול
-                </button>
-              </div>
-            </form>
+                <button onClick={handleManualSplit} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl">פירוק ידני</button>
+             </div>
           </div>
         </div>
       )}

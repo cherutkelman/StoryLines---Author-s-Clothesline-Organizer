@@ -14,9 +14,18 @@ export interface Plotline {
   color: string;
 }
 
+export interface QuestionnaireEntry {
+  id: string;
+  name: string;
+  data: Record<string, string>; // Questions and their answers
+}
+
 export interface Project {
   plotlines: Plotline[];
   scenes: Scene[];
+  characters?: QuestionnaireEntry[];
+  places?: QuestionnaireEntry[];
+  periods?: QuestionnaireEntry[];
 }
 
 export interface Book extends Project {
