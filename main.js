@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
@@ -15,10 +14,8 @@ function createWindow() {
     },
   });
 
-  // In production, load the built index.html
-  // In development, you might want to load the vite dev server URL
   const isDev = process.env.NODE_ENV === 'development';
-  
+
   if (isDev) {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();
@@ -26,13 +23,17 @@ function createWindow() {
     win.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 
-  // Remove the default menu bar for a cleaner look
   win.setMenuBarVisibility(false);
 }
 
+// לא להוריד אוטומטית
+autoUpdater.autoDownload = false;
+
 app.whenReady().then(() => {
   createWindow();
-  autoUpdater.autoDownload = false;
+
+  // בדיקת עדכון בעת פתיחה
+  autoUpdater.checkForUpdates();
 
   autoUpdater.on('update-available', () => {
     dialog.showMessageBox({
@@ -49,17 +50,24 @@ app.whenReady().then(() => {
     });
   });
 
-  autoUpdater.on('update-not-available', () => {
-    // אפשר להשאיר ריק כדי לא להציק
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'העדכון מוכן',
+      message: 'העדכון הורד בהצלחה.',
+      detail: 'להפעיל מחדש ולהתקין עכשיו?',
+      buttons: ['כן', 'לא'],
+      defaultId: 0
+    }).then(result => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
   });
 
   autoUpdater.on('error', (err) => {
-    // אפשר להדפיס לקונסול בלבד, כדי לא להבהיל משתמשים
     console.error('autoUpdater error:', err);
   });
-
-  // בדיקה בעת פתיחת האפליקציה
-  autoUpdater.checkForUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
