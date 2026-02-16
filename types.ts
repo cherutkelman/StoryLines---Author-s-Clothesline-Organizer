@@ -18,3 +18,9 @@ export interface Project {
   plotlines: Plotline[];
   scenes: Scene[];
 }
+
+export interface Book extends Project {
+  id: string;
+  title: string;
+  lastModified: number;
+}

@@ -1,3 +1,4 @@
+
 {
   "name": "storylines-desktop",
   "private": true,
@@ -42,18 +43,12 @@
       "main.js"
     ],
     "win": {
-      "target": "nsis"
+      "target": "portable",
+      "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
     },
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "cherutkelman",
-        "repo": "StoryLines---Author-s-Clothesline-Organizer"
-      }
-    ]
+    }
   }
 }
