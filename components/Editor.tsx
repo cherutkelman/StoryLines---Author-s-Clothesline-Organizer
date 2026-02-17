@@ -127,26 +127,36 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
           const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
           return (
-            <article key={scene.id} className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) setFocusedSceneId(scene.id); }}>
+            <article key={scene.id} className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) setFocusedSceneId(scene.id); }}>
               {!isExpanded ? (
-                <div className="group flex items-center justify-between bg-white border border-amber-100/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+                <div className={`group flex items-center justify-between bg-white border border-amber-100/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                   <div className="flex items-center gap-4">
                     <span className="text-lg font-black text-amber-900/10 handwritten w-6">{idx + 1}</span>
                     <h3 className="font-bold text-amber-900 truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800/30 px-2 py-0.5 bg-amber-50 rounded">{plotline?.name}</span>
+                    {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
                   </div>
                   <ChevronDown size={16} className="text-amber-200 group-hover:text-amber-400" />
                 </div>
               ) : (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                   <header className="flex items-center justify-between mb-4">
-                    <input className="w-full text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-amber-900 handwritten" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
-                    <button onClick={() => onAiRefine(scene.id)} disabled={isAiLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 shadow-sm">
+                    <div className="flex-1 flex items-center gap-4">
+                      <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-amber-900 handwritten flex-1" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                      <button 
+                        onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-white text-amber-800 border-amber-100 hover:bg-amber-50'}`}
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
+                      </button>
+                    </div>
+                    <button onClick={() => onAiRefine(scene.id)} disabled={isAiLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 shadow-sm ml-4">
                       {isAiLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                       <span className="text-[10px] font-bold italic">AI</span>
                     </button>
                   </header>
-                  <textarea className="w-full min-h-[400px] bg-[#fffaf0] rounded-[2rem] border border-amber-100 p-10 text-xl leading-relaxed focus:ring-4 focus:ring-amber-200/10 focus:border-amber-200 resize-none transition-all shadow-inner" value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
+                  <textarea className={`w-full min-h-[400px] rounded-[2rem] border border-amber-100 p-10 text-xl leading-relaxed focus:ring-4 focus:ring-amber-200/10 focus:border-amber-200 resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[#fffaf0]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
                 </div>
               )}
             </article>

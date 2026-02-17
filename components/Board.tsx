@@ -5,13 +5,14 @@ import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize } from 'lucide-
 
 interface BoardProps {
   project: Project;
+  visiblePlotlines: string[];
   onAddScene: (plotlineId: string, position: number) => void;
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
   onBulkAdd: (plotlineId: string) => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateScene, onBulkAdd }) => {
+const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,8 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
 
   // The number of columns is the number of scenes plus one for adding at the end
   const columnCount = Math.max(project.scenes.length + 1, 10); 
+
+  const activePlotlines = project.plotlines.filter(p => visiblePlotlines.includes(p.id));
 
   return (
     <div className="relative h-full w-full overflow-hidden flex flex-col">
@@ -104,7 +107,7 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
         >
           <div className="relative">
             {/* Plotline Ropes */}
-            {project.plotlines.map((plotline) => (
+            {activePlotlines.map((plotline) => (
               <div key={plotline.id} className="relative h-48 flex items-center mb-12">
                 <div 
                   className="absolute inset-x-0 h-0.5 opacity-40 shadow-sm"
@@ -188,6 +191,12 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
                 </div>
               </div>
             ))}
+            {activePlotlines.length === 0 && (
+              <div className="h-96 flex flex-col items-center justify-center text-amber-900/20">
+                <p className="text-xl font-bold">כל קווי העלילה מוסתרים</p>
+                <p className="text-sm">השתמש בתפריט הצדדי כדי להציג אותם</p>
+              </div>
+            )}
           </div>
           
           <div className="mt-16 flex gap-12 px-8 ml-[176px]">

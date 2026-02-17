@@ -28,7 +28,9 @@ import {
   PanelRightOpen,
   ChevronLast,
   ChevronFirst,
-  Users
+  Users,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapNode, CharacterMapConnection } from './types';
 import Board from './components/Board';
@@ -241,6 +243,28 @@ const App: React.FC = () => {
     setVisiblePlotlines(prev => [...prev, newP.id]);
   };
 
+  const renamePlotline = (id: string, name: string) => {
+    updateActiveBook({
+      plotlines: activeBook.plotlines.map(p => p.id === id ? { ...p, name } : p)
+    });
+  };
+
+  const deletePlotline = (id: string) => {
+    if (activeBook.plotlines.length <= 1) return;
+    if (confirm('מחיקת קו עלילה תשאיר את הסצנות שלו יתומות. להמשיך?')) {
+      updateActiveBook({
+        plotlines: activeBook.plotlines.filter(p => p.id !== id),
+        scenes: activeBook.scenes.filter(s => s.plotlineId !== id)
+      });
+    }
+  };
+
+  const togglePlotlineVisibility = (id: string) => {
+    setVisiblePlotlines(prev => 
+      prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]
+    );
+  };
+
   const addScene = (plotlineId: string, atPosition?: number) => {
     const newPos = atPosition !== undefined ? atPosition : activeBook.scenes.length;
     const newScene: Scene = {
@@ -395,7 +419,7 @@ const App: React.FC = () => {
               ))}
             </div>
           ) : (
-            <>
+            <div className="flex-1 overflow-y-auto">
               <div className="p-8 border-b border-amber-50">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">הספרים שלי</h3>
@@ -412,6 +436,39 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              <div className="p-8 border-b border-amber-50">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">קווי עלילה</h3>
+                  <button onClick={addPlotline} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
+                </div>
+                <div className="space-y-2">
+                  {activeBook.plotlines.map(plotline => (
+                    <div key={plotline.id} className="group flex items-center gap-3 p-3 rounded-2xl bg-amber-50/30 border border-transparent hover:border-amber-100 transition-all">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: plotline.color }} />
+                      <input 
+                        value={plotline.name} 
+                        onChange={(e) => renamePlotline(plotline.id, e.target.value)}
+                        className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-amber-900"
+                      />
+                      <button 
+                        onClick={() => togglePlotlineVisibility(plotline.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${visiblePlotlines.includes(plotline.id) ? 'text-amber-800 hover:bg-amber-100' : 'text-amber-300 hover:bg-amber-50'}`}
+                        title={visiblePlotlines.includes(plotline.id) ? "מוצג בעורך" : "מוסתר מהעורך"}
+                      >
+                        {visiblePlotlines.includes(plotline.id) ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <button 
+                        onClick={() => deletePlotline(plotline.id)}
+                        className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em]">ניהול נתונים</h3>
@@ -423,7 +480,7 @@ const App: React.FC = () => {
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </aside>
 
@@ -432,6 +489,7 @@ const App: React.FC = () => {
             <div className="absolute inset-0">
               <Board 
                 project={activeBook} 
+                visiblePlotlines={visiblePlotlines}
                 onAddScene={addScene} 
                 onMoveScene={moveScene} 
                 updateScene={updateScene} 
