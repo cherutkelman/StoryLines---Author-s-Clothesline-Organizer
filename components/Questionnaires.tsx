@@ -5,7 +5,11 @@ import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
   Download, LayoutList, Globe, Home, Eye, PencilLine, ClipboardList,
-  Search
+  Search,
+  Zap,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MessageSquarePlus
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -13,9 +17,13 @@ interface QuestionnairesProps {
   characters: QuestionnaireEntry[];
   places: QuestionnaireEntry[];
   periods: QuestionnaireEntry[];
+  twists: QuestionnaireEntry[];
+  fantasyWorlds: QuestionnaireEntry[];
   onUpdateCharacters: (entries: QuestionnaireEntry[]) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
+  onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
+  onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
 }
 
 const FEMALE_QUESTIONS_CONFIG = [
@@ -26,6 +34,7 @@ const FEMALE_QUESTIONS_CONFIG = [
   { id: "goal", category: "מטרות וקונפליקט", question: "מה היא רוצה להשיג", type: "textarea" },
   { id: "obstacles", category: "מטרות וקונפליקט", question: "מה מפריע לה להשיג את זה", type: "textarea" },
   { id: "abilities", category: "יכולות", question: "אילו יכולות יש לה", type: "textarea" },
+  { id: "special_powers", category: "יכולות", question: "כוחות מיוחדים (פנטזיה)", type: "textarea" },
   { id: "avoidance", category: "גבולות פנימיים", question: "מה היא לא רוצה לעשות", type: "textarea" },
   { id: "difficulties", category: "קשיים", question: "מה הקשיים שלה", type: "textarea" },
   { id: "values", category: "עולם ערכים", question: "ערכים שמובילים אותה", type: "textarea" },
@@ -41,7 +50,14 @@ const FEMALE_QUESTIONS_CONFIG = [
   { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
   { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
   { id: "social_connections", category: "מערכות יחסים", question: "קשרים חברתיים שיש לה", type: "textarea" },
-  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לה", type: "textarea" }
+  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לה", type: "textarea" },
+  { id: "initial_state", category: "קשת התפתחותית", question: "מצב התחלתי", type: "textarea" },
+  { id: "final_state", category: "קשת התפתחותית", question: "מצב סופי", type: "textarea" },
+  { id: "dev_stages", category: "קשת התפתחותית", question: "שלבים בהתפתחות", type: "textarea" },
+  { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
+  { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
+  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות היא מבצעת בעקבות ההתפתחות שלה", type: "textarea" },
+  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" }
 ];
 
 const MALE_QUESTIONS_CONFIG = [
@@ -52,10 +68,11 @@ const MALE_QUESTIONS_CONFIG = [
   { id: "goal", category: "מטרות וקונפליקט", question: "מה הוא רוצה להשיג", type: "textarea" },
   { id: "obstacles", category: "מטרות וקונפליקט", question: "מה מפריע לו להשיג את זה", type: "textarea" },
   { id: "abilities", category: "יכולות", question: "אילו יכולות יש לו", type: "textarea" },
+  { id: "special_powers", category: "יכולות", question: "כוחות מיוחדים (פנטזיה)", type: "textarea" },
   { id: "avoidance", category: "גבולות פנימיים", question: "מה הוא לא רוצה לעשות", type: "textarea" },
   { id: "difficulties", category: "קשיים", question: "מה הקשיים שלו", type: "textarea" },
   { id: "values", category: "עולם ערכים", question: "ערכים שמובילים אותו", type: "textarea" },
-  { id: "hobbies", category: "העדפות", question: "מה הוא אוהב לעשות", type: "textarea" },
+  { id: "hobbies", category: "העדפות", question: "מה הוא אוהבת לעשות", type: "textarea" },
   { id: "favorite_place", category: "העדפות", question: "איפה הוא אוהב להיות", type: "text" },
   { id: "sweet_memories", category: "זיכרונות", question: "מה הזכרונות המתוקים ביותר שלו", type: "textarea" },
   { id: "fear_memories", category: "זיכרונות", question: "מה הזכרונות המפחידים ביותר שלו", type: "textarea" },
@@ -67,7 +84,14 @@ const MALE_QUESTIONS_CONFIG = [
   { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
   { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
   { id: "social_connections", category: "מערכות יחסים", question: "קשרים חברתיים שיש לו", type: "textarea" },
-  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לו", type: "textarea" }
+  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לו", type: "textarea" },
+  { id: "initial_state", category: "קשת התפתחותית", question: "מצב התחלתי", type: "textarea" },
+  { id: "final_state", category: "קשת התפתחותית", question: "מצב סופי", type: "textarea" },
+  { id: "dev_stages", category: "קשת התפתחותית", question: "שלבים בהתפתחות", type: "textarea" },
+  { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
+  { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
+  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות היא מבצעת בעקבות ההתפתחות שלה", type: "textarea" },
+  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" }
 ];
 
 const MACRO_PLACE_QUESTIONS = [
@@ -110,18 +134,47 @@ const PERIOD_QUESTIONS = [
   { id: "communication", category: "חיי יום-יום", question: "איך מתקשרים עם אחרים?", type: "textarea" }
 ];
 
+const TWIST_QUESTIONS = [
+  { id: "pre_state", category: "לפני השינוי", question: "מה היה המצב לפני:", type: "textarea" },
+  { id: "expectations", category: "לפני השינוי", question: "מה חשבו וקיוו הדמויות שיקרה:", type: "textarea" },
+  { id: "ideal_path", category: "המסלול הרצוי", question: "מה היה קורה אילו המצב היה ממשיך כפי הרצוי:", type: "textarea" },
+  { id: "truth_moment", category: "הטוויסט", question: "מה קורה ברגע האמת:", type: "textarea" },
+  { id: "immediate_impact", category: "השלכות", question: "איך זה משפיע באופן מיידי:", type: "textarea" },
+  { id: "long_term_impact", category: "השלכות", question: "איך זה משפיע לטווח הארוך:", type: "textarea" }
+];
+
+const FANTASY_WORLD_QUESTIONS = [
+  { id: "ruling_powers", category: "ניהול העולם", question: "אילו כוחות מנהלים את העולם:", type: "textarea" },
+  { id: "daily_life_simple", category: "חברה וחיי יום-יום", question: "איך מתנהלים חיי היום יום של האדם הפשוט:", type: "textarea" },
+  { id: "character_powers", category: "דמויות וכוחות", question: "אילו כוחות יש לדמויות בספר:", type: "textarea" },
+  { id: "magic_source", category: "קסם ואנרגיה", question: "מאיפה נובעת אנרגיית הקסם:", type: "textarea" },
+  { id: "magic_limits", category: "קסם ואנרגיה", question: "מה מגביל את כוח הקסם:", type: "textarea" },
+  { id: "world_laws", category: "ניהול העולם", question: "אילו חוקים יש בעולם הזה:", type: "textarea" },
+  { id: "magic_nature", category: "קסם ואנרגיה", question: "טבע ייחודי הנובע מהקסם:", type: "textarea" },
+  { id: "good_guys", category: "קונפליקט", question: "מי הטובים:", type: "textarea" },
+  { id: "bad_guys", category: "קונפליקט", question: "מי הרעים:", type: "textarea" },
+  { id: "conflict_expression", category: "קונפליקט", question: "איך מתבטאת הלחימה ביניהם:", type: "textarea" },
+  { id: "hero_journey", category: "מסע וסוף", question: "איזה מסע עוברים הגיבורים. פיזי, נפשי, התפתחותי:", type: "textarea" },
+  { id: "good_ending", category: "מסע וסוף", question: "מהו הסוף הטוב:", type: "textarea" },
+  { id: "bad_ending", category: "מסע וסוף", question: "מהו הסוף הרע:", type: "textarea" },
+  { id: "other_creatures", category: "חברה וחיי יום-יום", question: "אילו יצורים נוספים קיימים בעולם:", type: "textarea" }
+];
+
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
-  characters, places, periods, 
-  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods 
+  characters, places, periods, twists, fantasyWorlds,
+  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds
 }) => {
-  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods'>('characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds'>('characters');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
+  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
   const [mode, setMode] = useState<'edit' | 'view'>('view');
+  
+  const [newQuestionLabel, setNewQuestionLabel] = useState('');
 
-  const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : periods;
-  const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : onUpdatePeriods;
+  const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : fantasyWorlds;
+  const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : onUpdateFantasyWorlds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
   
   const currentGender = selectedEntry?.data.gender || 'female';
@@ -131,10 +184,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     ? (currentGender === 'male' ? MALE_QUESTIONS_CONFIG : FEMALE_QUESTIONS_CONFIG)
     : activeTab === 'places' 
       ? (currentPlaceType === 'macro' ? MACRO_PLACE_QUESTIONS : MICRO_PLACE_QUESTIONS)
-      : PERIOD_QUESTIONS;
+      : activeTab === 'periods' ? PERIOD_QUESTIONS : activeTab === 'twists' ? TWIST_QUESTIONS : FANTASY_WORLD_QUESTIONS;
 
   const categories = Array.from(new Set(questionsConfig.map(q => q.category)));
-  const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : Clock;
+  if (selectedEntry?.customFields && selectedEntry.customFields.length > 0) {
+    categories.push("שאלות נוספות");
+  }
+
+  const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : Wand2;
 
   const filteredQuestions = questionsConfig.filter(q => {
     const matchesCategory = activeCategory ? q.category === activeCategory : true;
@@ -142,15 +199,22 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     return matchesCategory && matchesSearch;
   });
 
+  const customQuestions = (selectedEntry?.customFields || []).filter(cf => {
+    const matchesCategory = activeCategory ? activeCategory === "שאלות נוספות" : true;
+    const matchesSearch = cf.label.toLowerCase().includes(questionSearchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
   const addEntry = () => {
     const newEntry: QuestionnaireEntry = {
       id: `q-${Date.now()}`,
-      name: activeTab === 'characters' ? 'דמות חדשה' : activeTab === 'places' ? 'מקום חדש' : 'תקופה חדשה',
+      name: activeTab === 'characters' ? 'דמות חדשה' : activeTab === 'places' ? 'מקום חדש' : activeTab === 'periods' ? 'תקופה חדשה' : activeTab === 'twists' ? 'טוויסט חדש' : 'עולם פנטזיה חדש',
       data: activeTab === 'characters' 
         ? { gender: 'female' } 
         : activeTab === 'places' 
           ? { placeType: 'macro' } 
-          : {}
+          : {},
+      customFields: []
     };
     updateFn([...entries, newEntry]);
     setSelectedEntryId(newEntry.id);
@@ -164,16 +228,40 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateFn(entries.map(e => e.id === selectedEntryId ? { ...e, ...updates } : e));
   };
 
+  const addCustomQuestion = () => {
+    if (!newQuestionLabel.trim() || !selectedEntry) return;
+    const newFieldId = `custom-${Date.now()}`;
+    const updatedCustomFields = [...(selectedEntry.customFields || []), { id: newFieldId, label: newQuestionLabel.trim() }];
+    updateEntry({ customFields: updatedCustomFields });
+    setNewQuestionLabel('');
+  };
+
+  const removeCustomQuestion = (fieldId: string) => {
+    if (!selectedEntry) return;
+    const updatedCustomFields = (selectedEntry.customFields || []).filter(cf => cf.id !== fieldId);
+    const updatedData = { ...selectedEntry.data };
+    delete updatedData[fieldId];
+    updateEntry({ customFields: updatedCustomFields, data: updatedData });
+  };
+
   const exportCurrentEntry = () => {
     if (!selectedEntry) return;
     let text = `שאלון: ${selectedEntry.name}\n`;
-    text += `סוג: ${activeTab === 'characters' ? (currentGender === 'male' ? 'זכר' : 'נקבה') : activeTab === 'places' ? (currentPlaceType === 'macro' ? 'מיקום גאוגרפי' : 'מקום ספציפי') : 'תקופה'}\n`;
+    text += `סוג: ${activeTab === 'characters' ? (currentGender === 'male' ? 'זכר' : 'נקבה') : activeTab === 'places' ? (currentPlaceType === 'macro' ? 'מיקום גאוגרפי' : 'מקום ספציפי') : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם פנטזיה'}\n`;
     text += `-----------------------------------\n\n`;
     
     questionsConfig.forEach(q => {
       text += `[${q.category}] ${q.question}\n`;
       text += `${selectedEntry.data[q.id] || '---'}\n\n`;
     });
+
+    if (selectedEntry.customFields && selectedEntry.customFields.length > 0) {
+        text += `\nשאלות נוספות:\n-----------------------------------\n`;
+        selectedEntry.customFields.forEach(cf => {
+            text += `${cf.label}\n`;
+            text += `${selectedEntry.data[cf.id] || '---'}\n\n`;
+        });
+    }
 
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -186,16 +274,18 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   return (
     <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto overflow-hidden">
       <div className="flex justify-center flex-shrink-0">
-        <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-amber-100">
+        <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-amber-100 overflow-x-auto max-w-full">
           {[
             { id: 'characters', label: 'דמויות', icon: User },
             { id: 'places', label: 'מקומות', icon: MapPin },
             { id: 'periods', label: 'תקופות', icon: Clock },
+            { id: 'twists', label: 'טוויסטים', icon: Zap },
+            { id: 'fantasyWorlds', label: 'עולם פנטזיה', icon: Wand2 },
           ].map(tab => (
             <button 
               key={tab.id}
               onClick={() => { setActiveTab(tab.id as any); setSelectedEntryId(null); setActiveCategory(null); setQuestionSearchQuery(''); setMode('view'); }}
-              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all ${activeTab === tab.id ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
+              className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
             >
               <tab.icon size={18} />
               <span>{tab.label}</span>
@@ -211,7 +301,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
             className="flex items-center justify-center gap-2 p-4 bg-white border-2 border-dashed border-amber-200 rounded-2xl text-amber-600 font-bold hover:bg-amber-50 hover:border-amber-400 transition-all shadow-sm"
           >
             <Plus size={20} />
-            <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : 'תקופה'}</span>
+            <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם'}</span>
           </button>
           
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
@@ -240,9 +330,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         </div>
 
-        {selectedEntry && mode === 'edit' && (
+        {selectedEntry && mode === 'edit' && isCategoriesVisible && (
           <div className="w-56 flex flex-col gap-2 flex-shrink-0 animate-in slide-in-from-right-4 duration-300">
-             <div className="p-2 text-[10px] font-black text-amber-900/40 uppercase tracking-widest mb-2 px-4">קטגוריות שאלון</div>
+             <div className="p-2 text-[10px] font-black text-amber-900/40 uppercase tracking-widest mb-2 px-4 flex items-center justify-between">
+                <span>קטגוריות שאלון</span>
+                <button onClick={() => setIsCategoriesVisible(false)} className="text-amber-800/40 hover:text-amber-800"><X size={14} /></button>
+             </div>
              <button 
                 onClick={() => setActiveCategory(null)}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all ${activeCategory === null ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-amber-800/60 hover:bg-amber-50'}`}
@@ -262,12 +355,21 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         )}
 
-        <div className="flex-1 bg-white rounded-[2.5rem] shadow-2xl border border-amber-100 overflow-hidden flex flex-col min-w-0">
+        <div className="flex-1 bg-white rounded-[2.5rem] shadow-2xl border border-amber-100 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
           {selectedEntry ? (
             <>
               <div className="p-8 border-b border-amber-50 bg-amber-50/20 flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
+                     {!isCategoriesVisible && mode === 'edit' && (
+                       <button 
+                        onClick={() => setIsCategoriesVisible(true)}
+                        className="p-2 text-amber-800 hover:bg-white rounded-xl transition-all shadow-sm border border-amber-100"
+                        title="הצג קטגוריות"
+                       >
+                         <LayoutList size={20} />
+                       </button>
+                     )}
                      <div className="bg-white p-3 rounded-2xl shadow-sm border border-amber-100">
                         <Icon size={24} className="text-amber-800" />
                      </div>
@@ -346,7 +448,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         )}
                     </div>
                     
-                    {/* Search Bar for Questions */}
                     <div className="relative group">
                       <Search size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-amber-400 group-focus-within:text-amber-700 transition-colors" />
                       <input 
@@ -363,49 +464,92 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
               <div className="flex-1 overflow-y-auto p-10 space-y-10 scroll-smooth">
                 {mode === 'edit' ? (
-                  // Edit Layout
-                  filteredQuestions.length > 0 ? (
-                    filteredQuestions.map(q => (
-                      <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">{q.category}</span>
-                            <div className="h-px w-8 bg-amber-100" />
-                            <label className="text-sm font-bold text-amber-900">{q.question}</label>
+                  <>
+                    {filteredQuestions.length > 0 ? (
+                      filteredQuestions.map(q => (
+                        <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">{q.category}</span>
+                              <div className="h-px w-8 bg-amber-100" />
+                              <label className="text-sm font-bold text-amber-900">{q.question}</label>
+                            </div>
                           </div>
+                          {q.type === 'textarea' ? (
+                            <textarea 
+                              value={selectedEntry.data[q.id] || ''}
+                              onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
+                              className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                              placeholder="כתוב כאן..."
+                            />
+                          ) : (
+                            <input 
+                              type="text"
+                              value={selectedEntry.data[q.id] || ''}
+                              onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
+                              className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none shadow-inner"
+                              placeholder="כתוב כאן..."
+                            />
+                          )}
                         </div>
-                        {q.type === 'textarea' ? (
+                      ))
+                    ) : null}
+
+                    {customQuestions.length > 0 ? (
+                      customQuestions.map(cf => (
+                        <div key={cf.id} className="group space-y-3 animate-in fade-in duration-500 relative">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">שאלות נוספות</span>
+                              <div className="h-px w-8 bg-amber-100" />
+                              <label className="text-sm font-bold text-amber-900">{cf.label}</label>
+                            </div>
+                            <button onClick={() => removeCustomQuestion(cf.id)} className="text-red-200 hover:text-red-500 transition-colors p-1" title="הסר שאלה"><X size={14}/></button>
+                          </div>
                           <textarea 
-                            value={selectedEntry.data[q.id] || ''}
-                            onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
+                            value={selectedEntry.data[cf.id] || ''}
+                            onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [cf.id]: e.target.value } })}
                             className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
-                            placeholder="כתוב כאן..."
+                            placeholder="תשובה לשאלה המותאמת..."
                           />
-                        ) : (
-                          <input 
-                            type="text"
-                            value={selectedEntry.data[q.id] || ''}
-                            onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                            className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none shadow-inner"
-                            placeholder="כתוב כאן..."
-                          />
-                        )}
+                        </div>
+                      ))
+                    ) : null}
+
+                    {/* Add Custom Question Form */}
+                    <div className="pt-10 border-t border-amber-50 mt-10">
+                      <div className="text-xs font-black text-amber-900/40 uppercase tracking-widest mb-4">הוספת שאלה מותאמת אישית</div>
+                      <div className="flex gap-3">
+                        <input 
+                          type="text"
+                          value={newQuestionLabel}
+                          onChange={(e) => setNewQuestionLabel(e.target.value)}
+                          placeholder="מה ברצונך לשאול?"
+                          className="flex-1 bg-white border-2 border-amber-100 rounded-2xl px-5 py-3 text-sm focus:border-amber-300 outline-none"
+                        />
+                        <button 
+                          onClick={addCustomQuestion}
+                          className="bg-amber-800 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-900 transition-all shadow-md"
+                        >
+                          <MessageSquarePlus size={18} />
+                          <span>הוסף</span>
+                        </button>
                       </div>
-                    ))
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-amber-200 py-20">
-                      <Search size={40} className="mb-4 opacity-30" />
-                      <p className="text-sm font-bold">לא נמצאו שאלות תואמות לחיפוש</p>
                     </div>
-                  )
+                  </>
                 ) : (
-                  // View Layout (Identity Card)
                   <div className="max-w-2xl mx-auto space-y-12 py-8">
                      {categories.map(cat => {
-                        const catQuestions = questionsConfig.filter(q => q.category === cat);
-                        const hasContent = catQuestions.some(q => selectedEntry.data[q.id]);
+                        let contentToRender: any[] = [];
+
+                        if (cat === "שאלות נוספות") {
+                            contentToRender = (selectedEntry.customFields || []).filter(cf => selectedEntry.data[cf.id]);
+                        } else {
+                            const catQuestions = questionsConfig.filter(q => q.category === cat);
+                            contentToRender = catQuestions.filter(q => selectedEntry.data[q.id]);
+                        }
                         
-                        if (!hasContent) return null;
+                        if (contentToRender.length === 0) return null;
 
                         return (
                           <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -414,12 +558,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <div className="flex-1 h-px bg-amber-100" />
                              </div>
                              <div className="grid gap-6">
-                                {catQuestions.map(q => {
-                                   const val = selectedEntry.data[q.id];
-                                   if (!val) return null;
+                                {contentToRender.map(item => {
+                                   const isCustom = 'label' in item;
+                                   const id = item.id;
+                                   const question = isCustom ? item.label : item.question;
+                                   const val = selectedEntry.data[id];
                                    return (
-                                     <div key={q.id} className="space-y-1.5 border-r-2 border-amber-50 pr-4">
-                                        <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{q.question}</div>
+                                     <div key={id} className="space-y-1.5 border-r-2 border-amber-50 pr-4">
+                                        <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{question}</div>
                                         <div className="text-amber-900 leading-relaxed whitespace-pre-wrap">{val}</div>
                                      </div>
                                    );
@@ -428,8 +574,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </section>
                         );
                      })}
-                     
-                     {/* End of Card Footer */}
                      <div className="pt-12 flex flex-col items-center gap-4 opacity-30 border-t border-amber-50">
                         <ClipboardList size={32} className="text-amber-800" />
                         <div className="text-[10px] font-black uppercase tracking-[0.4em]">סוף תעודת זהות</div>
@@ -445,7 +589,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 <Icon size={80} className="opacity-20" />
               </div>
               <h3 className="text-2xl font-bold text-amber-900/40 handwritten text-4xl mb-3">
-                {activeTab === 'places' ? 'ניהול מקומות' : activeTab === 'periods' ? 'ניהול תקופות' : 'שאלון בניית דמות'}
+                {activeTab === 'places' ? 'ניהול מקומות' : activeTab === 'periods' ? 'ניהול תקופות' : activeTab === 'twists' ? 'ניהול טוויסטים' : activeTab === 'fantasyWorlds' ? 'ניהול עולמות פנטזיה' : 'שאלון בניית דמות'}
               </h3>
               <p className="max-w-xs text-sm text-amber-800/30 leading-relaxed">
                 בחר פריט מהרשימה או צור חדש כדי להתחיל.

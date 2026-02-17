@@ -19,7 +19,8 @@ import {
   Search,
   ArrowRight,
   X,
-  MapPin
+  MapPin,
+  Plus
 } from 'lucide-react';
 
 interface EditorProps {
@@ -101,6 +102,14 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           <div className="w-px h-6 bg-white/10 mx-1" />
 
           <div className="flex gap-2">
+            <button 
+              onClick={onOpenBulkAdd}
+              className="flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-900 rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm"
+              title="הוספת סצנות חדשות"
+            >
+              <Plus size={14} />
+              <span>סצנה חדשה</span>
+            </button>
             <button onClick={() => setBridgeType('character')} className="flex items-center gap-2 px-4 py-1.5 bg-amber-100 text-amber-900 rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm">
               <UserCircle2 size={14} />
               <span>שלוף דמות</span>

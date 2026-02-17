@@ -35,7 +35,7 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
   const handleResetZoom = () => setZoomLevel(1);
 
   // The number of columns is the number of scenes plus one for adding at the end
-  const columnCount = Math.max(project.scenes.length + 1, 10); // Show at least 10 slots
+  const columnCount = Math.max(project.scenes.length + 1, 10); 
 
   return (
     <div className="relative h-full w-full overflow-hidden flex flex-col">
@@ -78,6 +78,19 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
         </button>
       </div>
 
+      {/* Floating Action Button for Bulk Add */}
+      <div className="absolute bottom-10 right-10 z-40">
+        <button 
+          onClick={() => onBulkAdd(project.plotlines[0]?.id || '')}
+          className="flex items-center gap-3 px-8 py-4 bg-amber-800 text-white rounded-2xl shadow-2xl hover:bg-amber-900 hover:scale-105 transition-all group"
+        >
+          <div className="bg-white/20 p-1.5 rounded-lg group-hover:rotate-12 transition-transform">
+            <CopyPlus size={20} />
+          </div>
+          <span className="font-bold">הוספה מהירה</span>
+        </button>
+      </div>
+
       {/* Board Scrollable Area */}
       <div className="flex-1 overflow-auto bg-[#fdf6e3] cursor-grab active:cursor-grabbing">
         <div 
@@ -93,7 +106,6 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
             {/* Plotline Ropes */}
             {project.plotlines.map((plotline) => (
               <div key={plotline.id} className="relative h-48 flex items-center mb-12">
-                {/* The actual rope */}
                 <div 
                   className="absolute inset-x-0 h-0.5 opacity-40 shadow-sm"
                   style={{ 
@@ -104,7 +116,6 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
                   }}
                 />
                 
-                {/* Plotline Label */}
                 <div className="absolute -right-44 w-40 text-left pr-4 group/label">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-black uppercase tracking-widest text-amber-900/60 block truncate">
@@ -121,7 +132,6 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
                   <div className="h-1.5 w-full mt-1 rounded-full shadow-inner" style={{ backgroundColor: plotline.color }} />
                 </div>
 
-                {/* Grid for scenes */}
                 <div className="flex items-center gap-12 px-8 w-full">
                   {Array.from({ length: columnCount }).map((_, colIdx) => {
                     const sceneInThisSlot = project.scenes.find(s => s.position === colIdx && s.plotlineId === plotline.id);
@@ -140,13 +150,11 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
                             className={`w-40 h-40 bg-white shadow-xl border-t-8 p-4 rounded-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
                             style={{ borderTopColor: plotline.color }}
                           >
-                            {/* Clothespin */}
                             <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[#e5dcc3] border border-amber-200/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
                                <div className="w-1 h-1 bg-amber-900/20 rounded-full" />
                                <div className="w-2 h-4 bg-amber-900/5 rounded-full" />
                             </div>
                             
-                            {/* Completion Checkmark */}
                             {sceneInThisSlot.isCompleted && (
                               <div className="absolute -top-2 -right-2 text-green-500 bg-white rounded-full shadow-md p-0.5 z-30">
                                 <CheckCircle2 size={18} />
@@ -182,7 +190,6 @@ const Board: React.FC<BoardProps> = ({ project, onAddScene, onMoveScene, updateS
             ))}
           </div>
           
-          {/* Visual Marker for "Chronological Order" */}
           <div className="mt-16 flex gap-12 px-8 ml-[176px]">
              {Array.from({ length: columnCount }).map((_, i) => (
                <div key={i} className="w-44 text-center text-xs font-black text-amber-900/10 uppercase tracking-widest italic">

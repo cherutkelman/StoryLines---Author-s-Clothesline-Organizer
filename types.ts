@@ -18,6 +18,22 @@ export interface QuestionnaireEntry {
   id: string;
   name: string;
   data: Record<string, string>; // Questions and their answers
+  customFields?: { id: string; label: string }[]; // User-defined questions
+}
+
+export interface CharacterMapNode {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  x: number;
+  y: number;
+}
+
+export interface CharacterMapConnection {
+  id: string;
+  fromId: string;
+  toId: string;
+  description: string;
 }
 
 export interface Project {
@@ -26,6 +42,10 @@ export interface Project {
   characters?: QuestionnaireEntry[];
   places?: QuestionnaireEntry[];
   periods?: QuestionnaireEntry[];
+  twists?: QuestionnaireEntry[];
+  fantasyWorlds?: QuestionnaireEntry[];
+  characterMapNodes?: CharacterMapNode[];
+  characterMapConnections?: CharacterMapConnection[];
 }
 
 export interface Book extends Project {

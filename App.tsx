@@ -12,9 +12,9 @@ import {
   MonitorSmartphone,
   Save,
   FileJson,
-  // Renamed to avoid collision with GoogleGenAI.Type
   Type as LucideType,
   ChevronRight,
+  ChevronLeft,
   Library,
   Book as BookIcon,
   Pencil,
@@ -23,15 +23,21 @@ import {
   FileText,
   Sparkles,
   Loader2,
-  ListChecks
+  ListChecks,
+  PanelRightClose,
+  PanelRightOpen,
+  ChevronLast,
+  ChevronFirst,
+  Users
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapNode, CharacterMapConnection } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
+import CharacterMap from './components/CharacterMap';
 import { GoogleGenAI, Type } from "@google/genai";
 
-const STORAGE_KEY = 'storylines_library_v2'; // Bumped version for new schema
+const STORAGE_KEY = 'storylines_library_v2';
 
 const DEFAULT_PROJECT_DATA = {
   plotlines: [
@@ -45,7 +51,11 @@ const DEFAULT_PROJECT_DATA = {
   ],
   characters: [],
   places: [],
-  periods: []
+  periods: [],
+  twists: [],
+  fantasyWorlds: [],
+  characterMapNodes: [],
+  characterMapConnections: []
 };
 
 const createNewBook = (title: string): Book => ({
@@ -69,10 +79,10 @@ const App: React.FC = () => {
   });
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0].id);
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'characterMap'>('board');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   
   // Modals state
@@ -92,7 +102,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setVisiblePlotlines(activeBook.plotlines.map(p => p.id));
-    setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
+    if (!bulkPlotlineId) setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
   }, [activeBook.id]);
 
   useEffect(() => {
@@ -100,24 +110,29 @@ const App: React.FC = () => {
     setLastSaved(new Date());
   }, [books]);
 
-  useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    });
-  }, []);
-
-  const handleInstall = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null);
-    }
-  };
-
   const updateActiveBook = (updates: Partial<Book>) => {
     setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, ...updates, lastModified: Date.now() } : b));
+  };
+
+  const handleBulkAdd = () => {
+    const titles = bulkTitles.split('\n').map(t => t.trim()).filter(t => t !== '');
+    if (titles.length === 0) return;
+
+    const startPos = activeBook.scenes.length;
+    const newScenes: Scene[] = titles.map((title, idx) => ({
+      id: `s-bulk-${Date.now()}-${idx}`,
+      plotlineId: bulkPlotlineId,
+      title,
+      content: '',
+      position: startPos + idx,
+      isCompleted: false
+    }));
+
+    updateActiveBook({
+      scenes: [...activeBook.scenes, ...newScenes].map((s, idx) => ({ ...s, position: idx }))
+    });
+    setBulkTitles('');
+    setIsBulkAddOpen(false);
   };
 
   const handleAiRefine = async (sceneId: string) => {
@@ -149,17 +164,16 @@ const App: React.FC = () => {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Split the following long text into logical scenes. For each scene, provide a short descriptive title and the relevant text content. 
-        Text: ${importLongText.substring(0, 15000)}`, // Limit to avoid token overflow
+        Text: ${importLongText.substring(0, 15000)}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
-            // Using Type from @google/genai directly as per guidelines
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                title: { type: Type.STRING, description: "Descriptive title for the scene" },
-                content: { type: Type.STRING, description: "The content of the scene" }
+                title: { type: Type.STRING },
+                content: { type: Type.STRING }
               },
               required: ["title", "content"]
             }
@@ -187,7 +201,6 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("AI Split failed", error);
-      alert("נכשלה חלוקת הטקסט באמצעות AI. נסה חלוקה ידנית.");
     } finally {
       setIsSplittingAi(false);
     }
@@ -226,21 +239,6 @@ const App: React.FC = () => {
     };
     updateActiveBook({ plotlines: [...activeBook.plotlines, newP] });
     setVisiblePlotlines(prev => [...prev, newP.id]);
-  };
-
-  const updatePlotlineName = (id: string, name: string) => {
-    updateActiveBook({
-      plotlines: activeBook.plotlines.map(p => p.id === id ? { ...p, name } : p)
-    });
-  };
-
-  const deletePlotline = (id: string) => {
-    if (activeBook.plotlines.length <= 1) return;
-    if (!confirm('האם אתה בטוח שברצונך למחוק את קו העלילה וכל הסצנות שלו?')) return;
-    updateActiveBook({
-      plotlines: activeBook.plotlines.filter(p => p.id !== id),
-      scenes: activeBook.scenes.filter(s => s.plotlineId !== id)
-    });
   };
 
   const addScene = (plotlineId: string, atPosition?: number) => {
@@ -305,58 +303,17 @@ const App: React.FC = () => {
     a.click();
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const importDataBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json.plotlines && json.scenes) {
-          const newBook = {
-            ...createNewBook(json.title || 'ספר מיובא'),
-            ...json,
-            id: `book-${Date.now()}`
-          };
-          setBooks(prev => [...prev, newBook]);
-          setActiveBookId(newBook.id);
-        } else {
-          alert('קובץ לא תקין: מבנה הנתונים אינו תואם לפורמט הנדרש.');
-        }
-      } catch (err) {
-        alert('שגיאה בקריאת הקובץ: ' + err);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; 
-  };
-
   const addNewBookToLibrary = () => {
     const newBook = createNewBook(`ספר חדש ${books.length + 1}`);
     setBooks(prev => [...prev, newBook]);
     setActiveBookId(newBook.id);
   };
 
-  const deleteBook = (id: string) => {
-    if (books.length <= 1) return;
-    if (!confirm('האם אתה בטוח שברצונך למחוק את כל הספר? פעולה זו אינה הפיכה.')) return;
-    const newBooks = books.filter(b => b.id !== id);
-    setBooks(newBooks);
-    if (activeBookId === id) {
-      setActiveBookId(newBooks[0].id);
-    }
-  };
-
   const renameBook = (id: string, title: string) => {
     setBooks(prev => prev.map(b => b.id === id ? { ...b, title } : b));
   };
 
-  const updateEntries = (category: 'characters' | 'places' | 'periods', entries: QuestionnaireEntry[]) => {
+  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapNodes' | 'characterMapConnections', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
@@ -365,6 +322,13 @@ const App: React.FC = () => {
       <header className="flex-shrink-0 bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between shadow-sm z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-2 text-amber-800 hover:bg-amber-50 rounded-lg transition-colors lg:flex hidden"
+              title={isSidebarCollapsed ? "פתח תפריט" : "סגור תפריט"}
+            >
+              {isSidebarCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
+            </button>
             <div className="bg-amber-800 p-2 rounded-lg text-white transition-transform hover:scale-110">
               <BookOpen size={20} />
             </div>
@@ -388,6 +352,13 @@ const App: React.FC = () => {
             <span className="hidden sm:inline">עורך טקסט</span>
           </button>
           <button 
+            onClick={() => setActiveView('characterMap')} 
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'characterMap' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+          >
+            <Users size={18} />
+            <span className="hidden sm:inline">מפת דמויות</span>
+          </button>
+          <button 
             onClick={() => setActiveView('questionnaires')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
@@ -405,45 +376,82 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-80 border-l border-amber-100 bg-white overflow-y-auto hidden lg:flex flex-col shadow-xl z-20">
-          <div className="p-8 border-b border-amber-50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">הספרים שלי</h3>
-              <button onClick={addNewBookToLibrary} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
-            </div>
-            <div className="space-y-2">
+        <aside 
+          className={`border-l border-amber-100 bg-white overflow-hidden hidden lg:flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-80'}`}
+        >
+          {isSidebarCollapsed ? (
+            <div className="flex flex-col items-center py-8 gap-4">
+              <button onClick={addNewBookToLibrary} className="p-3 text-amber-600 hover:bg-amber-50 rounded-xl"><Plus size={20} /></button>
+              <div className="h-px w-8 bg-amber-50" />
               {books.map(book => (
-                <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
-                  <div className="flex items-center gap-3">
-                    <BookIcon size={18} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-200'} />
-                    <input value={book.title} onClick={(e) => e.stopPropagation()} onChange={(e) => renameBook(book.id, e.target.value)} className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} />
-                  </div>
-                </div>
+                <button 
+                  key={book.id} 
+                  onClick={() => setActiveBookId(book.id)}
+                  className={`p-3 rounded-xl transition-all ${activeBookId === book.id ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+                  title={book.title}
+                >
+                  <BookIcon size={20} />
+                </button>
               ))}
             </div>
-          </div>
-          <div className="p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em]">ניהול נתונים</h3>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button onClick={exportDataBackup} className="flex items-center gap-3 px-4 py-3 bg-white border border-amber-200 text-amber-800 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm">
-                <FileJson size={16} className="text-amber-500" />
-                <span>גיבוי מלא</span>
-              </button>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="p-8 border-b border-amber-50">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">הספרים שלי</h3>
+                  <button onClick={addNewBookToLibrary} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
+                </div>
+                <div className="space-y-2">
+                  {books.map(book => (
+                    <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
+                      <div className="flex items-center gap-3">
+                        <BookIcon size={18} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-200'} />
+                        <input value={book.title} onClick={(e) => e.stopPropagation()} onChange={(e) => renameBook(book.id, e.target.value)} className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em]">ניהול נתונים</h3>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button onClick={exportDataBackup} className="flex items-center gap-3 px-4 py-3 bg-white border border-amber-200 text-amber-800 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm">
+                    <FileJson size={16} className="text-amber-500" />
+                    <span>גיבוי מלא</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </aside>
 
         <main className="flex-1 relative overflow-hidden bg-[#fdf6e3]">
           {activeView === 'board' && (
             <div className="absolute inset-0">
-              <Board project={activeBook} onAddScene={addScene} onMoveScene={moveScene} updateScene={updateScene} onBulkAdd={() => setIsBulkAddOpen(true)} />
+              <Board 
+                project={activeBook} 
+                onAddScene={addScene} 
+                onMoveScene={moveScene} 
+                updateScene={updateScene} 
+                onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
+              />
             </div>
           )}
           {activeView === 'editor' && (
             <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
               <Editor project={activeBook} visiblePlotlines={visiblePlotlines} onUpdateScene={updateScene} onAiRefine={handleAiRefine} isAiLoading={isAiLoading} onOpenBulkAdd={() => setIsBulkAddOpen(true)} />
+            </div>
+          )}
+          {activeView === 'characterMap' && (
+            <div className="absolute inset-0 overflow-hidden">
+               <CharacterMap 
+                  nodes={activeBook.characterMapNodes || []}
+                  connections={activeBook.characterMapConnections || []}
+                  onUpdateNodes={(nodes) => updateEntries('characterMapNodes', nodes)}
+                  onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
+               />
             </div>
           )}
           {activeView === 'questionnaires' && (
@@ -452,33 +460,83 @@ const App: React.FC = () => {
                 characters={activeBook.characters || []}
                 places={activeBook.places || []}
                 periods={activeBook.periods || []}
+                twists={activeBook.twists || []}
+                fantasyWorlds={activeBook.fantasyWorlds || []}
                 onUpdateCharacters={(e) => updateEntries('characters', e)}
                 onUpdatePlaces={(e) => updateEntries('places', e)}
                 onUpdatePeriods={(e) => updateEntries('periods', e)}
+                onUpdateTwists={(e) => updateEntries('twists', e)}
+                onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
               />
             </div>
           )}
         </main>
       </div>
 
+      {isBulkAddOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
+          <div className="bg-[#fdf6e3] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold handwritten text-3xl">הוספה מרובה של סצנות</h2>
+                <button onClick={() => setIsBulkAddOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
+             </div>
+             
+             <div className="space-y-4">
+                <div>
+                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">בחר קו עלילה</label>
+                   <select 
+                      value={bulkPlotlineId} 
+                      onChange={(e) => setBulkPlotlineId(e.target.value)}
+                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                   >
+                      {activeBook.plotlines.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                   </select>
+                </div>
+                
+                <div>
+                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">כותרות הסצנות (אחת בכל שורה)</label>
+                   <textarea 
+                      value={bulkTitles} 
+                      onChange={(e) => setBulkTitles(e.target.value)} 
+                      className="w-full h-48 bg-white border border-amber-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none resize-none"
+                      placeholder="התחלה&#10;המשבר&#10;הפתרון..."
+                   />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                   <button onClick={handleBulkAdd} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2">
+                      <Plus size={20} />
+                      <span>הוסף סצנות</span>
+                   </button>
+                   <button onClick={() => setIsImportTextOpen(true)} className="px-6 bg-amber-100 text-amber-800 font-bold py-4 rounded-2xl hover:bg-amber-200 transition-all">
+                      ייבוא טקסט
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
       {isImportTextOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
-          <div className="bg-[#fdf6e3] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-amber-200 p-8">
+          <div className="bg-[#fdf6e3] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
              <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold handwritten text-3xl">ייבוא טקסט ארוך</h2>
-                <button onClick={() => setIsImportTextOpen(false)} className="text-amber-300 hover:text-amber-800"><X size={28} /></button>
+                <button onClick={() => setIsImportTextOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
              </div>
              <textarea 
                value={importLongText} 
                onChange={(e) => setImportLongText(e.target.value)} 
-               className="w-full h-80 bg-white border-2 border-amber-100 rounded-2xl p-6 mb-6"
-               placeholder="הדבק טקסט..."
+               className="w-full h-80 bg-white border border-amber-100 rounded-2xl p-6 mb-6 focus:ring-4 focus:ring-amber-200/20 outline-none resize-none"
+               placeholder="הדבק טקסט ארוך כאן..."
              />
              <div className="flex gap-4">
-                <button onClick={handleAiTextSplit} className="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
+                <button onClick={handleAiTextSplit} className="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700">
                    {isSplittingAi ? <Loader2 className="animate-spin" /> : <Sparkles />} פירוק AI
                 </button>
-                <button onClick={handleManualSplit} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl">פירוק ידני</button>
+                <button onClick={handleManualSplit} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900">פירוק ידני</button>
              </div>
           </div>
         </div>
