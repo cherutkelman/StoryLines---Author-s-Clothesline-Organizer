@@ -57,7 +57,14 @@ const FEMALE_QUESTIONS_CONFIG = [
   { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
   { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
   { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות היא מבצעת בעקבות ההתפתחות שלה", type: "textarea" },
-  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" }
+  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" },
+  { id: "central_dilemma", category: "קשת התפתחותית", question: "מהי הדילמה המרכזית של הדמות בסיפור?", type: "textarea" },
+  { id: "choice_between", category: "קשת התפתחותית", question: "בין אילו שני ערכים/פחדים היא נדרשת לבחור?", type: "textarea" },
+  { id: "first_choice_revelation", category: "קשת התפתחותית", question: "מה הבחירה הראשונה שלה חושפת עליה?", type: "textarea" },
+  { id: "choice_price", category: "קשת התפתחותית", question: "איזה מחיר היא משלמת בעקבות הבחירה?", type: "textarea" },
+  { id: "belief_impact", category: "קשת התפתחותית", question: "האם המחיר מערער אמונה פנימית שלה או מחזק אותה?", type: "textarea" },
+  { id: "similar_dilemma_later", category: "קשת התפתחותית", question: "האם בהמשך היא ניצבת בפני דילמה דומה?", type: "textarea" },
+  { id: "later_choice_diff", category: "קשת התפתחותית", question: "האם הבחירה המאוחרת שלה שונה מהראשונה?", type: "textarea" }
 ];
 
 const MALE_QUESTIONS_CONFIG = [
@@ -90,8 +97,15 @@ const MALE_QUESTIONS_CONFIG = [
   { id: "dev_stages", category: "קשת התפתחותית", question: "שלבים בהתפתחות", type: "textarea" },
   { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
   { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
-  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות היא מבצעת בעקבות ההתפתחות שלה", type: "textarea" },
-  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" }
+  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות הוא מבצע בעקבות ההתפתחות שלו", type: "textarea" },
+  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייו, רגשותיו, ובחירותיו", type: "textarea" },
+  { id: "central_dilemma", category: "קשת התפתחותית", question: "מהי הדילמה המרכזית של הדמות בסיפור?", type: "textarea" },
+  { id: "choice_between", category: "קשת התפתחותית", question: "בין אילו שני ערכים/פחדים הוא נדרש לבחור?", type: "textarea" },
+  { id: "first_choice_revelation", category: "קשת התפתחותית", question: "מה הבחירה הראשונה שלו חושפת עליו?", type: "textarea" },
+  { id: "choice_price", category: "קשת התפתחותית", question: "איזה מחיר הוא משלם בעקבות הבחירה?", type: "textarea" },
+  { id: "belief_impact", category: "קשת התפתחותית", question: "האם המחיר מערער אמונה פנימית שלו או מחזק אותה?", type: "textarea" },
+  { id: "similar_dilemma_later", category: "קשת התפתחותית", question: "האם בהמשך הוא ניצב בפני דילמה דומה?", type: "textarea" },
+  { id: "later_choice_diff", category: "קשת התפתחותית", question: "האם הבחירה המאוחרת שלו שונה מהראשונה?", type: "textarea" }
 ];
 
 const MACRO_PLACE_QUESTIONS = [

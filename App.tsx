@@ -356,7 +356,10 @@ const App: React.FC = () => {
             <div className="bg-amber-800 p-2 rounded-lg text-white transition-transform hover:scale-110">
               <BookOpen size={20} />
             </div>
-            <h1 className="text-xl font-bold text-amber-900 handwritten text-3xl select-none">StoryLines</h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold text-amber-900 handwritten text-3xl select-none leading-none">StoryLines</h1>
+              <span className="text-[10px] font-bold text-amber-700/60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
+            </div>
           </div>
         </div>
 
