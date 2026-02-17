@@ -3,8 +3,6 @@
   "name": "storylines-desktop",
   "private": true,
   "version": "1.1.4",
-
->>>>>>> bf34678 (chore: bump version to 1.1.4)
   "type": "commonjs",
   "main": "main.js",
   "scripts": {
@@ -44,10 +42,10 @@
       "dist/**/*",
       "main.js"
     ],
-    "win": {
-      "target": "portable",
-      "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
-    },
+"win": {
+  "target": "nsis",
+  "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
+},
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity"
