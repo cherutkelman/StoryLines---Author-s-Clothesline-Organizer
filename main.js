@@ -40,3 +40,4 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+console.log("[build test] 1.1.5");
