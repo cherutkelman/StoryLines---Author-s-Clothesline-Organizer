@@ -1,21 +1,20 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { CharacterMapNode, CharacterMapConnection } from '../types';
+import { QuestionnaireEntry, CharacterMapConnection } from '../types';
 import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2 } from 'lucide-react';
 
 interface CharacterMapProps {
-  nodes: CharacterMapNode[];
+  characters: QuestionnaireEntry[];
   connections: CharacterMapConnection[];
-  onUpdateNodes: (nodes: CharacterMapNode[]) => void;
+  onUpdateCharacters: (chars: QuestionnaireEntry[]) => void;
   onUpdateConnections: (connections: CharacterMapConnection[]) => void;
 }
 
-const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdateNodes, onUpdateConnections }) => {
+const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, onUpdateCharacters, onUpdateConnections }) => {
   const [tool, setTool] = useState<'move' | 'link'>('move');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (tool === 'move') {
@@ -24,17 +23,15 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
   };
 
   const addNode = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Place at center of view if possible, or near where clicked if we use absolute coordinates
-    const newNode: CharacterMapNode = {
-      id: `node-${Date.now()}`,
+    const newNode: QuestionnaireEntry = {
+      id: `char-${Date.now()}`,
       name: 'דמות חדשה',
       x: 200,
       y: 200,
+      data: { gender: 'female' },
+      customFields: []
     };
-    onUpdateNodes([...nodes, newNode]);
+    onUpdateCharacters([...characters, newNode]);
     setSelectedNodeId(newNode.id);
   };
 
@@ -71,7 +68,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      onUpdateNodes(nodes.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
+      onUpdateCharacters(characters.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
     }
   };
 
@@ -80,13 +77,13 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
   };
 
   const deleteNode = (id: string) => {
-    onUpdateNodes(nodes.filter(n => n.id !== id));
+    onUpdateCharacters(characters.filter(n => n.id !== id));
     onUpdateConnections(connections.filter(c => c.fromId !== id && c.toId !== id));
     if (selectedNodeId === id) setSelectedNodeId(null);
   };
 
-  const updateNode = (id: string, updates: Partial<CharacterMapNode>) => {
-    onUpdateNodes(nodes.map(n => n.id === id ? { ...n, ...updates } : n));
+  const updateNode = (id: string, updates: Partial<QuestionnaireEntry>) => {
+    onUpdateCharacters(characters.map(n => n.id === id ? { ...n, ...updates } : n));
   };
 
   const updateConnection = (id: string, description: string) => {
@@ -108,7 +105,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
     }
   };
 
-  const selectedNode = nodes.find(n => n.id === selectedNodeId);
+  const selectedNode = characters.find(n => n.id === selectedNodeId);
 
   return (
     <div className="h-full flex flex-col relative select-none bg-[#fdf6e3]">
@@ -149,17 +146,17 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
       >
         <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
           {connections.map(conn => {
-            const fromNode = nodes.find(n => n.id === conn.fromId);
-            const toNode = nodes.find(n => n.id === conn.toId);
+            const fromNode = characters.find(n => n.id === conn.fromId);
+            const toNode = characters.find(n => n.id === conn.toId);
             if (!fromNode || !toNode) return null;
 
             return (
               <g key={conn.id}>
                 <line 
-                  x1={fromNode.x} 
-                  y1={fromNode.y} 
-                  x2={toNode.x} 
-                  y2={toNode.y} 
+                  x1={fromNode.x ?? 0} 
+                  y1={fromNode.y ?? 0} 
+                  x2={toNode.x ?? 0} 
+                  y2={toNode.y ?? 0} 
                   stroke="#78350f" 
                   strokeWidth="2" 
                   strokeDasharray="5,5" 
@@ -172,12 +169,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
 
         {/* Relationship Text Boxes on Lines */}
         {connections.map(conn => {
-          const fromNode = nodes.find(n => n.id === conn.fromId);
-          const toNode = nodes.find(n => n.id === conn.toId);
+          const fromNode = characters.find(n => n.id === conn.fromId);
+          const toNode = characters.find(n => n.id === conn.toId);
           if (!fromNode || !toNode) return null;
 
-          const midX = (fromNode.x + toNode.x) / 2;
-          const midY = (fromNode.y + toNode.y) / 2;
+          const midX = ((fromNode.x ?? 0) + (toNode.x ?? 0)) / 2;
+          const midY = ((fromNode.y ?? 0) + (toNode.y ?? 0)) / 2;
 
           return (
             <div 
@@ -212,11 +209,11 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ nodes, connections, onUpdat
         })}
 
         {/* Character Nodes */}
-        {nodes.map(node => (
+        {characters.map(node => (
           <div 
             key={node.id}
             className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-2 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
-            style={{ left: node.x, top: node.y, transform: 'translate(-50%, -50%)' }}
+            style={{ left: node.x ?? 200, top: node.y ?? 200, transform: 'translate(-50%, -50%)' }}
             onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
           >
             <div className={`w-24 h-24 rounded-full border-4 shadow-xl overflow-hidden bg-white flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-amber-500 ring-4 ring-amber-200' : 'border-amber-100 hover:border-amber-300'}`}>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Plus, 
@@ -30,9 +29,13 @@ import {
   ChevronFirst,
   Users,
   Eye,
-  EyeOff
+  EyeOff,
+  MessageSquareQuote,
+  Send,
+  // Added missing CheckCircle2 import
+  CheckCircle2
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapNode, CharacterMapConnection } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -56,7 +59,6 @@ const DEFAULT_PROJECT_DATA = {
   periods: [],
   twists: [],
   fantasyWorlds: [],
-  characterMapNodes: [],
   characterMapConnections: []
 };
 
@@ -72,7 +74,25 @@ const App: React.FC = () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Migration logic for old data format
+        return parsed.map((b: any) => {
+          if (b.characterMapNodes) {
+             const nodes = b.characterMapNodes;
+             const newCharacters = (b.characters || []).map((char: any) => {
+                const node = nodes.find((n: any) => n.id === char.id || n.name === char.name);
+                return {
+                   ...char,
+                   x: node?.x ?? char.x,
+                   y: node?.y ?? char.y,
+                   imageUrl: node?.imageUrl ?? char.imageUrl
+                };
+             });
+             delete b.characterMapNodes;
+             b.characters = newCharacters;
+          }
+          return b;
+        });
       } catch (e) {
         console.error("Failed to load library", e);
       }
@@ -80,7 +100,7 @@ const App: React.FC = () => {
     return [createNewBook('הספר הראשון שלי')];
   });
   
-  const [activeBookId, setActiveBookId] = useState<string>(books[0].id);
+  const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
   const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'characterMap'>('board');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
@@ -90,12 +110,15 @@ const App: React.FC = () => {
   // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isImportTextOpen, setIsImportTextOpen] = useState(false);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const [suggestionText, setSuggestionText] = useState('');
+  const [isSendingSuggestion, setIsSendingSuggestion] = useState(false);
+  const [suggestionSent, setSuggestionSent] = useState(false);
+
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
   const [importLongText, setImportLongText] = useState('');
   const [isSplittingAi, setIsSplittingAi] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -103,9 +126,11 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
-    setVisiblePlotlines(activeBook.plotlines.map(p => p.id));
-    if (!bulkPlotlineId) setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
-  }, [activeBook.id]);
+    if (activeBook) {
+      setVisiblePlotlines(activeBook.plotlines.map(p => p.id));
+      if (!bulkPlotlineId) setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
+    }
+  }, [activeBook?.id]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
@@ -117,6 +142,7 @@ const App: React.FC = () => {
   };
 
   const handleBulkAdd = () => {
+    if (!activeBook) return;
     const titles = bulkTitles.split('\n').map(t => t.trim()).filter(t => t !== '');
     if (titles.length === 0) return;
 
@@ -138,6 +164,7 @@ const App: React.FC = () => {
   };
 
   const handleAiRefine = async (sceneId: string) => {
+    if (!activeBook) return;
     const scene = activeBook.scenes.find(s => s.id === sceneId);
     if (!scene || !process.env.API_KEY) return;
 
@@ -158,7 +185,7 @@ const App: React.FC = () => {
   };
 
   const handleAiTextSplit = async () => {
-    if (!importLongText.trim() || !process.env.API_KEY) return;
+    if (!activeBook || !importLongText.trim() || !process.env.API_KEY) return;
     setIsSplittingAi(true);
 
     try {
@@ -209,6 +236,7 @@ const App: React.FC = () => {
   };
 
   const handleManualSplit = () => {
+    if (!activeBook) return;
     const delimiter = prompt("הזן תו מפריד (למשל ###) או השאר ריק לחלוקה לפי פסקאות כפולות", "###");
     const parts = delimiter 
       ? importLongText.split(delimiter).filter(p => p.trim()) 
@@ -234,6 +262,7 @@ const App: React.FC = () => {
   };
 
   const addPlotline = () => {
+    if (!activeBook) return;
     const newP: Plotline = {
       id: `p-${Date.now()}`,
       name: `קו חדש`,
@@ -244,13 +273,14 @@ const App: React.FC = () => {
   };
 
   const renamePlotline = (id: string, name: string) => {
+    if (!activeBook) return;
     updateActiveBook({
       plotlines: activeBook.plotlines.map(p => p.id === id ? { ...p, name } : p)
     });
   };
 
   const deletePlotline = (id: string) => {
-    if (activeBook.plotlines.length <= 1) return;
+    if (!activeBook || activeBook.plotlines.length <= 1) return;
     if (confirm('מחיקת קו עלילה תשאיר את הסצנות שלו יתומות. להמשיך?')) {
       updateActiveBook({
         plotlines: activeBook.plotlines.filter(p => p.id !== id),
@@ -266,6 +296,7 @@ const App: React.FC = () => {
   };
 
   const addScene = (plotlineId: string, atPosition?: number) => {
+    if (!activeBook) return;
     const newPos = atPosition !== undefined ? atPosition : activeBook.scenes.length;
     const newScene: Scene = {
       id: `s-${Date.now()}`,
@@ -284,12 +315,14 @@ const App: React.FC = () => {
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
+    if (!activeBook) return;
     updateActiveBook({
       scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
     });
   };
 
   const moveScene = (id: string, targetGlobalIndex: number, targetPlotlineId: string) => {
+    if (!activeBook) return;
     const sceneToMove = activeBook.scenes.find(s => s.id === id);
     if (!sceneToMove) return;
 
@@ -305,6 +338,7 @@ const App: React.FC = () => {
   };
 
   const exportManuscript = () => {
+    if (!activeBook) return;
     const text = activeBook.scenes
       .filter(s => visiblePlotlines.includes(s.plotlineId))
       .map(s => `## ${s.title}${s.isCompleted ? ' [הושלם]' : ''}\n\n${s.content}`)
@@ -318,6 +352,7 @@ const App: React.FC = () => {
   };
 
   const exportDataBackup = () => {
+    if (!activeBook) return;
     const dataStr = JSON.stringify(activeBook, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -337,7 +372,45 @@ const App: React.FC = () => {
     setBooks(prev => prev.map(b => b.id === id ? { ...b, title } : b));
   };
 
-  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapNodes' | 'characterMapConnections', entries: any[]) => {
+  const deleteBook = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('אתה בטוח שאתה רוצה למחוק את הספר?')) {
+      const remainingBooks = books.filter(b => b.id !== id);
+      if (remainingBooks.length === 0) {
+        const freshBook = createNewBook('ספר חדש');
+        setBooks([freshBook]);
+        setActiveBookId(freshBook.id);
+      } else {
+        setBooks(remainingBooks);
+        if (activeBookId === id) {
+          setActiveBookId(remainingBooks[0].id);
+        }
+      }
+    }
+  };
+
+  const handleSendSuggestion = async () => {
+    if (!suggestionText.trim()) return;
+    setIsSendingSuggestion(true);
+    
+    // In a real scenario, you'd send this to an API or service like Formspree.
+    // For now, we simulate the 'sending' experience.
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setSuggestionSent(true);
+      setSuggestionText('');
+      setTimeout(() => {
+        setIsSuggestionsOpen(false);
+        setSuggestionSent(false);
+      }, 2000);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSendingSuggestion(false);
+    }
+  };
+
+  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapConnections', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
@@ -433,7 +506,19 @@ const App: React.FC = () => {
                     <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
                       <div className="flex items-center gap-3">
                         <BookIcon size={18} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-200'} />
-                        <input value={book.title} onClick={(e) => e.stopPropagation()} onChange={(e) => renameBook(book.id, e.target.value)} className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} />
+                        <input 
+                          value={book.title} 
+                          onClick={(e) => e.stopPropagation()} 
+                          onChange={(e) => renameBook(book.id, e.target.value)} 
+                          className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} 
+                        />
+                        <button 
+                          onClick={(e) => deleteBook(book.id, e)} 
+                          className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          title="מחיקת ספר"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -441,35 +526,39 @@ const App: React.FC = () => {
               </div>
 
               <div className="p-8 border-b border-amber-50">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">קווי עלילה</h3>
-                  <button onClick={addPlotline} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
-                </div>
-                <div className="space-y-2">
-                  {activeBook.plotlines.map(plotline => (
-                    <div key={plotline.id} className="group flex items-center gap-3 p-3 rounded-2xl bg-amber-50/30 border border-transparent hover:border-amber-100 transition-all">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: plotline.color }} />
-                      <input 
-                        value={plotline.name} 
-                        onChange={(e) => renamePlotline(plotline.id, e.target.value)}
-                        className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-amber-900"
-                      />
-                      <button 
-                        onClick={() => togglePlotlineVisibility(plotline.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${visiblePlotlines.includes(plotline.id) ? 'text-amber-800 hover:bg-amber-100' : 'text-amber-300 hover:bg-amber-50'}`}
-                        title={visiblePlotlines.includes(plotline.id) ? "מוצג בעורך" : "מוסתר מהעורך"}
-                      >
-                        {visiblePlotlines.includes(plotline.id) ? <Eye size={14} /> : <EyeOff size={14} />}
-                      </button>
-                      <button 
-                        onClick={() => deletePlotline(plotline.id)}
-                        className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                {activeBook && (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">קווי עלילה</h3>
+                      <button onClick={addPlotline} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2">
+                      {activeBook.plotlines.map(plotline => (
+                        <div key={plotline.id} className="group flex items-center gap-3 p-3 rounded-2xl bg-amber-50/30 border border-transparent hover:border-amber-100 transition-all">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: plotline.color }} />
+                          <input 
+                            value={plotline.name} 
+                            onChange={(e) => renamePlotline(plotline.id, e.target.value)}
+                            className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-amber-900"
+                          />
+                          <button 
+                            onClick={() => togglePlotlineVisibility(plotline.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${visiblePlotlines.includes(plotline.id) ? 'text-amber-800 hover:bg-amber-100' : 'text-amber-300 hover:bg-amber-50'}`}
+                            title={visiblePlotlines.includes(plotline.id) ? "מוצג בעורך" : "מוסתר מהעורך"}
+                          >
+                            {visiblePlotlines.includes(plotline.id) ? <Eye size={14} /> : <EyeOff size={14} />}
+                          </button>
+                          <button 
+                            onClick={() => deletePlotline(plotline.id)}
+                            className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="p-8">
@@ -488,47 +577,56 @@ const App: React.FC = () => {
         </aside>
 
         <main className="flex-1 relative overflow-hidden bg-[#fdf6e3]">
-          {activeView === 'board' && (
-            <div className="absolute inset-0">
-              <Board 
-                project={activeBook} 
-                visiblePlotlines={visiblePlotlines}
-                onAddScene={addScene} 
-                onMoveScene={moveScene} 
-                updateScene={updateScene} 
-                onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
-              />
-            </div>
-          )}
-          {activeView === 'editor' && (
-            <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
-              <Editor project={activeBook} visiblePlotlines={visiblePlotlines} onUpdateScene={updateScene} onAiRefine={handleAiRefine} isAiLoading={isAiLoading} onOpenBulkAdd={() => setIsBulkAddOpen(true)} />
-            </div>
-          )}
-          {activeView === 'characterMap' && (
-            <div className="absolute inset-0 overflow-hidden">
-               <CharacterMap 
-                  nodes={activeBook.characterMapNodes || []}
-                  connections={activeBook.characterMapConnections || []}
-                  onUpdateNodes={(nodes) => updateEntries('characterMapNodes', nodes)}
-                  onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
-               />
-            </div>
-          )}
-          {activeView === 'questionnaires' && (
-            <div className="absolute inset-0 overflow-auto">
-              <Questionnaires 
-                characters={activeBook.characters || []}
-                places={activeBook.places || []}
-                periods={activeBook.periods || []}
-                twists={activeBook.twists || []}
-                fantasyWorlds={activeBook.fantasyWorlds || []}
-                onUpdateCharacters={(e) => updateEntries('characters', e)}
-                onUpdatePlaces={(e) => updateEntries('places', e)}
-                onUpdatePeriods={(e) => updateEntries('periods', e)}
-                onUpdateTwists={(e) => updateEntries('twists', e)}
-                onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
-              />
+          {activeBook ? (
+            <>
+              {activeView === 'board' && (
+                <div className="absolute inset-0">
+                  <Board 
+                    project={activeBook} 
+                    visiblePlotlines={visiblePlotlines}
+                    onAddScene={addScene} 
+                    onMoveScene={moveScene} 
+                    updateScene={updateScene} 
+                    onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
+                    onOpenSuggestions={() => setIsSuggestionsOpen(true)}
+                  />
+                </div>
+              )}
+              {activeView === 'editor' && (
+                <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
+                  <Editor project={activeBook} visiblePlotlines={visiblePlotlines} onUpdateScene={updateScene} onAiRefine={handleAiRefine} isAiLoading={isAiLoading} onOpenBulkAdd={() => setIsBulkAddOpen(true)} />
+                </div>
+              )}
+              {activeView === 'characterMap' && (
+                <div className="absolute inset-0 overflow-hidden">
+                   <CharacterMap 
+                      characters={activeBook.characters || []}
+                      connections={activeBook.characterMapConnections || []}
+                      onUpdateCharacters={(chars) => updateEntries('characters', chars)}
+                      onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
+                   />
+                </div>
+              )}
+              {activeView === 'questionnaires' && (
+                <div className="absolute inset-0 overflow-auto">
+                  <Questionnaires 
+                    characters={activeBook.characters || []}
+                    places={activeBook.places || []}
+                    periods={activeBook.periods || []}
+                    twists={activeBook.twists || []}
+                    fantasyWorlds={activeBook.fantasyWorlds || []}
+                    onUpdateCharacters={(e) => updateEntries('characters', e)}
+                    onUpdatePlaces={(e) => updateEntries('places', e)}
+                    onUpdatePeriods={(e) => updateEntries('periods', e)}
+                    onUpdateTwists={(e) => updateEntries('twists', e)}
+                    onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-amber-800/20">
+              <p className="text-xl font-bold">אנא בחר ספר או צור אחד חדש</p>
             </div>
           )}
         </main>
@@ -543,18 +641,20 @@ const App: React.FC = () => {
              </div>
              
              <div className="space-y-4">
-                <div>
-                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">בחר קו עלילה</label>
-                   <select 
-                      value={bulkPlotlineId} 
-                      onChange={(e) => setBulkPlotlineId(e.target.value)}
-                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
-                   >
-                      {activeBook.plotlines.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                   </select>
-                </div>
+                {activeBook && (
+                  <div>
+                    <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">בחר קו עלילה</label>
+                    <select 
+                        value={bulkPlotlineId} 
+                        onChange={(e) => setBulkPlotlineId(e.target.value)}
+                        className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                    >
+                        {activeBook.plotlines.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                )}
                 
                 <div>
                    <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">כותרות הסצנות (אחת בכל שורה)</label>
@@ -599,6 +699,55 @@ const App: React.FC = () => {
                 </button>
                 <button onClick={handleManualSplit} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900">פירוק ידני</button>
              </div>
+          </div>
+        </div>
+      )}
+
+      {isSuggestionsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
+          <div className="bg-[#fdf6e3] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold handwritten text-3xl">הצעות לשיפור</h2>
+                <button onClick={() => setIsSuggestionsOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
+             </div>
+             
+             {suggestionSent ? (
+               <div className="py-12 flex flex-col items-center justify-center text-center animate-in zoom-in duration-300">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-amber-900 mb-2">תודה רבה!</h3>
+                  <p className="text-sm text-amber-800/60">ההצעה שלך התקבלה ותיקרא בתשומת לב.</p>
+               </div>
+             ) : (
+               <div className="space-y-6">
+                  <p className="text-sm text-amber-800/60 leading-relaxed">
+                    יש לך רעיון לפיצ'ר חדש? משהו לא עובד כמו שצריך?
+                    כתוב לי כאן ואנסה לשפר את האפליקציה!
+                  </p>
+                  
+                  <textarea 
+                    value={suggestionText} 
+                    onChange={(e) => setSuggestionText(e.target.value)} 
+                    className="w-full h-40 bg-white border border-amber-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none resize-none shadow-inner"
+                    placeholder="מה דעתך להוסיף..."
+                    autoFocus
+                  />
+
+                  <button 
+                    onClick={handleSendSuggestion}
+                    disabled={isSendingSuggestion || !suggestionText.trim()}
+                    className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  >
+                    {isSendingSuggestion ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <Send size={20} />
+                    )}
+                    <span>שלח הצעה</span>
+                  </button>
+               </div>
+             )}
           </div>
         </div>
       )}

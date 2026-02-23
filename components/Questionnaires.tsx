@@ -9,7 +9,9 @@ import {
   Zap,
   PanelLeftClose,
   PanelLeftOpen,
-  MessageSquarePlus
+  MessageSquarePlus,
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -219,10 +221,24 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     return matchesCategory && matchesSearch;
   });
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedEntry) return;
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateEntry({ imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const addEntry = () => {
     const newEntry: QuestionnaireEntry = {
       id: `q-${Date.now()}`,
       name: activeTab === 'characters' ? 'דמות חדשה' : activeTab === 'places' ? 'מקום חדש' : activeTab === 'periods' ? 'תקופה חדשה' : activeTab === 'twists' ? 'טוויסט חדש' : 'עולם פנטזיה חדש',
+      x: activeTab === 'characters' ? 200 : undefined,
+      y: activeTab === 'characters' ? 200 : undefined,
       data: activeTab === 'characters' 
         ? { gender: 'female' } 
         : activeTab === 'places' 
@@ -326,7 +342,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  {activeTab === 'places' ? (
+                  {entry.imageUrl ? (
+                    <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
+                  ) : activeTab === 'places' ? (
                     entry.data.placeType === 'macro' ? <Globe size={16} className="text-blue-400" /> : <Home size={16} className="text-amber-400" />
                   ) : (
                     <Icon size={16} className={selectedEntryId === entry.id ? 'text-amber-800' : 'text-amber-300'} />
@@ -384,9 +402,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                          <LayoutList size={20} />
                        </button>
                      )}
-                     <div className="bg-white p-3 rounded-2xl shadow-sm border border-amber-100">
-                        <Icon size={24} className="text-amber-800" />
+                     
+                     <div className="relative group/img">
+                        <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-white overflow-hidden bg-white flex items-center justify-center">
+                          {selectedEntry.imageUrl ? (
+                            <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
+                          ) : (
+                            <Icon size={24} className="text-amber-800/20" />
+                          )}
+                        </div>
+                        {mode === 'edit' && (
+                          <label className="absolute inset-0 flex items-center justify-center bg-amber-900/40 rounded-2xl opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-white">
+                            <Camera size={20} />
+                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                          </label>
+                        )}
                      </div>
+
                      <div className="flex-1">
                         {mode === 'edit' ? (
                           <input 

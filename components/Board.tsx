@@ -1,7 +1,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Scene, Project } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote } from 'lucide-react';
 
 interface BoardProps {
   project: Project;
@@ -10,9 +10,10 @@ interface BoardProps {
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
   onBulkAdd: (plotlineId: string) => void;
+  onOpenSuggestions: () => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd }) => {
+const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -78,6 +79,17 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
         >
           <Maximize size={16} />
           <span>{Math.round(zoomLevel * 100)}%</span>
+        </button>
+      </div>
+
+      {/* Top Right Actions */}
+      <div className="absolute top-6 right-6 z-40 flex items-center gap-3">
+        <button 
+          onClick={onOpenSuggestions}
+          className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md text-amber-800 border border-amber-200 rounded-xl shadow-lg hover:bg-amber-50 transition-all font-bold text-sm"
+        >
+          <MessageSquareQuote size={18} />
+          <span>הצעות לשיפור</span>
         </button>
       </div>
 

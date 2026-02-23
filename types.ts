@@ -17,16 +17,11 @@ export interface Plotline {
 export interface QuestionnaireEntry {
   id: string;
   name: string;
+  imageUrl?: string; // Unified image field
+  x?: number; // Spatial X for character map
+  y?: number; // Spatial Y for character map
   data: Record<string, string>; // Questions and their answers
   customFields?: { id: string; label: string }[]; // User-defined questions
-}
-
-export interface CharacterMapNode {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  x: number;
-  y: number;
 }
 
 export interface CharacterMapConnection {
@@ -44,7 +39,6 @@ export interface Project {
   periods?: QuestionnaireEntry[];
   twists?: QuestionnaireEntry[];
   fantasyWorlds?: QuestionnaireEntry[];
-  characterMapNodes?: CharacterMapNode[];
   characterMapConnections?: CharacterMapConnection[];
 }
 
