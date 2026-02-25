@@ -1,6 +1,7 @@
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -12,6 +13,39 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
+  });
+
+  // IPC handler for file dialog
+  ipcMain.handle('open-image-dialog', async () => {
+    console.log('Main: open-image-dialog called');
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'png', 'gif', 'webp', 'jpeg'] }
+      ]
+    });
+
+    console.log('Main: dialog result:', result);
+
+    if (result.canceled || result.filePaths.length === 0) {
+      console.log('Main: dialog canceled');
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    console.log('Main: selected path:', filePath);
+
+    try {
+      const data = fs.readFileSync(filePath);
+      const extension = path.extname(filePath).substring(1);
+      const base64 = data.toString('base64');
+      const dataUrl = `data:image/${extension};base64,${base64}`;
+      console.log('Main: file read and converted to base64');
+      return dataUrl;
+    } catch (error) {
+      console.error('Main: error reading file:', error);
+      throw error;
+    }
   });
 
   // In production, load the built index.html

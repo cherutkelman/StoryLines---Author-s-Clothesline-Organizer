@@ -2,8 +2,6 @@
 import React, { useMemo, useState } from 'react';
 import { Scene, Project, QuestionnaireEntry } from '../types';
 import { 
-  Wand2, 
-  Loader2, 
   BookOpen, 
   CheckCircle2, 
   Circle, 
@@ -27,28 +25,50 @@ interface EditorProps {
   project: Project;
   visiblePlotlines: string[];
   onUpdateScene: (id: string, updates: Partial<Scene>) => void;
-  onAiRefine: (sceneId: string) => void;
-  isAiLoading: boolean;
   onOpenBulkAdd: () => void;
+  initialFocusedSceneId?: string | null;
+  onFocusScene?: (id: string | null) => void;
+  initialDisplayMode?: 'full' | 'focus';
+  onDisplayModeChange?: (mode: 'full' | 'focus') => void;
 }
 
-const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onAiRefine, isAiLoading, onOpenBulkAdd }) => {
-  const [displayMode, setDisplayMode] = useState<'full' | 'focus'>('focus');
-  const [focusedSceneId, setFocusedSceneId] = useState<string | null>(null);
+const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange }) => {
+  const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
+  const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [bridgeType, setBridgeType] = useState<'character' | 'place' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const handleDisplayModeChange = (mode: 'full' | 'focus') => {
+    setDisplayMode(mode);
+    onDisplayModeChange?.(mode);
+  };
+
+  const handleFocusScene = (id: string | null) => {
+    setFocusedSceneId(id);
+    onFocusScene?.(id);
+  };
 
   const activeScenes = useMemo(() => {
-    const filtered = project.scenes
+    let filtered = project.scenes
       .filter(s => visiblePlotlines.includes(s.plotlineId))
       .sort((a, b) => a.position - b.position);
     
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.title.toLowerCase().includes(query) || 
+        s.content.toLowerCase().includes(query)
+      );
+    }
+
     if (filtered.length > 0 && !focusedSceneId && displayMode === 'focus') {
-      setFocusedSceneId(filtered[0].id);
+      handleFocusScene(filtered[0].id);
     }
     
     return filtered;
-  }, [project.scenes, visiblePlotlines, displayMode]);
+  }, [project.scenes, visiblePlotlines, displayMode, searchQuery]);
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
@@ -95,13 +115,37 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           </div>
 
           <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg">
-            <button onClick={() => setDisplayMode('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-white/60 hover:text-white'}`}><Focus size={14} /><span>מיקוד</span></button>
-            <button onClick={() => setDisplayMode('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-white/60 hover:text-white'}`}><AlignJustify size={14} /><span>מלא</span></button>
+            <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-white/60 hover:text-white'}`}><Focus size={14} /><span>מיקוד</span></button>
+            <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-white/60 hover:text-white'}`}><AlignJustify size={14} /><span>מלא</span></button>
           </div>
 
           <div className="w-px h-6 bg-white/10 mx-1" />
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {isSearchOpen ? (
+              <div className="flex items-center bg-black/20 rounded-lg px-3 py-1 animate-in fade-in slide-in-from-right-2">
+                <Search size={14} className="text-amber-300 mr-2" />
+                <input 
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="חפש מילים..."
+                  className="bg-transparent border-none focus:ring-0 text-xs text-white placeholder:text-white/40 w-32"
+                />
+                <button onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }} className="text-white/40 hover:text-white ml-2">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsSearchOpen(true)}
+                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                title="חיפוש"
+              >
+                <Search size={18} />
+              </button>
+            )}
+            
             <button 
               onClick={onOpenBulkAdd}
               className="flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-900 rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm"
@@ -127,7 +171,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
           const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
           return (
-            <article key={scene.id} className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) setFocusedSceneId(scene.id); }}>
+            <article key={scene.id} className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
               {!isExpanded ? (
                 <div className={`group flex items-center justify-between bg-white border border-amber-100/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                   <div className="flex items-center gap-4">
@@ -142,7 +186,13 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                   <header className="flex items-center justify-between mb-4">
                     <div className="flex-1 flex items-center gap-4">
-                      <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-amber-900 handwritten flex-1" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                      <div className="flex flex-col flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: plotline?.color }} />
+                          <span className="text-[10px] font-black text-amber-900/40 uppercase tracking-widest">{plotline?.name}</span>
+                        </div>
+                        <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-amber-900 handwritten w-full" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                      </div>
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-white text-amber-800 border-amber-100 hover:bg-amber-50'}`}
@@ -151,10 +201,6 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
                       </button>
                     </div>
-                    <button onClick={() => onAiRefine(scene.id)} disabled={isAiLoading} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 shadow-sm ml-4">
-                      {isAiLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                      <span className="text-[10px] font-bold italic">AI</span>
-                    </button>
                   </header>
                   <textarea className={`w-full min-h-[400px] rounded-[2rem] border border-amber-100 p-10 text-xl leading-relaxed focus:ring-4 focus:ring-amber-200/10 focus:border-amber-200 resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[#fffaf0]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
                 </div>

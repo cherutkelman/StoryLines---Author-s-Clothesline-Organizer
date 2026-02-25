@@ -26,6 +26,10 @@ interface QuestionnairesProps {
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
   onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
+  initialTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds';
+  initialSelectedEntryId?: string | null;
+  onTabChange?: (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds') => void;
+  onEntrySelect?: (id: string | null) => void;
 }
 
 const FEMALE_QUESTIONS_CONFIG = [
@@ -48,6 +52,8 @@ const FEMALE_QUESTIONS_CONFIG = [
   { id: "traumas", category: "עבר רגשי", question: "איזה טראומות קרו לה", type: "textarea" },
   { id: "favorite_food", category: "העדפות", question: "מאכלים אהובים", type: "text" },
   { id: "favorite_color", category: "העדפות", question: "צבע אהוב", type: "text" },
+  { id: "general_appearance", category: "מאפיינים חיצוניים", question: "תיאור חיצוני כללי", type: "textarea" },
+  { id: "unique_features", category: "מאפיינים חיצוניים", question: "פרטים ייחודיים במראה", type: "textarea" },
   { id: "gestures", category: "מאפיינים חיצוניים", question: "תנועות שהיא רגילה לעשות", type: "textarea" },
   { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
   { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
@@ -81,7 +87,7 @@ const MALE_QUESTIONS_CONFIG = [
   { id: "avoidance", category: "גבולות פנימיים", question: "מה הוא לא רוצה לעשות", type: "textarea" },
   { id: "difficulties", category: "קשיים", question: "מה הקשיים שלו", type: "textarea" },
   { id: "values", category: "עולם ערכים", question: "ערכים שמובילים אותו", type: "textarea" },
-  { id: "hobbies", category: "העדפות", question: "מה הוא אוהבת לעשות", type: "textarea" },
+  { id: "hobbies", category: "העדפות", question: "מה הוא אוהב לעשות", type: "textarea" },
   { id: "favorite_place", category: "העדפות", question: "איפה הוא אוהב להיות", type: "text" },
   { id: "sweet_memories", category: "זיכרונות", question: "מה הזכרונות המתוקים ביותר שלו", type: "textarea" },
   { id: "fear_memories", category: "זיכרונות", question: "מה הזכרונות המפחידים ביותר שלו", type: "textarea" },
@@ -89,6 +95,8 @@ const MALE_QUESTIONS_CONFIG = [
   { id: "traumas", category: "עבר רגשי", question: "איזה טראומות קרו לו", type: "textarea" },
   { id: "favorite_food", category: "העדפות", question: "מאכלים אהובים", type: "text" },
   { id: "favorite_color", category: "העדפות", question: "צבע אהוב", type: "text" },
+  { id: "general_appearance", category: "מאפיינים חיצוניים", question: "תיאור חיצוני כללי", type: "textarea" },
+  { id: "unique_features", category: "מאפיינים חיצוניים", question: "פרטים ייחודיים במראה", type: "textarea" },
   { id: "gestures", category: "מאפיינים חיצוניים", question: "תנועות שהוא רגיל לעשות", type: "textarea" },
   { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
   { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
@@ -176,18 +184,51 @@ const FANTASY_WORLD_QUESTIONS = [
   { id: "other_creatures", category: "חברה וחיי יום-יום", question: "אילו יצורים נוספים קיימים בעולם:", type: "textarea" }
 ];
 
+const CHARACTER_ROLES = [
+  { id: 'main', label: 'דמויות ראשיות' },
+  { id: 'family', label: 'משפחה' },
+  { id: 'friends', label: 'חברים' },
+  { id: 'staff', label: 'צוות' },
+  { id: 'antagonist', label: 'אנטי גיבור' },
+  { id: 'others', label: 'נוספים' },
+];
+
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
   characters, places, periods, twists, fantasyWorlds,
-  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds
+  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds,
+  initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
-  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds'>('characters');
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds'>(initialTab || 'characters');
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(initialSelectedEntryId || null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
   const [mode, setMode] = useState<'edit' | 'view'>('view');
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
+
+  const handleTabChange = (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds') => {
+    setActiveTab(tab);
+    setSelectedEntryId(null);
+    setActiveCategory(null);
+    setCurrentCategoryIndex(0);
+    setQuestionSearchQuery('');
+    setIsSearchActive(false);
+    setMode('view');
+    onTabChange?.(tab);
+    onEntrySelect?.(null);
+  };
+
+  const handleEntrySelect = (id: string | null) => {
+    setSelectedEntryId(id);
+    setActiveCategory(null);
+    setCurrentCategoryIndex(0);
+    setQuestionSearchQuery('');
+    setIsSearchActive(false);
+    onEntrySelect?.(id);
+  };
 
   const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : fantasyWorlds;
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : onUpdateFantasyWorlds;
@@ -207,30 +248,74 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     categories.push("שאלות נוספות");
   }
 
+  const currentCategory = activeCategory || categories[currentCategoryIndex] || categories[0];
+
   const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : Wand2;
 
   const filteredQuestions = questionsConfig.filter(q => {
-    const matchesCategory = activeCategory ? q.category === activeCategory : true;
+    const matchesCategory = mode === 'edit' ? q.category === currentCategory : (activeCategory ? q.category === activeCategory : true);
     const matchesSearch = q.question.toLowerCase().includes(questionSearchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
   const customQuestions = (selectedEntry?.customFields || []).filter(cf => {
-    const matchesCategory = activeCategory ? activeCategory === "שאלות נוספות" : true;
+    const matchesCategory = mode === 'edit' ? currentCategory === "שאלות נוספות" : (activeCategory ? activeCategory === "שאלות נוספות" : true);
     const matchesSearch = cf.label.toLowerCase().includes(questionSearchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedEntry) return;
-    const file = e.target.files?.[0];
+    console.log('Renderer: handleImageUpload triggered for entry:', selectedEntry.id);
+    
+    // Safer check for Electron
+    let isElectron = false;
+    try {
+      isElectron = !!((window as any).require && (window as any).require('electron'));
+    } catch (err) {
+      isElectron = false;
+    }
+    
+    if (isElectron) {
+      console.log('Renderer: Electron environment detected, using IPC dialog');
+      try {
+        const { ipcRenderer } = (window as any).require('electron');
+        const dataUrl = await ipcRenderer.invoke('open-image-dialog');
+        
+        console.log('Renderer: IPC dialog returned result');
+        if (dataUrl) {
+          console.log('Renderer: Received dataUrl, updating entry');
+          updateEntry({ imageUrl: dataUrl });
+        } else {
+          console.log('Renderer: Dialog was canceled or no file selected');
+        }
+      } catch (error) {
+        console.error('Renderer: Error in Electron image upload:', error);
+      }
+      return;
+    }
+
+    console.log('Renderer: Standard web environment detected, using FileReader');
+    const file = e?.target?.files?.[0];
     if (file) {
+      console.log('Renderer: File selected:', file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log('Renderer: FileReader finished reading');
         updateEntry({ imageUrl: reader.result as string });
       };
+      reader.onerror = (err) => {
+        console.error('Renderer: FileReader error:', err);
+      };
       reader.readAsDataURL(file);
+    } else {
+      console.log('Renderer: No file selected in standard input');
     }
+  };
+
+  const handleRemoveImage = () => {
+    if (!selectedEntry) return;
+    updateEntry({ imageUrl: undefined });
   };
 
   const addEntry = () => {
@@ -247,9 +332,20 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
       customFields: []
     };
     updateFn([...entries, newEntry]);
-    setSelectedEntryId(newEntry.id);
-    setActiveCategory(null);
-    setQuestionSearchQuery('');
+    handleEntrySelect(newEntry.id);
+    setMode('edit');
+  };
+
+  const addSubPlace = (parentId: string) => {
+    const newEntry: QuestionnaireEntry = {
+      id: `q-${Date.now()}`,
+      name: 'מיקום ספציפי חדש',
+      parentId,
+      data: { placeType: 'micro' },
+      customFields: []
+    };
+    onUpdatePlaces([...places, newEntry]);
+    handleEntrySelect(newEntry.id);
     setMode('edit');
   };
 
@@ -314,7 +410,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           ].map(tab => (
             <button 
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id as any); setSelectedEntryId(null); setActiveCategory(null); setQuestionSearchQuery(''); setMode('view'); }}
+              onClick={() => handleTabChange(tab.id as any)}
               className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
             >
               <tab.icon size={18} />
@@ -334,31 +430,122 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
             <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם'}</span>
           </button>
           
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {entries.map(entry => (
-              <div 
-                key={entry.id}
-                onClick={() => { setSelectedEntryId(entry.id); setActiveCategory(null); setQuestionSearchQuery(''); }}
-                className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  {entry.imageUrl ? (
-                    <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
-                  ) : activeTab === 'places' ? (
-                    entry.data.placeType === 'macro' ? <Globe size={16} className="text-blue-400" /> : <Home size={16} className="text-amber-400" />
-                  ) : (
-                    <Icon size={16} className={selectedEntryId === entry.id ? 'text-amber-800' : 'text-amber-300'} />
-                  )}
-                  <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {activeTab === 'characters' ? (
+              CHARACTER_ROLES.map(role => {
+                const roleEntries = entries.filter(e => e.role === role.id || (!e.role && role.id === 'others'));
+                if (roleEntries.length === 0) return null;
+                
+                return (
+                  <div key={role.id} className="space-y-2">
+                    <h4 className="text-[10px] font-black text-amber-900/40 uppercase tracking-widest px-2">{role.label}</h4>
+                    {roleEntries.map(entry => (
+                      <div 
+                        key={entry.id}
+                        onClick={() => handleEntrySelect(entry.id)}
+                        className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          {entry.imageUrl ? (
+                            <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
+                          ) : (
+                            <Icon size={16} className={selectedEntryId === entry.id ? 'text-amber-800' : 'text-amber-300'} />
+                          )}
+                          <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
+                        </div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                          className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })
+            ) : activeTab === 'places' ? (
+              entries.filter(e => !e.parentId).map(entry => (
+                <div key={entry.id} className="space-y-1">
+                  <div 
+                    onClick={() => handleEntrySelect(entry.id)}
+                    className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {entry.imageUrl ? (
+                        <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
+                      ) : (
+                        entry.data.placeType === 'macro' ? <Globe size={16} className="text-blue-400" /> : <Home size={16} className="text-amber-400" />
+                      )}
+                      <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {entry.data.placeType === 'macro' && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); addSubPlace(entry.id); }}
+                          className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600 p-1"
+                          title="הוסף מיקום ספציפי"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                        className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Render children */}
+                  {entries.filter(e => e.parentId === entry.id).map(child => (
+                    <div 
+                      key={child.id}
+                      onClick={() => handleEntrySelect(child.id)}
+                      className={`group flex items-center justify-between p-3 mr-6 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === child.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        {child.imageUrl ? (
+                          <img src={child.imageUrl} className="w-5 h-5 rounded-full object-cover border border-amber-200" />
+                        ) : (
+                          <Home size={14} className="text-amber-400" />
+                        )}
+                        <span className={`font-bold text-xs truncate ${selectedEntryId === child.id ? 'text-amber-900' : 'text-amber-700'}`}>{child.name}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== child.id)); if(selectedEntryId === child.id) handleEntrySelect(null); }}
+                        className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) setSelectedEntryId(null); }}
-                  className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+              ))
+            ) : (
+              entries.map(entry => (
+                <div 
+                  key={entry.id}
+                  onClick={() => handleEntrySelect(entry.id)}
+                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {entry.imageUrl ? (
+                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
+                    ) : (
+                      <Icon size={16} className={selectedEntryId === entry.id ? 'text-amber-800' : 'text-amber-300'} />
+                    )}
+                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                    className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -375,11 +562,17 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 <LayoutList size={14} />
                 <span>הכל</span>
              </button>
-             {categories.map(cat => (
+             {categories.map((cat, index) => (
                <button 
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-right transition-all ${activeCategory === cat ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-amber-800/60 hover:bg-amber-50'}`}
+                  onClick={() => {
+                    if (mode === 'edit') {
+                      setCurrentCategoryIndex(index);
+                    } else {
+                      setActiveCategory(cat);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-right transition-all ${currentCategoryIndex === index ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-amber-800/60 hover:bg-amber-50'}`}
                >
                   <span>{cat}</span>
                </button>
@@ -403,37 +596,109 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                        </button>
                      )}
                      
-                     <div className="relative group/img">
-                        <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-white overflow-hidden bg-white flex items-center justify-center">
+                      <div className="relative group/img">
+                        <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-white overflow-hidden bg-white flex items-center justify-center relative">
                           {selectedEntry.imageUrl ? (
                             <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
                           ) : (
                             <Icon size={24} className="text-amber-800/20" />
                           )}
+                          
+                          {mode === 'edit' && (
+                            <label 
+                              className="absolute inset-0 flex items-center justify-center bg-amber-900/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-white"
+                              onClick={(e) => {
+                                let isElectron = false;
+                                try {
+                                  isElectron = !!((window as any).require && (window as any).require('electron'));
+                                } catch (err) {
+                                  isElectron = false;
+                                }
+                                
+                                if (isElectron) {
+                                  e.preventDefault();
+                                  handleImageUpload(null as any);
+                                }
+                              }}
+                            >
+                              <Camera size={20} />
+                              <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                            </label>
+                          )}
                         </div>
-                        {mode === 'edit' && (
-                          <label className="absolute inset-0 flex items-center justify-center bg-amber-900/40 rounded-2xl opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-white">
-                            <Camera size={20} />
-                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                          </label>
+                        
+                        {mode === 'edit' && selectedEntry.imageUrl && (
+                          <button 
+                            onClick={handleRemoveImage}
+                            className="absolute -top-2 -right-2 bg-white text-red-500 p-1 rounded-full shadow-md border border-red-100 hover:bg-red-50 transition-all z-10"
+                            title="הסרת תמונה"
+                          >
+                            <X size={12} />
+                          </button>
                         )}
-                     </div>
+                      </div>
 
                      <div className="flex-1">
                         {mode === 'edit' ? (
-                          <input 
-                            value={selectedEntry.name}
-                            onChange={(e) => updateEntry({ name: e.target.value })}
-                            className="text-2xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
-                            placeholder="שם..."
-                          />
+                          <>
+                            <input 
+                              value={selectedEntry.name}
+                              onChange={(e) => updateEntry({ name: e.target.value })}
+                              className="text-2xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
+                              placeholder="שם..."
+                            />
+                            {activeTab === 'characters' && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {CHARACTER_ROLES.map(role => (
+                                  <button
+                                    key={role.id}
+                                    onClick={() => updateEntry({ role: role.id })}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-amber-800 text-white border-amber-800 shadow-sm' : 'bg-white text-amber-800/60 border-amber-100 hover:bg-amber-50'}`}
+                                  >
+                                    {role.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
-                          <h2 className="text-3xl font-bold text-amber-900 handwritten text-5xl">{selectedEntry.name}</h2>
+                          <>
+                            <h2 className="text-3xl font-bold text-amber-900 handwritten text-5xl">{selectedEntry.name}</h2>
+                            {activeTab === 'characters' && selectedEntry.role && (
+                              <div className="mt-2">
+                                <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold">
+                                  {CHARACTER_ROLES.find(r => r.id === selectedEntry.role)?.label}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
                      </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-3">
+                    {mode === 'edit' && (
+                      <div className="flex items-center gap-2">
+                        {isSearchActive && (
+                          <input 
+                            type="text"
+                            placeholder="חפש שאלה..."
+                            value={questionSearchQuery}
+                            onChange={(e) => setQuestionSearchQuery(e.target.value)}
+                            className="bg-white border border-amber-100 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-amber-200 outline-none w-40 animate-in slide-in-from-left-2"
+                            autoFocus
+                          />
+                        )}
+                        <button 
+                          onClick={() => setIsSearchActive(!isSearchActive)}
+                          className={`p-2.5 rounded-xl transition-all shadow-sm border ${isSearchActive ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-white text-amber-800 border-amber-100 hover:bg-amber-50'}`}
+                          title="חיפוש שאלה"
+                        >
+                          <Search size={18} />
+                        </button>
+                      </div>
+                    )}
+
                     <button 
                       onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
                       className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-amber-800 text-white border-amber-900 hover:bg-amber-900' : 'bg-white text-amber-800 border-amber-100 hover:bg-amber-50'}`}
@@ -449,60 +714,77 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     >
                       <Download size={18} />
                     </button>
+
+                    <button 
+                      onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                      className="p-2.5 bg-white border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                      title="מחיקת פריט"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
 
-                {mode === 'edit' && (
+                 {mode === 'edit' && (
                   <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-4">
-                      {activeTab === 'characters' && (
-                          <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
-                            <button 
-                              onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'male' } })}
-                              className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'male' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                            >
-                              <UserRound size={14} />
-                              <span>זכר</span>
-                            </button>
-                            <button 
-                              onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'female' } })}
-                              className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'female' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                            >
-                              <UserRoundSearch size={14} />
-                              <span>נקבה</span>
-                            </button>
-                          </div>
-                        )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {activeTab === 'characters' && (
+                            <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
+                              <button 
+                                onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'male' } })}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'male' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
+                              >
+                                <UserRound size={14} />
+                                <span>זכר</span>
+                              </button>
+                              <button 
+                                onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'female' } })}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'female' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
+                              >
+                                <UserRoundSearch size={14} />
+                                <span>נקבה</span>
+                              </button>
+                            </div>
+                          )}
 
-                        {activeTab === 'places' && (
-                          <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
-                            <button 
-                              onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'macro' } })}
-                              className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'macro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                            >
-                              <Globe size={14} />
-                              <span>מיקום גאוגרפי</span>
-                            </button>
-                            <button 
-                              onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'micro' } })}
-                              className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'micro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                            >
-                              <Home size={14} />
-                              <span>מקום ספציפי</span>
-                            </button>
-                          </div>
-                        )}
-                    </div>
-                    
-                    <div className="relative group">
-                      <Search size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-amber-400 group-focus-within:text-amber-700 transition-colors" />
-                      <input 
-                        type="text"
-                        placeholder="חפש שאלה בשאלון..."
-                        value={questionSearchQuery}
-                        onChange={(e) => setQuestionSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-amber-100 rounded-2xl pr-12 pl-6 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none shadow-sm"
-                      />
+                          {activeTab === 'places' && (
+                            <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
+                              <button 
+                                onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'macro' } })}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'macro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
+                              >
+                                <Globe size={14} />
+                                <span>מיקום גאוגרפי</span>
+                              </button>
+                              <button 
+                                onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'micro' } })}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'micro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
+                              >
+                                <Home size={14} />
+                                <span>מקום ספציפי</span>
+                              </button>
+                            </div>
+                          )}
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-amber-100/50 p-1 rounded-xl border border-amber-200">
+                        <button 
+                          disabled={currentCategoryIndex === 0}
+                          onClick={() => setCurrentCategoryIndex(prev => prev - 1)}
+                          className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all disabled:opacity-30"
+                        >
+                          <ChevronLeft size={20} className="rotate-180" />
+                        </button>
+                        <span className="text-xs font-bold text-amber-900 px-2 min-w-[100px] text-center">{currentCategory}</span>
+                        <button 
+                          disabled={currentCategoryIndex === categories.length - 1}
+                          onClick={() => setCurrentCategoryIndex(prev => prev + 1)}
+                          className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all disabled:opacity-30"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -581,6 +863,32 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           <span>הוסף</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Navigation Buttons at bottom */}
+                    <div className="flex items-center justify-between pt-10 border-t border-amber-50 mt-10">
+                      <button 
+                        disabled={currentCategoryIndex === 0}
+                        onClick={(e) => { 
+                          setCurrentCategoryIndex(prev => prev - 1); 
+                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-white border border-amber-100 rounded-xl text-amber-800 font-bold hover:bg-amber-50 transition-all disabled:opacity-30 shadow-sm"
+                      >
+                        <ChevronLeft size={18} className="rotate-180" />
+                        <span>קטגוריה קודמת</span>
+                      </button>
+                      <button 
+                        disabled={currentCategoryIndex === categories.length - 1}
+                        onClick={(e) => { 
+                          setCurrentCategoryIndex(prev => prev + 1); 
+                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-amber-800 text-white rounded-xl font-bold hover:bg-amber-900 transition-all disabled:opacity-30 shadow-md"
+                      >
+                        <span>קטגוריה הבאה</span>
+                        <ChevronLeft size={18} />
+                      </button>
                     </div>
                   </>
                 ) : (

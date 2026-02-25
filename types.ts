@@ -17,9 +17,11 @@ export interface Plotline {
 export interface QuestionnaireEntry {
   id: string;
   name: string;
+  role?: string; // For categorization (e.g., main character, family)
   imageUrl?: string; // Unified image field
   x?: number; // Spatial X for character map
   y?: number; // Spatial Y for character map
+  parentId?: string; // For nested entries (e.g., micro places within macro)
   data: Record<string, string>; // Questions and their answers
   customFields?: { id: string; label: string }[]; // User-defined questions
 }
@@ -46,4 +48,12 @@ export interface Book extends Project {
   id: string;
   title: string;
   lastModified: number;
+  uiState?: {
+    lastView?: 'board' | 'editor' | 'questionnaires' | 'characterMap';
+    editorFocusedSceneId?: string | null;
+    editorDisplayMode?: 'full' | 'focus';
+    questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds';
+    questionnaireSelectedEntryId?: string | null;
+    boardZoomLevel?: number;
+  };
 }

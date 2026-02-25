@@ -1,4 +1,3 @@
-
 {
   "name": "storylines-desktop",
   "private": true,
@@ -9,27 +8,29 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "tsc --noEmit",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@google/genai": "^1.41.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.468.0",
-    "@google/genai": "^1.41.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.0",
-    "vite-plugin-singlefile": "^2.1.0",
-    "typescript": "^5.7.0",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
-    "concurrently": "^9.1.0",
-    "wait-on": "^8.0.0",
-    "cross-env": "^7.0.3"
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.1.0",
+    "wait-on": "^8.0.0"
   },
   "build": {
     "appId": "com.storylines.author.tool",

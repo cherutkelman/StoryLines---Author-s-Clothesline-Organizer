@@ -101,10 +101,12 @@ const App: React.FC = () => {
   });
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'characterMap'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'characterMap'>(() => {
+    const firstBook = books[0];
+    return firstBook?.uiState?.lastView || 'board';
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   
   // Modals state
@@ -126,6 +128,12 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
+    if (activeBook?.uiState?.lastView) {
+      setActiveView(activeBook.uiState.lastView);
+    }
+  }, [activeBookId]);
+
+  useEffect(() => {
     if (activeBook) {
       setVisiblePlotlines(activeBook.plotlines.map(p => p.id));
       if (!bulkPlotlineId) setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
@@ -139,6 +147,21 @@ const App: React.FC = () => {
 
   const updateActiveBook = (updates: Partial<Book>) => {
     setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, ...updates, lastModified: Date.now() } : b));
+  };
+
+  const updateBookUiState = (updates: Partial<NonNullable<Book['uiState']>>) => {
+    if (!activeBook) return;
+    updateActiveBook({
+      uiState: {
+        ...(activeBook.uiState || {}),
+        ...updates
+      }
+    });
+  };
+
+  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'characterMap') => {
+    setActiveView(view);
+    updateBookUiState({ lastView: view });
   };
 
   const handleBulkAdd = () => {
@@ -161,27 +184,6 @@ const App: React.FC = () => {
     });
     setBulkTitles('');
     setIsBulkAddOpen(false);
-  };
-
-  const handleAiRefine = async (sceneId: string) => {
-    if (!activeBook) return;
-    const scene = activeBook.scenes.find(s => s.id === sceneId);
-    if (!scene || !process.env.API_KEY) return;
-
-    setIsAiLoading(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `עזור לי להרחיב את הסצנה הבאה: כותרת: ${scene.title}, תוכן: ${scene.content}. המשך את הסיפור בצורה מעניינת.`,
-      });
-      const newContent = response.text || '';
-      updateScene(sceneId, { content: scene.content + "\n\n" + newContent });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsAiLoading(false);
-    }
   };
 
   const handleAiTextSplit = async () => {
@@ -438,28 +440,28 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-1 bg-amber-50 p-1.5 rounded-2xl border border-amber-100/50 shadow-inner">
           <button 
-            onClick={() => setActiveView('board')} 
+            onClick={() => handleViewChange('board')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
             <Layout size={18} />
             <span className="hidden sm:inline">לוח עלילה</span>
           </button>
           <button 
-            onClick={() => setActiveView('editor')} 
+            onClick={() => handleViewChange('editor')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
             <LucideType size={18} />
             <span className="hidden sm:inline">עורך טקסט</span>
           </button>
           <button 
-            onClick={() => setActiveView('characterMap')} 
+            onClick={() => handleViewChange('characterMap')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'characterMap' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
             <Users size={18} />
             <span className="hidden sm:inline">מפת דמויות</span>
           </button>
           <button 
-            onClick={() => setActiveView('questionnaires')} 
+            onClick={() => handleViewChange('questionnaires')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
             <ListChecks size={18} />
@@ -584,17 +586,32 @@ const App: React.FC = () => {
                   <Board 
                     project={activeBook} 
                     visiblePlotlines={visiblePlotlines}
-                    onAddScene={addScene} 
+                    onAddScene={addScene}
                     onMoveScene={moveScene} 
                     updateScene={updateScene} 
                     onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
                     onOpenSuggestions={() => setIsSuggestionsOpen(true)}
+                    initialZoom={activeBook.uiState?.boardZoomLevel}
+                    onZoomChange={(z) => updateBookUiState({ boardZoomLevel: z })}
+                    onSceneDoubleClick={(id) => {
+                      handleViewChange('editor');
+                      updateBookUiState({ editorFocusedSceneId: id });
+                    }}
                   />
                 </div>
               )}
               {activeView === 'editor' && (
                 <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
-                  <Editor project={activeBook} visiblePlotlines={visiblePlotlines} onUpdateScene={updateScene} onAiRefine={handleAiRefine} isAiLoading={isAiLoading} onOpenBulkAdd={() => setIsBulkAddOpen(true)} />
+                  <Editor 
+                    project={activeBook} 
+                    visiblePlotlines={visiblePlotlines} 
+                    onUpdateScene={updateScene} 
+                    onOpenBulkAdd={() => setIsBulkAddOpen(true)} 
+                    initialFocusedSceneId={activeBook.uiState?.editorFocusedSceneId}
+                    onFocusScene={(id) => updateBookUiState({ editorFocusedSceneId: id })}
+                    initialDisplayMode={activeBook.uiState?.editorDisplayMode}
+                    onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
+                  />
                 </div>
               )}
               {activeView === 'characterMap' && (
@@ -620,6 +637,10 @@ const App: React.FC = () => {
                     onUpdatePeriods={(e) => updateEntries('periods', e)}
                     onUpdateTwists={(e) => updateEntries('twists', e)}
                     onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
+                    initialTab={activeBook.uiState?.questionnaireActiveTab}
+                    initialSelectedEntryId={activeBook.uiState?.questionnaireSelectedEntryId}
+                    onTabChange={(tab) => updateBookUiState({ questionnaireActiveTab: tab })}
+                    onEntrySelect={(id) => updateBookUiState({ questionnaireSelectedEntryId: id })}
                   />
                 </div>
               )}

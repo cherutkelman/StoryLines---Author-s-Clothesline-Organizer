@@ -11,12 +11,20 @@ interface BoardProps {
   updateScene: (id: string, updates: Partial<Scene>) => void;
   onBulkAdd: (plotlineId: string) => void;
   onOpenSuggestions: () => void;
+  initialZoom?: number;
+  onZoomChange?: (zoom: number) => void;
+  onSceneDoubleClick?: (sceneId: string) => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions }) => {
+const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions, initialZoom, onZoomChange, onSceneDoubleClick }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const boardRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+    onZoomChange?.(newZoom);
+  };
 
   const handleDragStart = (sceneId: string) => {
     dragItem.current = { sceneId };
@@ -46,7 +54,7 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
       {/* Zoom Controls Overlay */}
       <div className="absolute top-6 left-6 z-40 flex items-center gap-3 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200">
         <button 
-          onClick={() => setZoomLevel(prev => Math.max(0.2, prev - 0.1))}
+          onClick={() => handleZoomChange(Math.max(0.2, zoomLevel - 0.1))}
           className="p-2 text-amber-800 hover:bg-amber-100 rounded-xl transition-colors"
           title="הקטנה"
         >
@@ -59,12 +67,12 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
           max="1.5" 
           step="0.05" 
           value={zoomLevel} 
-          onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+          onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
           className="w-32 accent-amber-800"
         />
 
         <button 
-          onClick={() => setZoomLevel(prev => Math.min(1.5, prev + 0.1))}
+          onClick={() => handleZoomChange(Math.min(1.5, zoomLevel + 0.1))}
           className="p-2 text-amber-800 hover:bg-amber-100 rounded-xl transition-colors"
           title="הגדלה"
         >
@@ -74,7 +82,7 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
         <div className="w-px h-6 bg-amber-200 mx-1" />
 
         <button 
-          onClick={handleResetZoom}
+          onClick={() => handleZoomChange(1)}
           className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 rounded-lg transition-colors"
         >
           <Maximize size={16} />
@@ -131,20 +139,15 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
                   }}
                 />
                 
-                <div className="absolute -right-44 w-40 text-left pr-4 group/label">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black uppercase tracking-widest text-amber-900/60 block truncate">
-                      {plotline.name}
-                    </span>
-                    <button 
-                      onClick={() => onBulkAdd(plotline.id)}
-                      className="opacity-0 group-hover/label:opacity-100 p-1 text-amber-400 hover:text-indigo-600 transition-all bg-white rounded-full shadow-sm"
-                      title="הוספה מרובה"
-                    >
-                      <CopyPlus size={16} />
-                    </button>
+                <div className="sticky right-0 z-30 flex items-center h-full pr-12 pl-16 bg-gradient-to-l from-[#fdf6e3] via-[#fdf6e3]/95 to-transparent -mr-32 group/label pointer-events-none">
+                  <div className="flex flex-col gap-1 min-w-[160px] pointer-events-auto">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xl font-black uppercase tracking-tighter text-amber-900 block truncate handwritten text-3xl drop-shadow-sm">
+                        {plotline.name}
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full shadow-md border border-white/50" style={{ backgroundColor: plotline.color }} />
                   </div>
-                  <div className="h-1.5 w-full mt-1 rounded-full shadow-inner" style={{ backgroundColor: plotline.color }} />
                 </div>
 
                 <div className="flex items-center gap-12 px-8 w-full">
@@ -162,7 +165,8 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
                           <div
                             draggable
                             onDragStart={() => handleDragStart(sceneInThisSlot.id)}
-                            className={`w-40 h-40 bg-white shadow-xl border-t-8 p-4 rounded-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
+                            onDoubleClick={() => onSceneDoubleClick?.(sceneInThisSlot.id)}
+                            className={`w-40 h-40 bg-white shadow-xl border-t-8 p-4 rounded-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
                             style={{ borderTopColor: plotline.color }}
                           >
                             <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[#e5dcc3] border border-amber-200/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
@@ -183,11 +187,16 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
                             />
                             <div className="h-px bg-amber-50 my-3" />
                             <textarea 
-                              className="text-[11px] text-amber-700/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-20 overflow-hidden"
+                              className="text-[11px] text-amber-700/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
                               value={sceneInThisSlot.content}
                               placeholder="סצנה ריקה..."
                               onChange={(e) => updateScene(sceneInThisSlot.id, { content: e.target.value })}
                             />
+                            <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
+                              <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
+                                {plotline.name}
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <button 

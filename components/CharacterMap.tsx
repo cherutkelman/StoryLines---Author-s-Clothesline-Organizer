@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2 } from 'lucide-react';
+import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 interface CharacterMapProps {
   characters: QuestionnaireEntry[];
@@ -94,14 +95,88 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     onUpdateConnections(connections.filter(c => c.id !== id));
   };
 
-  const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Renderer: handleImageUpload triggered for node:', id);
+    
+    // Safer check for Electron
+    let isElectron = false;
+    try {
+      isElectron = !!((window as any).require && (window as any).require('electron'));
+    } catch (err) {
+      isElectron = false;
+    }
+    
+    if (isElectron) {
+      console.log('Renderer: Electron environment detected, using IPC dialog');
+      try {
+        const { ipcRenderer } = (window as any).require('electron');
+        const dataUrl = await ipcRenderer.invoke('open-image-dialog');
+        
+        console.log('Renderer: IPC dialog returned result');
+        if (dataUrl) {
+          console.log('Renderer: Received dataUrl, updating node');
+          updateNode(id, { imageUrl: dataUrl });
+        } else {
+          console.log('Renderer: Dialog was canceled or no file selected');
+        }
+      } catch (error) {
+        console.error('Renderer: Error in Electron image upload:', error);
+      }
+      return;
+    }
+
+    console.log('Renderer: Standard web environment detected, using FileReader');
+    const file = e?.target?.files?.[0];
     if (file) {
+      console.log('Renderer: File selected:', file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log('Renderer: FileReader finished reading');
         updateNode(id, { imageUrl: reader.result as string });
       };
+      reader.onerror = (err) => {
+        console.error('Renderer: FileReader error:', err);
+      };
       reader.readAsDataURL(file);
+    } else {
+      console.log('Renderer: No file selected in standard input');
+    }
+  };
+
+  const handleRemoveImage = (id: string) => {
+    updateNode(id, { imageUrl: undefined });
+  };
+
+  const exportAsImage = async () => {
+    if (!canvasRef.current) return;
+    
+    // Temporarily hide UI elements that shouldn't be in the image
+    const toolbar = document.querySelector('.character-map-toolbar') as HTMLElement;
+    const instructions = document.querySelector('.character-map-instructions') as HTMLElement;
+    const nodeControls = document.querySelectorAll('.node-controls');
+    
+    if (toolbar) toolbar.style.display = 'none';
+    if (instructions) instructions.style.display = 'none';
+    nodeControls.forEach(el => (el as HTMLElement).style.display = 'none');
+
+    try {
+      const canvas = await html2canvas(canvasRef.current, {
+        backgroundColor: '#fdf6e3',
+        useCORS: true,
+        scale: 2, // Higher quality
+      });
+      
+      const link = document.createElement('a');
+      link.download = `character-map-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('Failed to export image:', err);
+    } finally {
+      // Restore UI elements
+      if (toolbar) toolbar.style.display = 'flex';
+      if (instructions) instructions.style.display = 'block';
+      nodeControls.forEach(el => (el as HTMLElement).style.display = 'flex');
     }
   };
 
@@ -110,7 +185,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   return (
     <div className="h-full flex flex-col relative select-none bg-[#fdf6e3]">
       {/* Tool Bar */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200 flex items-center gap-2">
+      <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200 flex items-center gap-2">
         <button 
           onClick={() => setTool('move')}
           className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
@@ -132,6 +207,15 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         >
           <Plus size={18} />
           <span className="text-xs font-bold">דמות חדשה</span>
+        </button>
+        <div className="w-px h-6 bg-amber-200 mx-1" />
+        <button 
+          onClick={exportAsImage}
+          className="p-3 bg-white text-amber-800 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all flex items-center gap-2"
+          title="ייצוא תמונה"
+        >
+          <Download size={18} />
+          <span className="text-xs font-bold">ייצוא תמונה</span>
         </button>
       </div>
 
@@ -240,14 +324,40 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
 
             {/* Node Controls Overlay */}
             {selectedNodeId === node.id && (
-              <div className="absolute -top-12 flex gap-2 animate-in fade-in slide-in-from-bottom-2">
-                <label className="p-2 bg-white text-blue-500 rounded-full shadow-lg hover:bg-blue-50 cursor-pointer">
+              <div className="node-controls absolute -top-12 flex gap-2 animate-in fade-in slide-in-from-bottom-2">
+                <label 
+                  className="p-2 bg-white text-blue-600 rounded-full shadow-lg hover:bg-blue-50 cursor-pointer border border-blue-100 transition-colors" 
+                  title="העלאת תמונה"
+                  onClick={(e) => {
+                    let isElectron = false;
+                    try {
+                      isElectron = !!((window as any).require && (window as any).require('electron'));
+                    } catch (err) {
+                      isElectron = false;
+                    }
+                    
+                    if (isElectron) {
+                      e.preventDefault();
+                      handleImageUpload(node.id, null as any);
+                    }
+                  }}
+                >
                   <ImageIcon size={16} />
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(node.id, e)} />
                 </label>
+                {node.imageUrl && (
+                  <button 
+                    onClick={() => handleRemoveImage(node.id)}
+                    className="p-2 bg-white text-orange-500 rounded-full shadow-lg hover:bg-orange-50 border border-orange-100 transition-colors"
+                    title="הסרת תמונה"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
                 <button 
                   onClick={() => deleteNode(node.id)}
-                  className="p-2 bg-white text-red-500 rounded-full shadow-lg hover:bg-red-50"
+                  className="p-2 bg-white text-red-500 rounded-full shadow-lg hover:bg-red-50 border border-red-100 transition-colors"
+                  title="מחיקת דמות"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -264,7 +374,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       </div>
 
       {/* Floating Instructions */}
-      <div className="absolute bottom-8 right-8 text-right pointer-events-none">
+      <div className="character-map-instructions absolute bottom-8 right-8 text-right pointer-events-none">
         <h4 className="handwritten text-3xl text-amber-900/40 mb-1">מפת דמויות</h4>
         <p className="text-[10px] text-amber-900/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
       </div>
