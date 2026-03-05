@@ -28,6 +28,7 @@ import {
   ChevronLast,
   ChevronFirst,
   Users,
+  Map,
   Eye,
   EyeOff,
   MessageSquareQuote,
@@ -35,11 +36,11 @@ import {
   // Added missing CheckCircle2 import
   CheckCircle2
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
-import CharacterMap from './components/CharacterMap';
+import MapsManager from './components/MapsManager';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const STORAGE_KEY = 'storylines_library_v2';
@@ -59,7 +60,9 @@ const DEFAULT_PROJECT_DATA = {
   periods: [],
   twists: [],
   fantasyWorlds: [],
-  characterMapConnections: []
+  characterMapConnections: [],
+  maps: [],
+  mindMaps: []
 };
 
 const createNewBook = (title: string): Book => ({
@@ -101,9 +104,10 @@ const App: React.FC = () => {
   });
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'characterMap'>(() => {
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps'>(() => {
     const firstBook = books[0];
-    return firstBook?.uiState?.lastView || 'board';
+    const lastView = firstBook?.uiState?.lastView;
+    return (lastView === 'characterMap' as any ? 'maps' : lastView) || 'board';
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
@@ -159,7 +163,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'characterMap') => {
+  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'maps') => {
     setActiveView(view);
     updateBookUiState({ lastView: view });
   };
@@ -412,7 +416,7 @@ const App: React.FC = () => {
     }
   };
 
-  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapConnections', entries: any[]) => {
+  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
@@ -454,11 +458,11 @@ const App: React.FC = () => {
             <span className="hidden sm:inline">עורך טקסט</span>
           </button>
           <button 
-            onClick={() => handleViewChange('characterMap')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'characterMap' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            onClick={() => handleViewChange('maps')} 
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
           >
-            <Users size={18} />
-            <span className="hidden sm:inline">מפת דמויות</span>
+            <Map size={18} />
+            <span className="hidden sm:inline">מפות</span>
           </button>
           <button 
             onClick={() => handleViewChange('questionnaires')} 
@@ -585,6 +589,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-0">
                   <Board 
                     project={activeBook} 
+                    title={activeBook.title}
                     visiblePlotlines={visiblePlotlines}
                     onAddScene={addScene}
                     onMoveScene={moveScene} 
@@ -614,13 +619,23 @@ const App: React.FC = () => {
                   />
                 </div>
               )}
-              {activeView === 'characterMap' && (
+              {activeView === 'maps' && (
                 <div className="absolute inset-0 overflow-hidden">
-                   <CharacterMap 
+                   <MapsManager 
                       characters={activeBook.characters || []}
                       connections={activeBook.characterMapConnections || []}
+                      maps={activeBook.maps || []}
+                      mindMaps={activeBook.mindMaps || []}
                       onUpdateCharacters={(chars) => updateEntries('characters', chars)}
                       onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
+                      onUpdateMaps={(maps) => updateEntries('maps', maps)}
+                      onUpdateMindMaps={(mindMaps) => updateEntries('mindMaps', mindMaps)}
+                      initialTab={activeBook.uiState?.mapsActiveTab}
+                      onTabChange={(tab) => updateBookUiState({ mapsActiveTab: tab })}
+                      selectedMapId={activeBook.uiState?.mapsSelectedMapId}
+                      onMapSelect={(id) => updateBookUiState({ mapsSelectedMapId: id })}
+                      selectedMindMapId={activeBook.uiState?.mapsSelectedMindMapId}
+                      onMindMapSelect={(id) => updateBookUiState({ mapsSelectedMindMapId: id })}
                    />
                 </div>
               )}

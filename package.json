@@ -1,7 +1,7 @@
 {
   "name": "storylines-desktop",
   "private": true,
-  "version": "1.1.10",
+  "version": "1.1.0",
   "type": "commonjs",
   "main": "main.js",
   "scripts": {
@@ -15,9 +15,12 @@
   "dependencies": {
     "@google/genai": "^1.41.0",
     "html2canvas": "^1.4.1",
+    "konva": "^10.2.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-konva": "^19.2.3",
+    "use-image": "^1.1.4"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -43,21 +46,10 @@
       "dist/**/*",
       "main.js"
     ],
-"win": {
-  "target": [
-    {
-      "target": "nsis",
-      "arch": ["x64"]
-    }
-  ],
-  "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
-},
-"nsis": {
-  "oneClick": false,
-  "perMachine": false,
-  "allowElevation": true,
-  "allowToChangeInstallationDirectory": true
-},
+    "win": {
+      "target": "portable",
+      "icon": "https://cdn-icons-png.flaticon.com/512/3532/3532139.png"
+    },
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity"
