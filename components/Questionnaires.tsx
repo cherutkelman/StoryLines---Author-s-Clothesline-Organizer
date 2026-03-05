@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { QuestionnaireEntry } from '../types';
+import { QuestionnaireEntry, DevelopmentStage, SpecialItem } from '../types';
 import { 
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
@@ -33,89 +33,85 @@ interface QuestionnairesProps {
 }
 
 const FEMALE_QUESTIONS_CONFIG = [
-  { id: "name", category: "זהות בסיסית", question: "שם הדמות", type: "text" },
+  { id: "name", category: "זהות בסיסית", question: "שם מלא וכינוי (אם יש)", type: "text" },
   { id: "age", category: "זהות בסיסית", question: "גיל", type: "text" },
   { id: "residence", category: "זהות בסיסית", question: "מקום מגורים", type: "text" },
-  { id: "daily_life", category: "שגרה", question: "מה היא עושה ביום יום", type: "textarea" },
-  { id: "goal", category: "מטרות וקונפליקט", question: "מה היא רוצה להשיג", type: "textarea" },
-  { id: "obstacles", category: "מטרות וקונפליקט", question: "מה מפריע לה להשיג את זה", type: "textarea" },
-  { id: "abilities", category: "יכולות", question: "אילו יכולות יש לה", type: "textarea" },
-  { id: "special_powers", category: "יכולות", question: "כוחות מיוחדים (פנטזיה)", type: "textarea" },
-  { id: "avoidance", category: "גבולות פנימיים", question: "מה היא לא רוצה לעשות", type: "textarea" },
-  { id: "difficulties", category: "קשיים", question: "מה הקשיים שלה", type: "textarea" },
-  { id: "values", category: "עולם ערכים", question: "ערכים שמובילים אותה", type: "textarea" },
-  { id: "hobbies", category: "העדפות", question: "מה היא אוהבת לעשות", type: "textarea" },
-  { id: "favorite_place", category: "העדפות", question: "איפה היא אוהבת להיות", type: "text" },
-  { id: "sweet_memories", category: "זיכרונות", question: "מה הזכרונות המתוקים ביותר שלה", type: "textarea" },
-  { id: "fear_memories", category: "זיכרונות", question: "מה הזכרונות המפחידים ביותר שלה", type: "textarea" },
-  { id: "strengths", category: "חוזקות", question: "איזה חוזקות יש לה", type: "textarea" },
-  { id: "traumas", category: "עבר רגשי", question: "איזה טראומות קרו לה", type: "textarea" },
-  { id: "favorite_food", category: "העדפות", question: "מאכלים אהובים", type: "text" },
-  { id: "favorite_color", category: "העדפות", question: "צבע אהוב", type: "text" },
-  { id: "general_appearance", category: "מאפיינים חיצוניים", question: "תיאור חיצוני כללי", type: "textarea" },
-  { id: "unique_features", category: "מאפיינים חיצוניים", question: "פרטים ייחודיים במראה", type: "textarea" },
-  { id: "gestures", category: "מאפיינים חיצוניים", question: "תנועות שהיא רגילה לעשות", type: "textarea" },
-  { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
-  { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
-  { id: "social_connections", category: "מערכות יחסים", question: "קשרים חברתיים שיש לה", type: "textarea" },
-  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לה", type: "textarea" },
-  { id: "initial_state", category: "קשת התפתחותית", question: "מצב התחלתי", type: "textarea" },
-  { id: "final_state", category: "קשת התפתחותית", question: "מצב סופי", type: "textarea" },
-  { id: "dev_stages", category: "קשת התפתחותית", question: "שלבים בהתפתחות", type: "textarea" },
-  { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
-  { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
-  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות היא מבצעת בעקבות ההתפתחות שלה", type: "textarea" },
-  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייה, רגשותיה, ובחירותיה", type: "textarea" },
-  { id: "central_dilemma", category: "קשת התפתחותית", question: "מהי הדילמה המרכזית של הדמות בסיפור?", type: "textarea" },
-  { id: "choice_between", category: "קשת התפתחותית", question: "בין אילו שני ערכים/פחדים היא נדרשת לבחור?", type: "textarea" },
-  { id: "first_choice_revelation", category: "קשת התפתחותית", question: "מה הבחירה הראשונה שלה חושפת עליה?", type: "textarea" },
-  { id: "choice_price", category: "קשת התפתחותית", question: "איזה מחיר היא משלמת בעקבות הבחירה?", type: "textarea" },
-  { id: "belief_impact", category: "קשת התפתחותית", question: "האם המחיר מערער אמונה פנימית שלה או מחזק אותה?", type: "textarea" },
-  { id: "similar_dilemma_later", category: "קשת התפתחותית", question: "האם בהמשך היא ניצבת בפני דילמה דומה?", type: "textarea" },
-  { id: "later_choice_diff", category: "קשת התפתחותית", question: "האם הבחירה המאוחרת שלה שונה מהראשונה?", type: "textarea" }
+  { id: "daily_life", category: "זהות בסיסית", question: "מה היא עושה ביום יום", type: "textarea" },
+  { id: "favorite_food", category: "זהות בסיסית", question: "מאכלים אהובים", type: "text" },
+  { id: "favorite_color", category: "זהות בסיסית", question: "צבע אהוב", type: "text" },
+  { id: "general_appearance", category: "זהות בסיסית", question: "תיאור חיצוני כללי", type: "textarea" },
+  { id: "unique_features", category: "זהות בסיסית", question: "פרטים ייחודיים במראה", type: "textarea" },
+  { id: "gestures", category: "זהות בסיסית", question: "תנועות שהיא רגילה לעשות", type: "textarea" },
+  { id: "common_phrases", category: "זהות בסיסית", question: "ביטויים שגורים", type: "textarea" },
+  { id: "traits", category: "זהות בסיסית", question: "תכונות אופי בולטות", type: "textarea" },
+  { id: "abilities", category: "עיצוב דמות", question: "אילו יכולות יש לה באופן כללי?", type: "textarea" },
+  { id: "special_powers", category: "עיצוב דמות", question: "כוחות מיוחדים שיש לה", type: "textarea" },
+  { id: "values", category: "עיצוב דמות", question: "ערכים שמובילים אותה", type: "textarea" },
+  { id: "hobbies", category: "עיצוב דמות", question: "מה היא אוהבת לעשות", type: "textarea" },
+  { id: "favorite_place", category: "עיצוב דמות", question: "איפה היא אוהבת להיות", type: "text" },
+  { id: "strengths", category: "עיצוב דמות", question: "אילו חוזקות יש לה", type: "textarea" },
+  { id: "difficulties", category: "עיצוב דמות", question: "אילו קשיים יש לה", type: "textarea" },
+  { id: "life_motto", category: "עיצוב דמות", question: "מוטו לחיים", type: "text" },
+  { id: "goal", category: "עיצוב דמות", question: "מה היא רוצה להשיג", type: "textarea" },
+  { id: "obstacles", category: "עיצוב דמות", question: "מה מפריע לה להשיג את זה", type: "textarea" },
+  { id: "avoidance", category: "עיצוב דמות", question: "מה היא לא רוצה לעשות", type: "textarea" },
+  { id: "sweet_memories", category: "עיצוב דמות", question: "מה הזכרונות המתוקים ביותר שלה", type: "textarea" },
+  { id: "bad_memories", category: "עיצוב דמות", question: "מה הזכרונות הגרועים ביותר שלה", type: "textarea" },
+  { id: "traumas", category: "עיצוב דמות", question: "טראומות עבר", type: "textarea" },
+  { id: "central_dilemma", category: "מניע עלילתי", question: "מהי הדילמה המרכזית שלה בסיפור?", type: "textarea" },
+  { id: "choice_between", category: "מניע עלילתי", question: "בין אילו שני ערכים/פחדים היא נדרשת לבחור?", type: "textarea" },
+  { id: "first_choice_revelation", category: "מניע עלילתי", question: "מה הבחירה הראשונה שלה חושפת עליה?", type: "textarea" },
+  { id: "choice_price", category: "מניע עלילתי", question: "איזה מחיר היא משלמת בעקבות הבחירה?", type: "textarea" },
+  { id: "belief_impact", category: "מניע עלילתי", question: "האם המחיר מערער אמונה פנימית שלה או מחזק אותה?", type: "textarea" },
+  { id: "similar_dilemma_later", category: "מניע עלילתי", question: "האם בהמשך היא ניצבת בפני דילמה דומה?", type: "textarea" },
+  { id: "later_choice_diff", category: "מניע עלילתי", question: "האם הבחירה המאוחרת שלה שונה מהראשונה?", type: "textarea" },
+  { id: "social_start_end", category: "מערכות יחסים", question: "קשרים חברתיים בתחילת ובסוף הספר", type: "textarea" },
+  { id: "family_start_end", category: "מערכות יחסים", question: "קשרים משפחתיים בתחילת ובסוף הספר", type: "textarea" },
+  { id: "romantic_start_end", category: "מערכות יחסים", question: "קשר זוגי בתחילת ובסוף הספר", type: "textarea" },
+  { id: "enemy_start_end", category: "מערכות יחסים", question: "קשר עם אויב/ אנטי הירו בתחילת ובסוף הספר", type: "textarea" },
+  { id: "changing_connections", category: "מערכות יחסים", question: "קשרים שמשתנים במהלך הספר ולמה", type: "textarea" },
+  { id: "other_connections", category: "מערכות יחסים", question: "קשרים נוספים", type: "textarea" }
 ];
 
 const MALE_QUESTIONS_CONFIG = [
-  { id: "name", category: "זהות בסיסית", question: "שם הדמות", type: "text" },
+  { id: "name", category: "זהות בסיסית", question: "שם מלא וכינוי (אם יש)", type: "text" },
   { id: "age", category: "זהות בסיסית", question: "גיל", type: "text" },
   { id: "residence", category: "זהות בסיסית", question: "מקום מגורים", type: "text" },
-  { id: "daily_life", category: "שגרה", question: "מה הוא עושה ביום יום", type: "textarea" },
-  { id: "goal", category: "מטרות וקונפליקט", question: "מה הוא רוצה להשיג", type: "textarea" },
-  { id: "obstacles", category: "מטרות וקונפליקט", question: "מה מפריע לו להשיג את זה", type: "textarea" },
-  { id: "abilities", category: "יכולות", question: "אילו יכולות יש לו", type: "textarea" },
-  { id: "special_powers", category: "יכולות", question: "כוחות מיוחדים (פנטזיה)", type: "textarea" },
-  { id: "avoidance", category: "גבולות פנימיים", question: "מה הוא לא רוצה לעשות", type: "textarea" },
-  { id: "difficulties", category: "קשיים", question: "מה הקשיים שלו", type: "textarea" },
-  { id: "values", category: "עולם ערכים", question: "ערכים שמובילים אותו", type: "textarea" },
-  { id: "hobbies", category: "העדפות", question: "מה הוא אוהב לעשות", type: "textarea" },
-  { id: "favorite_place", category: "העדפות", question: "איפה הוא אוהב להיות", type: "text" },
-  { id: "sweet_memories", category: "זיכרונות", question: "מה הזכרונות המתוקים ביותר שלו", type: "textarea" },
-  { id: "fear_memories", category: "זיכרונות", question: "מה הזכרונות המפחידים ביותר שלו", type: "textarea" },
-  { id: "strengths", category: "חוזקות", question: "איזה חוזקות יש לו", type: "textarea" },
-  { id: "traumas", category: "עבר רגשי", question: "איזה טראומות קרו לו", type: "textarea" },
-  { id: "favorite_food", category: "העדפות", question: "מאכלים אהובים", type: "text" },
-  { id: "favorite_color", category: "העדפות", question: "צבע אהוב", type: "text" },
-  { id: "general_appearance", category: "מאפיינים חיצוניים", question: "תיאור חיצוני כללי", type: "textarea" },
-  { id: "unique_features", category: "מאפיינים חיצוניים", question: "פרטים ייחודיים במראה", type: "textarea" },
-  { id: "gestures", category: "מאפיינים חיצוניים", question: "תנועות שהוא רגיל לעשות", type: "textarea" },
-  { id: "life_motto", category: "זהות פנימית", question: "מוטו לחיים", type: "text" },
-  { id: "common_phrases", category: "דיבור", question: "ביטויים שגורים", type: "textarea" },
-  { id: "social_connections", category: "מערכות יחסים", question: "קשרים חברתיים שיש לו", type: "textarea" },
-  { id: "family_connections", category: "מערכות יחסים", question: "קשרים משפחתיים שיש לו", type: "textarea" },
-  { id: "initial_state", category: "קשת התפתחותית", question: "מצב התחלתי", type: "textarea" },
-  { id: "final_state", category: "קשת התפתחותית", question: "מצב סופי", type: "textarea" },
-  { id: "dev_stages", category: "קשת התפתחותית", question: "שלבים בהתפתחות", type: "textarea" },
-  { id: "influences", category: "קשת התפתחותית", question: "מה משפיע על ההתפתחות", type: "textarea" },
-  { id: "choices_affecting_dev", category: "קשת התפתחותית", question: "אילו בחירות מבצעת הדמות המשפיעות על ההתפתחות שלה", type: "textarea" },
-  { id: "choices_post_dev", category: "קשת התפתחותית", question: "אילו בחירות הוא מבצע בעקבות ההתפתחות שלו", type: "textarea" },
-  { id: "twists_impact", category: "קשת התפתחותית", question: "איך משפיעים הטוויסטים בסיפור על חייו, רגשותיו, ובחירותיו", type: "textarea" },
-  { id: "central_dilemma", category: "קשת התפתחותית", question: "מהי הדילמה המרכזית של הדמות בסיפור?", type: "textarea" },
-  { id: "choice_between", category: "קשת התפתחותית", question: "בין אילו שני ערכים/פחדים הוא נדרש לבחור?", type: "textarea" },
-  { id: "first_choice_revelation", category: "קשת התפתחותית", question: "מה הבחירה הראשונה שלו חושפת עליו?", type: "textarea" },
-  { id: "choice_price", category: "קשת התפתחותית", question: "איזה מחיר הוא משלם בעקבות הבחירה?", type: "textarea" },
-  { id: "belief_impact", category: "קשת התפתחותית", question: "האם המחיר מערער אמונה פנימית שלו או מחזק אותה?", type: "textarea" },
-  { id: "similar_dilemma_later", category: "קשת התפתחותית", question: "האם בהמשך הוא ניצב בפני דילמה דומה?", type: "textarea" },
-  { id: "later_choice_diff", category: "קשת התפתחותית", question: "האם הבחירה המאוחרת שלו שונה מהראשונה?", type: "textarea" }
+  { id: "daily_life", category: "זהות בסיסית", question: "מה הוא עושה ביום יום", type: "textarea" },
+  { id: "favorite_food", category: "זהות בסיסית", question: "מאכלים אהובים", type: "text" },
+  { id: "favorite_color", category: "זהות בסיסית", question: "צבע אהוב", type: "text" },
+  { id: "general_appearance", category: "זהות בסיסית", question: "תיאור חיצוני כללי", type: "textarea" },
+  { id: "unique_features", category: "זהות בסיסית", question: "פרטים ייחודיים במראה", type: "textarea" },
+  { id: "gestures", category: "זהות בסיסית", question: "תנועות שהוא רגיל לעשות", type: "textarea" },
+  { id: "common_phrases", category: "זהות בסיסית", question: "ביטויים שגורים", type: "textarea" },
+  { id: "traits", category: "זהות בסיסית", question: "תכונות אופי בולטות", type: "textarea" },
+  { id: "abilities", category: "עיצוב דמות", question: "אילו יכולות יש לו באופן כללי?", type: "textarea" },
+  { id: "special_powers", category: "עיצוב דמות", question: "כוחות מיוחדים שיש לו", type: "textarea" },
+  { id: "values", category: "עיצוב דמות", question: "ערכים שמובילים אותו", type: "textarea" },
+  { id: "hobbies", category: "עיצוב דמות", question: "מה הוא אוהב לעשות", type: "textarea" },
+  { id: "favorite_place", category: "עיצוב דמות", question: "איפה הוא אוהב להיות", type: "text" },
+  { id: "strengths", category: "עיצוב דמות", question: "אילו חוזקות יש לו", type: "textarea" },
+  { id: "difficulties", category: "עיצוב דמות", question: "אילו קשיים יש לו", type: "textarea" },
+  { id: "life_motto", category: "עיצוב דמות", question: "מוטו לחיים", type: "text" },
+  { id: "goal", category: "עיצוב דמות", question: "מה הוא רוצה להשיג", type: "textarea" },
+  { id: "obstacles", category: "עיצוב דמות", question: "מה מפריע לו להשיג את זה", type: "textarea" },
+  { id: "avoidance", category: "עיצוב דמות", question: "מה הוא לא רוצה לעשות", type: "textarea" },
+  { id: "sweet_memories", category: "עיצוב דמות", question: "מה הזכרונות המתוקים ביותר שלו", type: "textarea" },
+  { id: "bad_memories", category: "עיצוב דמות", question: "מה הזכרונות הגרועים ביותר שלו", type: "textarea" },
+  { id: "traumas", category: "עיצוב דמות", question: "טראומות עבר", type: "textarea" },
+  { id: "central_dilemma", category: "מניע עלילתי", question: "מהי הדילמה המרכזית שלו בסיפור?", type: "textarea" },
+  { id: "choice_between", category: "מניע עלילתי", question: "בין אילו שני ערכים/פחדים הוא נדרש לבחור?", type: "textarea" },
+  { id: "first_choice_revelation", category: "מניע עלילתי", question: "מה הבחירה הראשונה שלו חושפת עליו?", type: "textarea" },
+  { id: "choice_price", category: "מניע עלילתי", question: "איזה מחיר הוא משלם בעקבות הבחירה?", type: "textarea" },
+  { id: "belief_impact", category: "מניע עלילתי", question: "האם המחיר מערער אמונה פנימית שלו או מחזק אותה?", type: "textarea" },
+  { id: "similar_dilemma_later", category: "מניע עלילתי", question: "האם בהמשך הוא ניצב בפני דילמה דומה?", type: "textarea" },
+  { id: "later_choice_diff", category: "מניע עלילתי", question: "האם הבחירה המאוחרת שלו שונה מהראשונה?", type: "textarea" },
+  { id: "social_start_end", category: "מערכות יחסים", question: "קשרים חברתיים בתחילת ובסוף הספר", type: "textarea" },
+  { id: "family_start_end", category: "מערכות יחסים", question: "קשרים משפחתיים בתחילת ובסוף הספר", type: "textarea" },
+  { id: "romantic_start_end", category: "מערכות יחסים", question: "קשר זוגי בתחילת ובסוף הספר", type: "textarea" },
+  { id: "enemy_start_end", category: "מערכות יחסים", question: "קשר עם אויב/ אנטי הירו בתחילת ובסוף הספר", type: "textarea" },
+  { id: "changing_connections", category: "מערכות יחסים", question: "קשרים שמשתנים במהלך הספר ולמה", type: "textarea" },
+  { id: "other_connections", category: "מערכות יחסים", question: "קשרים נוספים", type: "textarea" }
 ];
 
 const MACRO_PLACE_QUESTIONS = [
@@ -184,6 +180,29 @@ const FANTASY_WORLD_QUESTIONS = [
   { id: "other_creatures", category: "חברה וחיי יום-יום", question: "אילו יצורים נוספים קיימים בעולם:", type: "textarea" }
 ];
 
+const DEVELOPMENT_STAGE_QUESTIONS = [
+  { id: "hero_choices_impact", question: "אילו בחירות של הגיבור השפיעו על המצב." },
+  { id: "external_events", question: "מה קורה בשלב הזה, שלא תלוי בגיבור." },
+  { id: "current_choices", question: "אילו בחירות הוא מבצע." },
+  { id: "change_impact", question: "מה משתנה בעקבות הבחירה שלו?" },
+  { id: "emotions_impact", question: "איך משפיע השינוי על הרגשות שלו ושל אחרים?" },
+  { id: "life_consequences", question: "מהן ההשלכות של השינוי על חייו ועל חיי האחרים סביבו?" },
+  { id: "regrets", question: "האם יש לו חרטות?" },
+  { id: "future_choice", question: "האם הוא יבחר אחרת פעם הבאה? למה?" },
+];
+
+const SPECIAL_ITEM_QUESTIONS = [
+  { id: "description", question: "תיאור חיצוני" },
+  { id: "start_state", question: "מצב בתחילת הספר" },
+  { id: "state_change", question: "שינוי במצב" },
+  { id: "end_state", question: "מצב בסוף הספר" },
+  { id: "powers", question: "מהם הכוחות שלו" },
+  { id: "impact", question: "על מה הוא משפיע" },
+  { id: "who_wants_it", question: "מי רוצה להשיג אותו" },
+  { id: "location_flow", question: "אצל מי הוא נמצא ולמי הוא מגיע" },
+  { id: "history", question: "מה ההיסטוריה שלו" },
+];
+
 const CHARACTER_ROLES = [
   { id: 'main', label: 'דמויות ראשיות' },
   { id: 'family', label: 'משפחה' },
@@ -244,6 +263,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
       : activeTab === 'periods' ? PERIOD_QUESTIONS : activeTab === 'twists' ? TWIST_QUESTIONS : FANTASY_WORLD_QUESTIONS;
 
   const categories = Array.from(new Set(questionsConfig.map(q => q.category)));
+  if (activeTab === 'characters') {
+    categories.push("פיתוח דמות");
+  }
+  if (activeTab === 'fantasyWorlds') {
+    categories.push("חפצים מיוחדים");
+  }
   if (selectedEntry?.customFields && selectedEntry.customFields.length > 0) {
     categories.push("שאלות נוספות");
   }
@@ -370,6 +395,56 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateEntry({ customFields: updatedCustomFields, data: updatedData });
   };
 
+  const addDevelopmentStage = () => {
+    if (!selectedEntry) return;
+    const newStage: DevelopmentStage = {
+      id: `stage-${Date.now()}`,
+      title: `שלב פיתוח ${ (selectedEntry.developmentStages?.length || 0) + 1}`,
+      data: {}
+    };
+    const updatedStages = [...(selectedEntry.developmentStages || []), newStage];
+    updateEntry({ developmentStages: updatedStages });
+  };
+
+  const updateDevelopmentStage = (stageId: string, updates: Partial<DevelopmentStage>) => {
+    if (!selectedEntry) return;
+    const updatedStages = (selectedEntry.developmentStages || []).map(s => 
+      s.id === stageId ? { ...s, ...updates } : s
+    );
+    updateEntry({ developmentStages: updatedStages });
+  };
+
+  const removeDevelopmentStage = (stageId: string) => {
+    if (!selectedEntry) return;
+    const updatedStages = (selectedEntry.developmentStages || []).filter(s => s.id !== stageId);
+    updateEntry({ developmentStages: updatedStages });
+  };
+
+  const addSpecialItem = () => {
+    if (!selectedEntry) return;
+    const newItem: SpecialItem = {
+      id: `item-${Date.now()}`,
+      name: `חפץ מיוחד ${ (selectedEntry.specialItems?.length || 0) + 1}`,
+      data: {}
+    };
+    const updatedItems = [...(selectedEntry.specialItems || []), newItem];
+    updateEntry({ specialItems: updatedItems });
+  };
+
+  const updateSpecialItem = (itemId: string, updates: Partial<SpecialItem>) => {
+    if (!selectedEntry) return;
+    const updatedItems = (selectedEntry.specialItems || []).map(i => 
+      i.id === itemId ? { ...i, ...updates } : i
+    );
+    updateEntry({ specialItems: updatedItems });
+  };
+
+  const removeSpecialItem = (itemId: string) => {
+    if (!selectedEntry) return;
+    const updatedItems = (selectedEntry.specialItems || []).filter(i => i.id !== itemId);
+    updateEntry({ specialItems: updatedItems });
+  };
+
   const exportCurrentEntry = () => {
     if (!selectedEntry) return;
     let text = `שאלון: ${selectedEntry.name}\n`;
@@ -386,6 +461,28 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         selectedEntry.customFields.forEach(cf => {
             text += `${cf.label}\n`;
             text += `${selectedEntry.data[cf.id] || '---'}\n\n`;
+        });
+    }
+
+    if (selectedEntry.developmentStages && selectedEntry.developmentStages.length > 0) {
+        text += `\nפיתוח דמות:\n-----------------------------------\n`;
+        selectedEntry.developmentStages.forEach((stage, idx) => {
+            text += `${idx + 1}. ${stage.title}\n`;
+            DEVELOPMENT_STAGE_QUESTIONS.forEach(q => {
+                text += `   - ${q.question}: ${stage.data[q.id] || '---'}\n`;
+            });
+            text += `\n`;
+        });
+    }
+
+    if (selectedEntry.specialItems && selectedEntry.specialItems.length > 0) {
+        text += `\nחפצים מיוחדים:\n-----------------------------------\n`;
+        selectedEntry.specialItems.forEach((item, idx) => {
+            text += `${idx + 1}. ${item.name}\n`;
+            SPECIAL_ITEM_QUESTIONS.forEach(q => {
+                text += `   - ${q.question}: ${item.data[q.id] || '---'}\n`;
+            });
+            text += `\n`;
         });
     }
 
@@ -724,183 +821,322 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     </button>
                   </div>
                 </div>
-
-                 {mode === 'edit' && (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        {activeTab === 'characters' && (
-                            <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
-                              <button 
-                                onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'male' } })}
-                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'male' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                              >
-                                <UserRound size={14} />
-                                <span>זכר</span>
-                              </button>
-                              <button 
-                                onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'female' } })}
-                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentGender === 'female' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                              >
-                                <UserRoundSearch size={14} />
-                                <span>נקבה</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {activeTab === 'places' && (
-                            <div className="flex bg-white/80 p-1 rounded-xl border border-amber-100 shadow-sm">
-                              <button 
-                                onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'macro' } })}
-                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'macro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                              >
-                                <Globe size={14} />
-                                <span>מיקום גאוגרפי</span>
-                              </button>
-                              <button 
-                                onClick={() => updateEntry({ data: { ...selectedEntry.data, placeType: 'micro' } })}
-                                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-bold transition-all ${currentPlaceType === 'micro' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-900/40 hover:text-amber-900'}`}
-                              >
-                                <Home size={14} />
-                                <span>מקום ספציפי</span>
-                              </button>
-                            </div>
-                          )}
-                      </div>
-
-                      <div className="flex items-center gap-2 bg-amber-100/50 p-1 rounded-xl border border-amber-200">
-                        <button 
-                          disabled={currentCategoryIndex === 0}
-                          onClick={() => setCurrentCategoryIndex(prev => prev - 1)}
-                          className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all disabled:opacity-30"
-                        >
-                          <ChevronLeft size={20} className="rotate-180" />
-                        </button>
-                        <span className="text-xs font-bold text-amber-900 px-2 min-w-[100px] text-center">{currentCategory}</span>
-                        <button 
-                          disabled={currentCategoryIndex === categories.length - 1}
-                          onClick={() => setCurrentCategoryIndex(prev => prev + 1)}
-                          className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all disabled:opacity-30"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-10 space-y-10 scroll-smooth">
                 {mode === 'edit' ? (
                   <>
-                    {filteredQuestions.length > 0 ? (
-                      filteredQuestions.map(q => (
-                        <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">{q.category}</span>
-                              <div className="h-px w-8 bg-amber-100" />
-                              <label className="text-sm font-bold text-amber-900">{q.question}</label>
-                            </div>
-                          </div>
-                          {q.type === 'textarea' ? (
-                            <textarea 
-                              value={selectedEntry.data[q.id] || ''}
-                              onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                              className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
-                              placeholder="כתוב כאן..."
-                            />
-                          ) : (
-                            <input 
-                              type="text"
-                              value={selectedEntry.data[q.id] || ''}
-                              onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                              className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none shadow-inner"
-                              placeholder="כתוב כאן..."
-                            />
-                          )}
+                    {currentCategory === "פיתוח דמות" ? (
+                      <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-amber-900 handwritten text-3xl">שלבי פיתוח דמות</h3>
+                          <button 
+                            onClick={addDevelopmentStage}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-xl font-bold text-xs hover:bg-amber-900 transition-all shadow-md"
+                          >
+                            <Plus size={16} />
+                            <span>הוסף שלב פיתוח</span>
+                          </button>
                         </div>
-                      ))
-                    ) : null}
 
-                    {customQuestions.length > 0 ? (
-                      customQuestions.map(cf => (
-                        <div key={cf.id} className="group space-y-3 animate-in fade-in duration-500 relative">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">שאלות נוספות</span>
-                              <div className="h-px w-8 bg-amber-100" />
-                              <label className="text-sm font-bold text-amber-900">{cf.label}</label>
-                            </div>
-                            <button onClick={() => removeCustomQuestion(cf.id)} className="text-red-200 hover:text-red-500 transition-colors p-1" title="הסר שאלה"><X size={14}/></button>
+                        {(selectedEntry.developmentStages || []).length === 0 ? (
+                          <div className="p-12 border-2 border-dashed border-amber-100 rounded-[2rem] text-center text-amber-800/30">
+                            <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold">טרם נוספו שלבי פיתוח. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
-                          <textarea 
-                            value={selectedEntry.data[cf.id] || ''}
-                            onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [cf.id]: e.target.value } })}
-                            className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
-                            placeholder="תשובה לשאלה המותאמת..."
-                          />
-                        </div>
-                      ))
-                    ) : null}
+                        ) : (
+                          <div className="space-y-12">
+                            {(selectedEntry.developmentStages || []).map((stage, sIdx) => (
+                              <div key={stage.id} className="bg-amber-50/30 p-8 rounded-[2rem] border border-amber-100 space-y-6 relative group/stage">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                      {sIdx + 1}
+                                    </div>
+                                    <input 
+                                      value={stage.title}
+                                      onChange={(e) => updateDevelopmentStage(stage.id, { title: e.target.value })}
+                                      className="text-xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      placeholder="כותרת השלב..."
+                                    />
+                                  </div>
+                                  <button 
+                                    onClick={() => { if(confirm('למחוק את שלב הפיתוח?')) removeDevelopmentStage(stage.id); }}
+                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/stage:opacity-100"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
 
-                    {/* Add Custom Question Form */}
-                    <div className="pt-10 border-t border-amber-50 mt-10">
-                      <div className="text-xs font-black text-amber-900/40 uppercase tracking-widest mb-4">הוספת שאלה מותאמת אישית</div>
-                      <div className="flex gap-3">
-                        <input 
-                          type="text"
-                          value={newQuestionLabel}
-                          onChange={(e) => setNewQuestionLabel(e.target.value)}
-                          placeholder="מה ברצונך לשאול?"
-                          className="flex-1 bg-white border-2 border-amber-100 rounded-2xl px-5 py-3 text-sm focus:border-amber-300 outline-none"
-                        />
-                        <button 
-                          onClick={addCustomQuestion}
-                          className="bg-amber-800 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-900 transition-all shadow-md"
-                        >
-                          <MessageSquarePlus size={18} />
-                          <span>הוסף</span>
-                        </button>
+                                <div className="grid gap-6">
+                                  {DEVELOPMENT_STAGE_QUESTIONS.map(q => (
+                                    <div key={q.id} className="space-y-2">
+                                      <label className="text-xs font-bold text-amber-900/60">{q.question}</label>
+                                      <textarea 
+                                        value={stage.data[q.id] || ''}
+                                        onChange={(e) => {
+                                          const newData = { ...stage.data, [q.id]: e.target.value };
+                                          updateDevelopmentStage(stage.id, { data: newData });
+                                        }}
+                                        className="w-full bg-white border border-amber-100 rounded-xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none min-h-[80px] shadow-sm"
+                                        placeholder="תשובה..."
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    ) : currentCategory === "חפצים מיוחדים" ? (
+                      <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-amber-900 handwritten text-3xl">חפצים מיוחדים</h3>
+                          <button 
+                            onClick={addSpecialItem}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-xl font-bold text-xs hover:bg-amber-900 transition-all shadow-md"
+                          >
+                            <Plus size={16} />
+                            <span>הוסף חפץ מיוחד</span>
+                          </button>
+                        </div>
 
-                    {/* Navigation Buttons at bottom */}
-                    <div className="flex items-center justify-between pt-10 border-t border-amber-50 mt-10">
-                      <button 
-                        disabled={currentCategoryIndex === 0}
-                        onClick={(e) => { 
-                          setCurrentCategoryIndex(prev => prev - 1); 
-                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-white border border-amber-100 rounded-xl text-amber-800 font-bold hover:bg-amber-50 transition-all disabled:opacity-30 shadow-sm"
-                      >
-                        <ChevronLeft size={18} className="rotate-180" />
-                        <span>קטגוריה קודמת</span>
-                      </button>
-                      <button 
-                        disabled={currentCategoryIndex === categories.length - 1}
-                        onClick={(e) => { 
-                          setCurrentCategoryIndex(prev => prev + 1); 
-                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-amber-800 text-white rounded-xl font-bold hover:bg-amber-900 transition-all disabled:opacity-30 shadow-md"
-                      >
-                        <span>קטגוריה הבאה</span>
-                        <ChevronLeft size={18} />
-                      </button>
-                    </div>
+                        {(selectedEntry.specialItems || []).length === 0 ? (
+                          <div className="p-12 border-2 border-dashed border-amber-100 rounded-[2rem] text-center text-amber-800/30">
+                            <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold">טרם נוספו חפצים מיוחדים. לחץ על הכפתור למעלה כדי להתחיל.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-12">
+                            {(selectedEntry.specialItems || []).map((item, iIdx) => (
+                              <div key={item.id} className="bg-amber-50/30 p-8 rounded-[2rem] border border-amber-100 space-y-6 relative group/item">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                      {iIdx + 1}
+                                    </div>
+                                    <input 
+                                      value={item.name}
+                                      onChange={(e) => updateSpecialItem(item.id, { name: e.target.value })}
+                                      className="text-xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      placeholder="שם החפץ..."
+                                    />
+                                  </div>
+                                  <button 
+                                    onClick={() => { if(confirm('למחוק את החפץ המיוחד?')) removeSpecialItem(item.id); }}
+                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/item:opacity-100"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
+
+                                <div className="grid gap-6">
+                                  {SPECIAL_ITEM_QUESTIONS.map(q => (
+                                    <div key={q.id} className="space-y-2">
+                                      <label className="text-xs font-bold text-amber-900/60">{q.question}</label>
+                                      <textarea 
+                                        value={item.data[q.id] || ''}
+                                        onChange={(e) => {
+                                          const newData = { ...item.data, [q.id]: e.target.value };
+                                          updateSpecialItem(item.id, { data: newData });
+                                        }}
+                                        className="w-full bg-white border border-amber-100 rounded-xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none min-h-[80px] shadow-sm"
+                                        placeholder="תשובה..."
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {filteredQuestions.length > 0 ? (
+                          filteredQuestions.map(q => (
+                            <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">{q.category}</span>
+                                  <div className="h-px w-8 bg-amber-100" />
+                                  <label className="text-sm font-bold text-amber-900">{q.question}</label>
+                                </div>
+                              </div>
+                              {q.type === 'textarea' ? (
+                                <textarea 
+                                  value={selectedEntry.data[q.id] || ''}
+                                  onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
+                                  className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                  placeholder="כתוב כאן..."
+                                />
+                              ) : (
+                                <input 
+                                  type="text"
+                                  value={selectedEntry.data[q.id] || ''}
+                                  onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
+                                  className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none shadow-inner"
+                                  placeholder="כתוב כאן..."
+                                />
+                              )}
+                            </div>
+                          ))
+                        ) : null}
+
+                        {currentCategory === "שאלות נוספות" && customQuestions.length > 0 && (
+                          customQuestions.map(cf => (
+                            <div key={cf.id} className="group space-y-3 animate-in fade-in duration-500 relative">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[10px] font-black text-amber-900/30 uppercase tracking-[0.2em]">שאלות נוספות</span>
+                                  <div className="h-px w-8 bg-amber-100" />
+                                  <label className="text-sm font-bold text-amber-900">{cf.label}</label>
+                                </div>
+                                <button onClick={() => removeCustomQuestion(cf.id)} className="text-red-200 hover:text-red-500 transition-colors p-1" title="הסר שאלה"><X size={14}/></button>
+                              </div>
+                              <textarea 
+                                value={selectedEntry.data[cf.id] || ''}
+                                onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [cf.id]: e.target.value } })}
+                                className="w-full bg-amber-50/20 border-2 border-amber-100 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-amber-200/20 focus:border-amber-300 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                placeholder="תשובה לשאלה המותאמת..."
+                              />
+                            </div>
+                          ))
+                        )}
+
+                        {currentCategory === "שאלות נוספות" && (
+                          <div className="pt-10 border-t border-amber-50 mt-10">
+                            <div className="text-xs font-black text-amber-900/40 uppercase tracking-widest mb-4">הוספת שאלה מותאמת אישית</div>
+                            <div className="flex gap-3">
+                              <input 
+                                type="text"
+                                value={newQuestionLabel}
+                                onChange={(e) => setNewQuestionLabel(e.target.value)}
+                                placeholder="מה ברצונך לשאול?"
+                                className="flex-1 bg-white border-2 border-amber-100 rounded-2xl px-5 py-3 text-sm focus:border-amber-300 outline-none"
+                              />
+                              <button 
+                                onClick={addCustomQuestion}
+                                className="bg-amber-800 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-900 transition-all shadow-md"
+                              >
+                                <MessageSquarePlus size={18} />
+                                <span>הוסף</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Navigation Buttons at bottom */}
+                        <div className="flex items-center justify-between pt-10 border-t border-amber-50 mt-10">
+                          <button 
+                            disabled={currentCategoryIndex === 0}
+                            onClick={(e) => { 
+                              setCurrentCategoryIndex(prev => prev - 1); 
+                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-white border border-amber-100 rounded-xl text-amber-800 font-bold hover:bg-amber-50 transition-all disabled:opacity-30 shadow-sm"
+                          >
+                            <ChevronLeft size={18} className="rotate-180" />
+                            <span>קטגוריה קודמת</span>
+                          </button>
+                          <button 
+                            disabled={currentCategoryIndex === categories.length - 1}
+                            onClick={(e) => { 
+                              setCurrentCategoryIndex(prev => prev + 1); 
+                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-amber-800 text-white rounded-xl font-bold hover:bg-amber-900 transition-all disabled:opacity-30 shadow-md"
+                          >
+                            <span>קטגוריה הבאה</span>
+                            <ChevronLeft size={18} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </>
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-12 py-8">
                      {categories.map(cat => {
                         let contentToRender: any[] = [];
 
+                        if (cat === "פיתוח דמות") {
+                           if (!selectedEntry.developmentStages || selectedEntry.developmentStages.length === 0) return null;
+                           return (
+                             <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4">
+                                   <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest bg-amber-100 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                <div className="space-y-8">
+                                  {(selectedEntry.developmentStages || []).map((stage, sIdx) => (
+                                    <div key={stage.id} className="space-y-6 bg-amber-50/20 p-8 rounded-[2rem] border border-amber-100/50">
+                                       <div className="flex items-center gap-4">
+                                          <div className="w-8 h-8 bg-amber-800/10 text-amber-800 rounded-lg flex items-center justify-center text-xs font-black">
+                                            {sIdx + 1}
+                                          </div>
+                                          <h4 className="text-xl font-bold text-amber-900 handwritten text-3xl">{stage.title}</h4>
+                                       </div>
+                                       <div className="grid gap-6 border-r-2 border-amber-100 pr-6">
+                                          {DEVELOPMENT_STAGE_QUESTIONS.map(q => {
+                                            const val = stage.data[q.id];
+                                            if (!val) return null;
+                                            return (
+                                              <div key={q.id} className="space-y-1">
+                                                 <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-amber-900 leading-relaxed whitespace-pre-wrap">{val}</div>
+                                              </div>
+                                            );
+                                          })}
+                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                             </section>
+                           );
+                        }
+
+                        if (cat === "חפצים מיוחדים") {
+                           if (!selectedEntry.specialItems || selectedEntry.specialItems.length === 0) return null;
+                           return (
+                             <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4">
+                                   <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest bg-amber-100 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                <div className="space-y-8">
+                                  {(selectedEntry.specialItems || []).map((item, iIdx) => (
+                                    <div key={item.id} className="space-y-6 bg-amber-50/20 p-8 rounded-[2rem] border border-amber-100/50">
+                                       <div className="flex items-center gap-4">
+                                          <div className="w-8 h-8 bg-amber-800/10 text-amber-800 rounded-lg flex items-center justify-center text-xs font-black">
+                                            {iIdx + 1}
+                                          </div>
+                                          <h4 className="text-xl font-bold text-amber-900 handwritten text-3xl">{item.name}</h4>
+                                       </div>
+                                       <div className="grid gap-6 border-r-2 border-amber-100 pr-6">
+                                          {SPECIAL_ITEM_QUESTIONS.map(q => {
+                                            const val = item.data[q.id];
+                                            if (!val) return null;
+                                            return (
+                                              <div key={q.id} className="space-y-1">
+                                                 <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-amber-900 leading-relaxed whitespace-pre-wrap">{val}</div>
+                                              </div>
+                                            );
+                                          })}
+                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                             </section>
+                           );
+                        }
+
                         if (cat === "שאלות נוספות") {
-                            contentToRender = (selectedEntry.customFields || []).filter(cf => selectedEntry.data[cf.id]);
+                           contentToRender = (selectedEntry.customFields || []).filter(cf => selectedEntry.data[cf.id]);
                         } else {
-                            const catQuestions = questionsConfig.filter(q => q.category === cat);
-                            contentToRender = catQuestions.filter(q => selectedEntry.data[q.id]);
+                           const catQuestions = questionsConfig.filter(q => q.category === cat);
+                           contentToRender = catQuestions.filter(q => selectedEntry.data[q.id]);
                         }
                         
                         if (contentToRender.length === 0) return null;

@@ -14,6 +14,18 @@ export interface Plotline {
   color: string;
 }
 
+export interface DevelopmentStage {
+  id: string;
+  title: string;
+  data: Record<string, string>;
+}
+
+export interface SpecialItem {
+  id: string;
+  name: string;
+  data: Record<string, string>;
+}
+
 export interface QuestionnaireEntry {
   id: string;
   name: string;
@@ -24,6 +36,8 @@ export interface QuestionnaireEntry {
   parentId?: string; // For nested entries (e.g., micro places within macro)
   data: Record<string, string>; // Questions and their answers
   customFields?: { id: string; label: string }[]; // User-defined questions
+  developmentStages?: DevelopmentStage[]; // For character development tracking
+  specialItems?: SpecialItem[]; // For fantasy world special items
 }
 
 export interface CharacterMapConnection {
@@ -31,6 +45,50 @@ export interface CharacterMapConnection {
   fromId: string;
   toId: string;
   description: string;
+  labelPosition?: number; // 0 to 1, default 0.5
+}
+
+export interface MapElement {
+  id: string;
+  type: 'icon' | 'text' | 'line';
+  x: number;
+  y: number;
+  iconType?: 'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'animal';
+  text?: string;
+  points?: number[]; // For lines (road, river, pool)
+  stroke?: string;
+  strokeWidth?: number;
+  fill?: string;
+  fontSize?: number;
+}
+
+export interface WorldMap {
+  id: string;
+  name: string;
+  backgroundImage?: string; // Base64 uploaded image
+  elements: MapElement[];
+}
+
+export interface MindMapNode {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  type: 'circle' | 'square';
+  isRoot?: boolean;
+}
+
+export interface MindMapEdge {
+  id: string;
+  fromId: string;
+  toId: string;
+}
+
+export interface MindMap {
+  id: string;
+  name: string;
+  nodes: MindMapNode[];
+  edges: MindMapEdge[];
 }
 
 export interface Project {
@@ -42,6 +100,8 @@ export interface Project {
   twists?: QuestionnaireEntry[];
   fantasyWorlds?: QuestionnaireEntry[];
   characterMapConnections?: CharacterMapConnection[];
+  maps?: WorldMap[];
+  mindMaps?: MindMap[];
 }
 
 export interface Book extends Project {
@@ -49,11 +109,14 @@ export interface Book extends Project {
   title: string;
   lastModified: number;
   uiState?: {
-    lastView?: 'board' | 'editor' | 'questionnaires' | 'characterMap';
+    lastView?: 'board' | 'editor' | 'questionnaires' | 'maps';
     editorFocusedSceneId?: string | null;
     editorDisplayMode?: 'full' | 'focus';
     questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds';
     questionnaireSelectedEntryId?: string | null;
     boardZoomLevel?: number;
+    mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
+    mapsSelectedMapId?: string | null;
+    mapsSelectedMindMapId?: string | null;
   };
 }

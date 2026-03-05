@@ -15,6 +15,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [tool, setTool] = useState<'move' | 'link'>('move');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
@@ -62,19 +63,41 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingNodeId && tool === 'move') {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
+    if (draggingNodeId && tool === 'move') {
       onUpdateCharacters(characters.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
+    } else if (draggingLabelId) {
+      const conn = connections.find(c => c.id === draggingLabelId);
+      if (!conn) return;
+      const from = characters.find(n => n.id === conn.fromId);
+      const to = characters.find(n => n.id === conn.toId);
+      if (!from || !to) return;
+
+      const x1 = from.x ?? 0;
+      const y1 = from.y ?? 0;
+      const x2 = to.x ?? 0;
+      const y2 = to.y ?? 0;
+
+      // Project point onto line segment
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return;
+
+      let t = ((x - x1) * dx + (y - y1) * dy) / lenSq;
+      t = Math.max(0.1, Math.min(0.9, t)); // Keep it within bounds and not exactly on nodes
+
+      onUpdateConnections(connections.map(c => c.id === draggingLabelId ? { ...c, labelPosition: t } : c));
     }
   };
 
   const handleMouseUp = () => {
     setDraggingNodeId(null);
+    setDraggingLabelId(null);
   };
 
   const deleteNode = (id: string) => {
@@ -257,16 +280,31 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
           const toNode = characters.find(n => n.id === conn.toId);
           if (!fromNode || !toNode) return null;
 
-          const midX = ((fromNode.x ?? 0) + (toNode.x ?? 0)) / 2;
-          const midY = ((fromNode.y ?? 0) + (toNode.y ?? 0)) / 2;
+          const t = conn.labelPosition ?? 0.5;
+          const x1 = fromNode.x ?? 0;
+          const y1 = fromNode.y ?? 0;
+          const x2 = toNode.x ?? 0;
+          const y2 = toNode.y ?? 0;
+
+          const labelX = x1 + (x2 - x1) * t;
+          const labelY = y1 + (y2 - y1) * t;
 
           return (
             <div 
               key={`${conn.id}-text`}
               className="absolute pointer-events-auto z-10 group"
-              style={{ left: midX, top: midY, transform: 'translate(-50%, -50%)' }}
+              style={{ left: labelX, top: labelY, transform: 'translate(-50%, -50%)' }}
             >
-              <div className="relative">
+              <div className="relative flex flex-col items-center">
+                <div 
+                  className="cursor-grab active:cursor-grabbing p-1 text-amber-300 hover:text-amber-500 transition-colors"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setDraggingLabelId(conn.id);
+                  }}
+                >
+                  <Move size={14} />
+                </div>
                 <textarea 
                   className="handwritten text-lg min-w-[120px] max-w-[200px] bg-white/90 border-2 border-amber-100 rounded-xl p-3 shadow-lg focus:ring-4 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-tight"
                   value={conn.description}

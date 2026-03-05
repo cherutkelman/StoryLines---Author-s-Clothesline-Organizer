@@ -1,10 +1,11 @@
 
 import React, { useRef, useState } from 'react';
 import { Scene, Project } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote } from 'lucide-react';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download } from 'lucide-react';
 
 interface BoardProps {
   project: Project;
+  title: string;
   visiblePlotlines: string[];
   onAddScene: (plotlineId: string, position: number) => void;
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
@@ -16,7 +17,7 @@ interface BoardProps {
   onSceneDoubleClick?: (sceneId: string) => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions, initialZoom, onZoomChange, onSceneDoubleClick }) => {
+const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions, initialZoom, onZoomChange, onSceneDoubleClick }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,40 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
   };
 
   const handleResetZoom = () => setZoomLevel(1);
+
+  const exportBoard = () => {
+    let text = `ייצוא לוח עלילה - ${title}\n`;
+    text += `תאריך: ${new Date().toLocaleDateString('he-IL')}\n`;
+    text += `-----------------------------------\n\n`;
+
+    // Export all plotlines that have scenes
+    project.plotlines.forEach(plotline => {
+      const plotlineScenes = project.scenes
+        .filter(s => s.plotlineId === plotline.id)
+        .sort((a, b) => a.position - b.position);
+
+      if (plotlineScenes.length > 0) {
+        text += `קו עלילה: ${plotline.name}\n`;
+        text += `===================================\n\n`;
+        
+        plotlineScenes.forEach((scene, index) => {
+          text += `פתק ${index + 1}: ${scene.title || 'ללא כותרת'}\n`;
+          text += `תוכן:\n${scene.content || 'סצנה ריקה...'}\n`;
+          text += `-----------------------------------\n\n`;
+        });
+        
+        text += `\n`;
+      }
+    });
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `board-export-${title}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // The number of columns is the number of scenes plus one for adding at the end
   const columnCount = Math.max(project.scenes.length + 1, 10); 
@@ -92,6 +127,14 @@ const Board: React.FC<BoardProps> = ({ project, visiblePlotlines, onAddScene, on
 
       {/* Top Right Actions */}
       <div className="absolute top-6 right-6 z-40 flex items-center gap-3">
+        <button 
+          onClick={exportBoard}
+          className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md text-amber-800 border border-amber-200 rounded-xl shadow-lg hover:bg-amber-50 transition-all font-bold text-sm"
+          title="ייצוא לוח עלילה"
+        >
+          <Download size={18} />
+          <span>ייצוא לוח</span>
+        </button>
         <button 
           onClick={onOpenSuggestions}
           className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md text-amber-800 border border-amber-200 rounded-xl shadow-lg hover:bg-amber-50 transition-all font-bold text-sm"
