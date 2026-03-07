@@ -11,13 +11,14 @@ interface BoardProps {
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
   onBulkAdd: (plotlineId: string) => void;
-  onOpenSuggestions: () => void;
   initialZoom?: number;
   onZoomChange?: (zoom: number) => void;
   onSceneDoubleClick?: (sceneId: string) => void;
+  onUpdateSummary: (summary: string) => void;
+  onUpdateChapterTitle: (position: number, title: string) => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, onOpenSuggestions, initialZoom, onZoomChange, onSceneDoubleClick }) => {
+const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, initialZoom, onZoomChange, onSceneDoubleClick, onUpdateSummary, onUpdateChapterTitle }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -128,6 +129,14 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
       {/* Top Right Actions */}
       <div className="absolute top-6 right-6 z-40 flex items-center gap-3">
         <button 
+          onClick={() => onBulkAdd(project.plotlines[0]?.id || '')}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white border border-amber-900 rounded-xl shadow-lg hover:bg-amber-900 transition-all font-bold text-sm"
+          title="הוספה מהירה של סצנות"
+        >
+          <CopyPlus size={18} />
+          <span>הוספה מהירה</span>
+        </button>
+        <button 
           onClick={exportBoard}
           className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md text-amber-800 border border-amber-200 rounded-xl shadow-lg hover:bg-amber-50 transition-all font-bold text-sm"
           title="ייצוא לוח עלילה"
@@ -135,33 +144,13 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
           <Download size={18} />
           <span>ייצוא לוח</span>
         </button>
-        <button 
-          onClick={onOpenSuggestions}
-          className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md text-amber-800 border border-amber-200 rounded-xl shadow-lg hover:bg-amber-50 transition-all font-bold text-sm"
-        >
-          <MessageSquareQuote size={18} />
-          <span>הצעות לשיפור</span>
-        </button>
-      </div>
-
-      {/* Floating Action Button for Bulk Add */}
-      <div className="absolute bottom-10 right-10 z-40">
-        <button 
-          onClick={() => onBulkAdd(project.plotlines[0]?.id || '')}
-          className="flex items-center gap-3 px-8 py-4 bg-amber-800 text-white rounded-2xl shadow-2xl hover:bg-amber-900 hover:scale-105 transition-all group"
-        >
-          <div className="bg-white/20 p-1.5 rounded-lg group-hover:rotate-12 transition-transform">
-            <CopyPlus size={20} />
-          </div>
-          <span className="font-bold">הוספה מהירה</span>
-        </button>
       </div>
 
       {/* Board Scrollable Area */}
-      <div className="flex-1 overflow-auto bg-[#fdf6e3] cursor-grab active:cursor-grabbing">
+      <div className="flex-1 overflow-auto bg-[#fdf6e3] cursor-grab active:cursor-grabbing scrollbar-hide">
         <div 
           ref={boardRef}
-          className="p-32 transition-transform duration-200 origin-top-right"
+          className="p-32 pb-64 transition-transform duration-200 origin-top-right"
           style={{ 
             transform: `scale(${zoomLevel})`,
             width: `${100 / zoomLevel}%`,
@@ -264,12 +253,37 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
           </div>
           
           <div className="mt-16 flex gap-12 px-8 ml-[176px]">
-             {Array.from({ length: columnCount }).map((_, i) => (
-               <div key={i} className="w-44 text-center text-xs font-black text-amber-900/10 uppercase tracking-widest italic">
-                 פרק {i + 1}
-               </div>
-             ))}
+             {Array.from({ length: columnCount }).map((_, i) => {
+               const chapterTitle = project.scenes.find(s => s.position === i)?.chapterTitle;
+               return (
+                 <div key={i} className="w-44 text-center group/chapter-label">
+                   <input 
+                     className="w-full bg-transparent border-none focus:ring-0 text-xs font-black text-amber-900/20 uppercase tracking-widest italic text-center hover:text-amber-900/40 focus:text-amber-900 transition-colors"
+                     value={chapterTitle || `פרק ${i + 1}`}
+                     onChange={(e) => onUpdateChapterTitle(i, e.target.value)}
+                   />
+                 </div>
+               );
+             })}
           </div>
+        </div>
+      </div>
+
+      {/* Plot Summary Box - Sticky at bottom */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-30">
+        <div className="bg-white/90 backdrop-blur-md border border-amber-200 rounded-3xl shadow-2xl p-4 flex flex-col gap-2">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest flex items-center gap-2">
+              <MessageSquareQuote size={14} />
+              תקציר העלילה
+            </h3>
+          </div>
+          <textarea 
+            value={project.summary || ''}
+            onChange={(e) => onUpdateSummary(e.target.value)}
+            placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
+            className="w-full h-24 bg-amber-50/50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-900 focus:ring-4 focus:ring-amber-200/20 outline-none resize-none handwritten text-lg leading-relaxed"
+          />
         </div>
       </div>
     </div>

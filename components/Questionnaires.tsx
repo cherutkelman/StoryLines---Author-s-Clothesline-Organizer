@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { QuestionnaireEntry, DevelopmentStage, SpecialItem } from '../types';
+import { QuestionnaireEntry, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import { 
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
@@ -115,30 +115,27 @@ const MALE_QUESTIONS_CONFIG = [
 ];
 
 const MACRO_PLACE_QUESTIONS = [
-  { id: "street", category: "פרטי מיקום", question: "רחוב", type: "text" },
-  { id: "neighborhood", category: "פרטי מיקום", question: "שכונה", type: "text" },
-  { id: "city_or_village", category: "פרטי מיקום", question: "שם עיר / כפר", type: "text" },
-  { id: "country", category: "פרטי מיקום", question: "ארץ", type: "text" },
-  { id: "continent", category: "פרטי מיקום", question: "יבשת", type: "text" },
-  { id: "planet", category: "פרטי מיקום", question: "פלנטה", type: "text" },
-  { id: "other_location_definition", category: "פרטי מיקום", question: "הגדרה אחרת למיקום", type: "textarea" },
-  { id: "common_landscape", category: "מאפייני סביבה", question: "נוף מצוי", type: "textarea" },
-  { id: "access_routes", category: "מאפייני סביבה", question: "דרכי הגעה", type: "textarea" },
-  { id: "local_population", category: "חברה ותרבות", question: "אוכלוסיה מקומית", type: "textarea" },
-  { id: "who_rules", category: "חברה ותרבות", question: "מי שולט בשטח?", type: "textarea" },
-  { id: "common_foods", category: "חברה ותרבות", question: "מאכלים נפוצים", type: "textarea" },
-  { id: "plants", category: "טבע", question: "צמחים", type: "textarea" },
-  { id: "animals", category: "טבע", question: "אילו חיות נפוצות באזור?", type: "textarea" },
-  { id: "more_details", category: "כללי", question: "פרטים נוספים", type: "textarea" }
+  { id: "city_country", category: "מיקום גיאוגרפי", question: "שם עיר / כפר ובאיזה ארץ", type: "text" },
+  { id: "population_type", category: "מיקום גיאוגרפי", question: "סוג אוכלוסיה מקומית", type: "textarea" },
+  { id: "living_conditions", category: "מיקום גיאוגרפי", question: "תנאי מחיה של האוכלוסיה", type: "textarea" },
+  { id: "common_foods", category: "מיקום גיאוגרפי", question: "מאכלים נפוצים", type: "textarea" },
+  { id: "flora_fauna", category: "מיקום גיאוגרפי", question: "צמחים וחיות נפוצות באזור", type: "textarea" },
+  { id: "ruler", category: "מיקום גיאוגרפי", question: "מי שולט בשטח", type: "textarea" },
+  { id: "landscape", category: "מיקום גיאוגרפי", question: "נוף מצוי", type: "textarea" },
+  { id: "arrival_ways", category: "מיקום גיאוגרפי", question: "דרכי הגעה", type: "textarea" },
+  { id: "comm_ways", category: "מיקום גיאוגרפי", question: "דרכי תקשורת", type: "textarea" },
+  { id: "more_details", category: "מיקום גיאוגרפי", question: "פרטים נוספים", type: "textarea" }
 ];
 
-const MICRO_PLACE_QUESTIONS = [
-  { id: "building_type", category: "זהות המקום", question: "סוג המבנה", type: "text" },
-  { id: "room", category: "זהות המקום", question: "חדר", type: "text" },
-  { id: "place_role", category: "זהות המקום", question: "תפקיד של המקום", type: "textarea" },
-  { id: "description", category: "תיאור", question: "תיאור", type: "textarea" },
-  { id: "living_conditions", category: "תנאים", question: "תנאי מחיה", type: "textarea" },
-  { id: "more_details", category: "כללי", question: "פרטים נוספים", type: "textarea" }
+const MICRO_PLACE_QUESTIONS: any[] = [];
+
+const SPECIFIC_LOCATION_QUESTIONS = [
+  { id: "street", question: "רחוב" },
+  { id: "neighborhood", question: "שכונה" },
+  { id: "building_type", question: "סוג המבנה" },
+  { id: "place_role", question: "תפקיד של המקום" },
+  { id: "description", question: "תיאור" },
+  { id: "more_details", question: "פרטים נוספים" },
 ];
 
 const PERIOD_QUESTIONS = [
@@ -155,29 +152,38 @@ const PERIOD_QUESTIONS = [
 ];
 
 const TWIST_QUESTIONS = [
-  { id: "pre_state", category: "לפני השינוי", question: "מה היה המצב לפני:", type: "textarea" },
-  { id: "expectations", category: "לפני השינוי", question: "מה חשבו וקיוו הדמויות שיקרה:", type: "textarea" },
-  { id: "ideal_path", category: "המסלול הרצוי", question: "מה היה קורה אילו המצב היה ממשיך כפי הרצוי:", type: "textarea" },
-  { id: "truth_moment", category: "הטוויסט", question: "מה קורה ברגע האמת:", type: "textarea" },
-  { id: "immediate_impact", category: "השלכות", question: "איך זה משפיע באופן מיידי:", type: "textarea" },
-  { id: "long_term_impact", category: "השלכות", question: "איך זה משפיע לטווח הארוך:", type: "textarea" }
+  { id: "pre_state", category: "טוויסט", question: "תיאור מצב קודם:", type: "textarea" },
+  { id: "expectations", category: "טוויסט", question: "מה הקורא חושב שעומד לקרות:", type: "textarea" },
+  { id: "facts", category: "טוויסט", question: "מה העובדות שהובילו אותו לחשוב כך:", type: "textarea" },
+  { id: "ideal_path", category: "טוויסט", question: "מה היה קורה אילו הסיפור היה ממשיך כמו שהקורא חושב:", type: "textarea" },
+  { id: "truth_moment", category: "טוויסט", question: "מה קורה ברגע האמת:", type: "textarea" },
+  { id: "clues", category: "טוויסט", question: "אילו רמזים מקדימים נמצאים בטקסט:", type: "textarea" },
+  { id: "immediate_impact", category: "טוויסט", question: "איך השינוי משפיע באופן מיידי על הסיפור:", type: "textarea" },
+  { id: "long_term_impact", category: "טוויסט", question: "אילו השלכות יש לטוויסט בטווח הארוך:", type: "textarea" },
+  { id: "next_twist", category: "טוויסט", question: "האם ואיך זה מוביל לטוויסט הבא:", type: "textarea" },
+  { id: "mention_for_end", category: "טוויסט", question: "מה צריך להיות מוזכר במהלך הטוויסט כדי לוודא הגעה לסוף הרצוי:", type: "textarea" }
 ];
 
 const FANTASY_WORLD_QUESTIONS = [
-  { id: "ruling_powers", category: "ניהול העולם", question: "אילו כוחות מנהלים את העולם:", type: "textarea" },
-  { id: "daily_life_simple", category: "חברה וחיי יום-יום", question: "איך מתנהלים חיי היום יום של האדם הפשוט:", type: "textarea" },
-  { id: "character_powers", category: "דמויות וכוחות", question: "אילו כוחות יש לדמויות בספר:", type: "textarea" },
-  { id: "magic_source", category: "קסם ואנרגיה", question: "מאיפה נובעת אנרגיית הקסם:", type: "textarea" },
-  { id: "magic_limits", category: "קסם ואנרגיה", question: "מה מגביל את כוח הקסם:", type: "textarea" },
-  { id: "world_laws", category: "ניהול העולם", question: "אילו חוקים יש בעולם הזה:", type: "textarea" },
-  { id: "magic_nature", category: "קסם ואנרגיה", question: "טבע ייחודי הנובע מהקסם:", type: "textarea" },
-  { id: "good_guys", category: "קונפליקט", question: "מי הטובים:", type: "textarea" },
-  { id: "bad_guys", category: "קונפליקט", question: "מי הרעים:", type: "textarea" },
-  { id: "conflict_expression", category: "קונפליקט", question: "איך מתבטאת הלחימה ביניהם:", type: "textarea" },
-  { id: "hero_journey", category: "מסע וסוף", question: "איזה מסע עוברים הגיבורים. פיזי, נפשי, התפתחותי:", type: "textarea" },
-  { id: "good_ending", category: "מסע וסוף", question: "מהו הסוף הטוב:", type: "textarea" },
-  { id: "bad_ending", category: "מסע וסוף", question: "מהו הסוף הרע:", type: "textarea" },
-  { id: "other_creatures", category: "חברה וחיי יום-יום", question: "אילו יצורים נוספים קיימים בעולם:", type: "textarea" }
+  { id: "pre_state", category: "יום יום", question: "תיאור מצב קודם:", type: "textarea" },
+  { id: "expectations", category: "יום יום", question: "מה הקורא חושב שעומד לקרות:", type: "textarea" },
+  { id: "facts", category: "יום יום", question: "מה העובדות שהובילו אותו לחשוב כך:", type: "textarea" },
+  { id: "ideal_path", category: "יום יום", question: "מה היה קורה אילו הסיפור היה ממשיך כמו שהקורא חושב:", type: "textarea" },
+  { id: "truth_moment", category: "יום יום", question: "מה קורה ברגע האמת:", type: "textarea" },
+  { id: "clues", category: "יום יום", question: "אילו רמזים מקדימים נמצאים בטקסט:", type: "textarea" },
+  { id: "immediate_impact", category: "יום יום", question: "איך השינוי משפיע באופן מיידי על הסיפור:", type: "textarea" },
+  { id: "long_term_impact", category: "יום יום", question: "אילו השלכות יש לטוויסט בטווח הארוך:", type: "textarea" },
+  { id: "next_twist", category: "יום יום", question: "האם ואיך זה מוביל לטוויסט הבא:", type: "textarea" },
+  { id: "mention_for_end", category: "יום יום", question: "מה צריך להיות מוזכר במהלך הטוויסט כדי לוודא הגעה לסוף הרצוי:", type: "textarea" },
+  
+  { id: "good_guys", category: "מלחמות", question: "מי הטובים:", type: "textarea" },
+  { id: "bad_guys", category: "מלחמות", question: "מי הרעים:", type: "textarea" },
+  { id: "neutral_guys", category: "מלחמות", question: "מי אלו שקיימים אבל לא נמצאים בשום צד:", type: "textarea" },
+  { id: "conflict_expression", category: "מלחמות", question: "איך מתבטאת הלחימה בין הצדדים:", type: "textarea" },
+  { id: "affected_guys", category: "מלחמות", question: "מי אלו שמושפעים מהלחימה אבל לא מעורבים:", type: "textarea" },
+  { id: "hero_journey", category: "מלחמות", question: "איזה מסע עוברים הגיבורים. פיזי, נפשי, התפתחותי:", type: "textarea" },
+  { id: "bad_ending", category: "מלחמות", question: "מהו הסוף הרע שאליו לא רוצים להגיע:", type: "textarea" },
+  { id: "good_ending", category: "מלחמות", question: "מהו הסוף הטוב:", type: "textarea" }
 ];
 
 const DEVELOPMENT_STAGE_QUESTIONS = [
@@ -201,6 +207,13 @@ const SPECIAL_ITEM_QUESTIONS = [
   { id: "who_wants_it", question: "מי רוצה להשיג אותו" },
   { id: "location_flow", question: "אצל מי הוא נמצא ולמי הוא מגיע" },
   { id: "history", question: "מה ההיסטוריה שלו" },
+];
+
+const UNIQUE_POWER_QUESTIONS = [
+  { id: "powers", question: "אילו כוחות יש לדמות:" },
+  { id: "add_power", question: "מה יכול להוסיף כוח לדמות:" },
+  { id: "limits", question: "מה מגביל אותה:" },
+  { id: "needs", question: "למה היא זקוקה בשביל לממש את הכוח שלה:" },
 ];
 
 const CHARACTER_ROLES = [
@@ -262,11 +275,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
       ? (currentPlaceType === 'macro' ? MACRO_PLACE_QUESTIONS : MICRO_PLACE_QUESTIONS)
       : activeTab === 'periods' ? PERIOD_QUESTIONS : activeTab === 'twists' ? TWIST_QUESTIONS : FANTASY_WORLD_QUESTIONS;
 
-  const categories = Array.from(new Set(questionsConfig.map(q => q.category)));
+  const categories = Array.from(new Set(questionsConfig.map(q => q.category))).filter(c => c !== "");
   if (activeTab === 'characters') {
     categories.push("פיתוח דמות");
   }
+  if (activeTab === 'places') {
+    categories.push("מיקום ספציפי");
+  }
   if (activeTab === 'fantasyWorlds') {
+    categories.push("כוחות ייחודיים");
     categories.push("חפצים מיוחדים");
   }
   if (selectedEntry?.customFields && selectedEntry.customFields.length > 0) {
@@ -361,19 +378,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     setMode('edit');
   };
 
-  const addSubPlace = (parentId: string) => {
-    const newEntry: QuestionnaireEntry = {
-      id: `q-${Date.now()}`,
-      name: 'מיקום ספציפי חדש',
-      parentId,
-      data: { placeType: 'micro' },
-      customFields: []
-    };
-    onUpdatePlaces([...places, newEntry]);
-    handleEntrySelect(newEntry.id);
-    setMode('edit');
-  };
-
   const updateEntry = (updates: Partial<QuestionnaireEntry>) => {
     if (!selectedEntryId) return;
     updateFn(entries.map(e => e.id === selectedEntryId ? { ...e, ...updates } : e));
@@ -445,6 +449,56 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateEntry({ specialItems: updatedItems });
   };
 
+  const addUniquePower = () => {
+    if (!selectedEntry) return;
+    const newPower: UniquePower = {
+      id: `power-${Date.now()}`,
+      name: `כוח ייחודי ${ (selectedEntry.uniquePowers?.length || 0) + 1}`,
+      data: {}
+    };
+    const updatedPowers = [...(selectedEntry.uniquePowers || []), newPower];
+    updateEntry({ uniquePowers: updatedPowers });
+  };
+
+  const updateUniquePower = (powerId: string, updates: Partial<UniquePower>) => {
+    if (!selectedEntry) return;
+    const updatedPowers = (selectedEntry.uniquePowers || []).map(p => 
+      p.id === powerId ? { ...p, ...updates } : p
+    );
+    updateEntry({ uniquePowers: updatedPowers });
+  };
+
+  const removeUniquePower = (powerId: string) => {
+    if (!selectedEntry) return;
+    const updatedPowers = (selectedEntry.uniquePowers || []).filter(p => p.id !== powerId);
+    updateEntry({ uniquePowers: updatedPowers });
+  };
+
+  const addSpecificLocation = () => {
+    if (!selectedEntry) return;
+    const newLoc: SpecificLocation = {
+      id: `loc-${Date.now()}`,
+      name: `מיקום ספציפי ${ (selectedEntry.specificLocations?.length || 0) + 1}`,
+      data: {}
+    };
+    const updatedLocs = [...(selectedEntry.specificLocations || []), newLoc];
+    updateEntry({ specificLocations: updatedLocs });
+  };
+
+  const updateSpecificLocation = (locId: string, updates: Partial<SpecificLocation>) => {
+    if (!selectedEntry) return;
+    const updatedLocs = (selectedEntry.specificLocations || []).map(l => 
+      l.id === locId ? { ...l, ...updates } : l
+    );
+    updateEntry({ specificLocations: updatedLocs });
+  };
+
+  const removeSpecificLocation = (locId: string) => {
+    if (!selectedEntry) return;
+    const updatedLocs = (selectedEntry.specificLocations || []).filter(l => l.id !== locId);
+    updateEntry({ specificLocations: updatedLocs });
+  };
+
   const exportCurrentEntry = () => {
     if (!selectedEntry) return;
     let text = `שאלון: ${selectedEntry.name}\n`;
@@ -452,7 +506,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     text += `-----------------------------------\n\n`;
     
     questionsConfig.forEach(q => {
-      text += `[${q.category}] ${q.question}\n`;
+      text += `[${q.category || 'כללי'}] ${q.question}\n`;
       text += `${selectedEntry.data[q.id] || '---'}\n\n`;
     });
 
@@ -481,6 +535,28 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
             text += `${idx + 1}. ${item.name}\n`;
             SPECIAL_ITEM_QUESTIONS.forEach(q => {
                 text += `   - ${q.question}: ${item.data[q.id] || '---'}\n`;
+            });
+            text += `\n`;
+        });
+    }
+
+    if (selectedEntry.uniquePowers && selectedEntry.uniquePowers.length > 0) {
+        text += `\nכוחות ייחודיים:\n-----------------------------------\n`;
+        selectedEntry.uniquePowers.forEach((power, idx) => {
+            text += `${idx + 1}. ${power.name}\n`;
+            UNIQUE_POWER_QUESTIONS.forEach(q => {
+                text += `   - ${q.question}: ${power.data[q.id] || '---'}\n`;
+            });
+            text += `\n`;
+        });
+    }
+
+    if (selectedEntry.specificLocations && selectedEntry.specificLocations.length > 0) {
+        text += `\nמיקומים ספציפיים:\n-----------------------------------\n`;
+        selectedEntry.specificLocations.forEach((loc, idx) => {
+            text += `${idx + 1}. ${loc.name}\n`;
+            SPECIFIC_LOCATION_QUESTIONS.forEach(q => {
+                text += `   - ${q.question}: ${loc.data[q.id] || '---'}\n`;
             });
             text += `\n`;
         });
@@ -562,61 +638,26 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 );
               })
             ) : activeTab === 'places' ? (
-              entries.filter(e => !e.parentId).map(entry => (
-                <div key={entry.id} className="space-y-1">
-                  <div 
-                    onClick={() => handleEntrySelect(entry.id)}
-                    className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      {entry.imageUrl ? (
-                        <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
-                      ) : (
-                        entry.data.placeType === 'macro' ? <Globe size={16} className="text-blue-400" /> : <Home size={16} className="text-amber-400" />
-                      )}
-                      <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {entry.data.placeType === 'macro' && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); addSubPlace(entry.id); }}
-                          className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600 p-1"
-                          title="הוסף מיקום ספציפי"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      )}
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
-                        className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              entries.map(entry => (
+                <div 
+                  key={entry.id}
+                  onClick={() => handleEntrySelect(entry.id)}
+                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {entry.imageUrl ? (
+                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-amber-200" />
+                    ) : (
+                      <Globe size={16} className="text-blue-400" />
+                    )}
+                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-amber-900' : 'text-amber-700'}`}>{entry.name}</span>
                   </div>
-                  {/* Render children */}
-                  {entries.filter(e => e.parentId === entry.id).map(child => (
-                    <div 
-                      key={child.id}
-                      onClick={() => handleEntrySelect(child.id)}
-                      className={`group flex items-center justify-between p-3 mr-6 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === child.id ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        {child.imageUrl ? (
-                          <img src={child.imageUrl} className="w-5 h-5 rounded-full object-cover border border-amber-200" />
-                        ) : (
-                          <Home size={14} className="text-amber-400" />
-                        )}
-                        <span className={`font-bold text-xs truncate ${selectedEntryId === child.id ? 'text-amber-900' : 'text-amber-700'}`}>{child.name}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== child.id)); if(selectedEntryId === child.id) handleEntrySelect(null); }}
-                        className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                    className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               ))
             ) : (
@@ -889,6 +930,132 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </div>
                         )}
                       </div>
+                    ) : currentCategory === "מיקום ספציפי" ? (
+                      <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-amber-900 handwritten text-3xl">מיקומים ספציפיים</h3>
+                          <button 
+                            onClick={addSpecificLocation}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-xl font-bold text-xs hover:bg-amber-900 transition-all shadow-md"
+                          >
+                            <Plus size={16} />
+                            <span>הוסף מיקום ספציפי</span>
+                          </button>
+                        </div>
+
+                        {(selectedEntry.specificLocations || []).length === 0 ? (
+                          <div className="p-12 border-2 border-dashed border-amber-100 rounded-[2rem] text-center text-amber-800/30">
+                            <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold">טרם נוספו מיקומים ספציפיים. לחץ על הכפתור למעלה כדי להתחיל.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-12">
+                            {(selectedEntry.specificLocations || []).map((loc, lIdx) => (
+                              <div key={loc.id} className="bg-amber-50/30 p-8 rounded-[2rem] border border-amber-100 space-y-6 relative group/loc">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                      {lIdx + 1}
+                                    </div>
+                                    <input 
+                                      value={loc.name}
+                                      onChange={(e) => updateSpecificLocation(loc.id, { name: e.target.value })}
+                                      className="text-xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      placeholder="שם המיקום..."
+                                    />
+                                  </div>
+                                  <button 
+                                    onClick={() => { if(confirm('למחוק את המיקום הספציפי?')) removeSpecificLocation(loc.id); }}
+                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/loc:opacity-100"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
+
+                                <div className="grid gap-6">
+                                  {SPECIFIC_LOCATION_QUESTIONS.map(q => (
+                                    <div key={q.id} className="space-y-2">
+                                      <label className="text-xs font-bold text-amber-900/60">{q.question}</label>
+                                      <textarea 
+                                        value={loc.data[q.id] || ''}
+                                        onChange={(e) => {
+                                          const newData = { ...loc.data, [q.id]: e.target.value };
+                                          updateSpecificLocation(loc.id, { data: newData });
+                                        }}
+                                        className="w-full bg-white border border-amber-100 rounded-xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none min-h-[80px] shadow-sm"
+                                        placeholder="תשובה..."
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : currentCategory === "כוחות ייחודיים" ? (
+                      <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-amber-900 handwritten text-3xl">כוחות ייחודיים</h3>
+                          <button 
+                            onClick={addUniquePower}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-xl font-bold text-xs hover:bg-amber-900 transition-all shadow-md"
+                          >
+                            <Plus size={16} />
+                            <span>הוסף כוח ייחודי</span>
+                          </button>
+                        </div>
+
+                        {(selectedEntry.uniquePowers || []).length === 0 ? (
+                          <div className="p-12 border-2 border-dashed border-amber-100 rounded-[2rem] text-center text-amber-800/30">
+                            <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold">טרם נוספו כוחות ייחודיים. לחץ על הכפתור למעלה כדי להתחיל.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-12">
+                            {(selectedEntry.uniquePowers || []).map((power, pIdx) => (
+                              <div key={power.id} className="bg-amber-50/30 p-8 rounded-[2rem] border border-amber-100 space-y-6 relative group/power">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                      {pIdx + 1}
+                                    </div>
+                                    <input 
+                                      value={power.name}
+                                      onChange={(e) => updateUniquePower(power.id, { name: e.target.value })}
+                                      className="text-xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      placeholder="שם הכוח..."
+                                    />
+                                  </div>
+                                  <button 
+                                    onClick={() => { if(confirm('למחוק את הכוח הייחודי?')) removeUniquePower(power.id); }}
+                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/power:opacity-100"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
+
+                                <div className="grid gap-6">
+                                  {UNIQUE_POWER_QUESTIONS.map(q => (
+                                    <div key={q.id} className="space-y-2">
+                                      <label className="text-xs font-bold text-amber-900/60">{q.question}</label>
+                                      <textarea 
+                                        value={power.data[q.id] || ''}
+                                        onChange={(e) => {
+                                          const newData = { ...power.data, [q.id]: e.target.value };
+                                          updateUniquePower(power.id, { data: newData });
+                                        }}
+                                        className="w-full bg-white border border-amber-100 rounded-xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none min-h-[80px] shadow-sm"
+                                        placeholder="תשובה..."
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : currentCategory === "חפצים מיוחדים" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
@@ -1027,6 +1194,44 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </div>
                         )}
 
+                        {activeTab === 'fantasyWorlds' && currentCategory === 'יום יום' && (
+                          <div className="pt-10 border-t border-amber-50 mt-10">
+                            <div className="text-xs font-black text-amber-900/40 uppercase tracking-widest mb-4">כוחות ייחודיים</div>
+                            <button 
+                              onClick={() => {
+                                const index = categories.indexOf("כוחות ייחודיים");
+                                if (index !== -1) {
+                                  setCurrentCategoryIndex(index);
+                                  addUniquePower();
+                                }
+                              }}
+                              className="bg-amber-800 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-900 transition-all shadow-md"
+                            >
+                              <Plus size={18} />
+                              <span>הוסף כוח ייחודי</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {activeTab === 'places' && currentCategory === 'מיקום גיאוגרפי' && (
+                          <div className="pt-10 border-t border-amber-50 mt-10">
+                            <div className="text-xs font-black text-amber-900/40 uppercase tracking-widest mb-4">מיקומים ספציפיים</div>
+                            <button 
+                              onClick={() => {
+                                const index = categories.indexOf("מיקום ספציפי");
+                                if (index !== -1) {
+                                  setCurrentCategoryIndex(index);
+                                  addSpecificLocation();
+                                }
+                              }}
+                              className="bg-amber-800 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-amber-900 transition-all shadow-md"
+                            >
+                              <Plus size={18} />
+                              <span>הוסף מיקום ספציפי</span>
+                            </button>
+                          </div>
+                        )}
+
                         {/* Navigation Buttons at bottom */}
                         <div className="flex items-center justify-between pt-10 border-t border-amber-50 mt-10">
                           <button 
@@ -1080,6 +1285,78 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                        <div className="grid gap-6 border-r-2 border-amber-100 pr-6">
                                           {DEVELOPMENT_STAGE_QUESTIONS.map(q => {
                                             const val = stage.data[q.id];
+                                            if (!val) return null;
+                                            return (
+                                              <div key={q.id} className="space-y-1">
+                                                 <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-amber-900 leading-relaxed whitespace-pre-wrap">{val}</div>
+                                              </div>
+                                            );
+                                          })}
+                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                             </section>
+                           );
+                        }
+
+                        if (cat === "מיקום ספציפי") {
+                           if (!selectedEntry.specificLocations || selectedEntry.specificLocations.length === 0) return null;
+                           return (
+                             <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4">
+                                   <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest bg-amber-100 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                <div className="space-y-8">
+                                  {(selectedEntry.specificLocations || []).map((loc, lIdx) => (
+                                    <div key={loc.id} className="space-y-6 bg-amber-50/20 p-8 rounded-[2rem] border border-amber-100/50">
+                                       <div className="flex items-center gap-4">
+                                          <div className="w-8 h-8 bg-amber-800/10 text-amber-800 rounded-lg flex items-center justify-center text-xs font-black">
+                                            {lIdx + 1}
+                                          </div>
+                                          <h4 className="text-xl font-bold text-amber-900 handwritten text-3xl">{loc.name}</h4>
+                                       </div>
+                                       <div className="grid gap-6 border-r-2 border-amber-100 pr-6">
+                                          {SPECIFIC_LOCATION_QUESTIONS.map(q => {
+                                            const val = loc.data[q.id];
+                                            if (!val) return null;
+                                            return (
+                                              <div key={q.id} className="space-y-1">
+                                                 <div className="text-[10px] font-bold text-amber-900/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-amber-900 leading-relaxed whitespace-pre-wrap">{val}</div>
+                                              </div>
+                                            );
+                                          })}
+                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                             </section>
+                           );
+                        }
+
+                        if (cat === "כוחות ייחודיים") {
+                           if (!selectedEntry.uniquePowers || selectedEntry.uniquePowers.length === 0) return null;
+                           return (
+                             <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4">
+                                   <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest bg-amber-100 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                <div className="space-y-8">
+                                  {(selectedEntry.uniquePowers || []).map((power, pIdx) => (
+                                    <div key={power.id} className="space-y-6 bg-amber-50/20 p-8 rounded-[2rem] border border-amber-100/50">
+                                       <div className="flex items-center gap-4">
+                                          <div className="w-8 h-8 bg-amber-800/10 text-amber-800 rounded-lg flex items-center justify-center text-xs font-black">
+                                            {pIdx + 1}
+                                          </div>
+                                          <h4 className="text-xl font-bold text-amber-900 handwritten text-3xl">{power.name}</h4>
+                                       </div>
+                                       <div className="grid gap-6 border-r-2 border-amber-100 pr-6">
+                                          {UNIQUE_POWER_QUESTIONS.map(q => {
+                                            const val = power.data[q.id];
                                             if (!val) return null;
                                             return (
                                               <div key={q.id} className="space-y-1">
