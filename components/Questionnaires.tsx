@@ -165,16 +165,12 @@ const TWIST_QUESTIONS = [
 ];
 
 const FANTASY_WORLD_QUESTIONS = [
-  { id: "pre_state", category: "יום יום", question: "תיאור מצב קודם:", type: "textarea" },
-  { id: "expectations", category: "יום יום", question: "מה הקורא חושב שעומד לקרות:", type: "textarea" },
-  { id: "facts", category: "יום יום", question: "מה העובדות שהובילו אותו לחשוב כך:", type: "textarea" },
-  { id: "ideal_path", category: "יום יום", question: "מה היה קורה אילו הסיפור היה ממשיך כמו שהקורא חושב:", type: "textarea" },
-  { id: "truth_moment", category: "יום יום", question: "מה קורה ברגע האמת:", type: "textarea" },
-  { id: "clues", category: "יום יום", question: "אילו רמזים מקדימים נמצאים בטקסט:", type: "textarea" },
-  { id: "immediate_impact", category: "יום יום", question: "איך השינוי משפיע באופן מיידי על הסיפור:", type: "textarea" },
-  { id: "long_term_impact", category: "יום יום", question: "אילו השלכות יש לטוויסט בטווח הארוך:", type: "textarea" },
-  { id: "next_twist", category: "יום יום", question: "האם ואיך זה מוביל לטוויסט הבא:", type: "textarea" },
-  { id: "mention_for_end", category: "יום יום", question: "מה צריך להיות מוזכר במהלך הטוויסט כדי לוודא הגעה לסוף הרצוי:", type: "textarea" },
+  { id: "common_daily_life", category: "יום יום", question: "איך מתנהלים חיי היום יום של האדם הפשוט:", type: "textarea" },
+  { id: "other_creatures", category: "יום יום", question: "אילו יצורים נוספים קיימים בעולם:", type: "textarea" },
+  { id: "magic_nature", category: "יום יום", question: "טבע ייחודי הנובע מהקסם:", type: "textarea" },
+  { id: "magic_source", category: "יום יום", question: "מאיפה נובעת אנרגיית הקסם:", type: "textarea" },
+  { id: "magic_limits", category: "יום יום", question: "מה מגביל את כוח הקסם:", type: "textarea" },
+  { id: "world_laws", category: "יום יום", question: "אילו חוקים יש בעולם הזה:", type: "textarea" },
   
   { id: "good_guys", category: "מלחמות", question: "מי הטובים:", type: "textarea" },
   { id: "bad_guys", category: "מלחמות", question: "מי הרעים:", type: "textarea" },
