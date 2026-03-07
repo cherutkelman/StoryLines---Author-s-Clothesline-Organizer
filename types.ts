@@ -6,6 +6,7 @@ export interface Scene {
   content: string;
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
+  chapterTitle?: string;
 }
 
 export interface Plotline {
@@ -26,6 +27,18 @@ export interface SpecialItem {
   data: Record<string, string>;
 }
 
+export interface UniquePower {
+  id: string;
+  name: string;
+  data: Record<string, string>;
+}
+
+export interface SpecificLocation {
+  id: string;
+  name: string;
+  data: Record<string, string>;
+}
+
 export interface QuestionnaireEntry {
   id: string;
   name: string;
@@ -38,6 +51,8 @@ export interface QuestionnaireEntry {
   customFields?: { id: string; label: string }[]; // User-defined questions
   developmentStages?: DevelopmentStage[]; // For character development tracking
   specialItems?: SpecialItem[]; // For fantasy world special items
+  uniquePowers?: UniquePower[]; // For fantasy world unique powers
+  specificLocations?: SpecificLocation[]; // For geographical locations
 }
 
 export interface CharacterMapConnection {
@@ -60,6 +75,8 @@ export interface MapElement {
   strokeWidth?: number;
   fill?: string;
   fontSize?: number;
+  questionnaireId?: string;
+  isPlace?: boolean;
 }
 
 export interface WorldMap {
@@ -94,6 +111,7 @@ export interface MindMap {
 export interface Project {
   plotlines: Plotline[];
   scenes: Scene[];
+  summary?: string;
   characters?: QuestionnaireEntry[];
   places?: QuestionnaireEntry[];
   periods?: QuestionnaireEntry[];

@@ -60,6 +60,7 @@ const DEFAULT_PROJECT_DATA = {
   periods: [],
   twists: [],
   fantasyWorlds: [],
+  summary: '',
   characterMapConnections: [],
   maps: [],
   mindMaps: []
@@ -115,16 +116,9 @@ const App: React.FC = () => {
   
   // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
-  const [isImportTextOpen, setIsImportTextOpen] = useState(false);
-  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
-  const [suggestionText, setSuggestionText] = useState('');
-  const [isSendingSuggestion, setIsSendingSuggestion] = useState(false);
-  const [suggestionSent, setSuggestionSent] = useState(false);
 
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
-  const [importLongText, setImportLongText] = useState('');
-  const [isSplittingAi, setIsSplittingAi] = useState(false);
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -190,83 +184,6 @@ const App: React.FC = () => {
     setIsBulkAddOpen(false);
   };
 
-  const handleAiTextSplit = async () => {
-    if (!activeBook || !importLongText.trim() || !process.env.API_KEY) return;
-    setIsSplittingAi(true);
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Split the following long text into logical scenes. For each scene, provide a short descriptive title and the relevant text content. 
-        Text: ${importLongText.substring(0, 15000)}`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                content: { type: Type.STRING }
-              },
-              required: ["title", "content"]
-            }
-          }
-        }
-      });
-
-      const scenes = JSON.parse(response.text || '[]');
-      if (Array.isArray(scenes) && scenes.length > 0) {
-        const startPos = activeBook.scenes.length;
-        const newScenesToAdd: Scene[] = scenes.map((s: any, idx: number) => ({
-          id: `s-ai-${Date.now()}-${idx}`,
-          plotlineId: bulkPlotlineId,
-          title: s.title || 'סצנה חדשה',
-          content: s.content || '',
-          position: startPos + idx,
-          isCompleted: false
-        }));
-
-        updateActiveBook({
-          scenes: [...activeBook.scenes, ...newScenesToAdd].map((s, idx) => ({ ...s, position: idx }))
-        });
-        setIsImportTextOpen(false);
-        setImportLongText('');
-      }
-    } catch (error) {
-      console.error("AI Split failed", error);
-    } finally {
-      setIsSplittingAi(false);
-    }
-  };
-
-  const handleManualSplit = () => {
-    if (!activeBook) return;
-    const delimiter = prompt("הזן תו מפריד (למשל ###) או השאר ריק לחלוקה לפי פסקאות כפולות", "###");
-    const parts = delimiter 
-      ? importLongText.split(delimiter).filter(p => p.trim()) 
-      : importLongText.split('\n\n').filter(p => p.trim());
-    
-    if (parts.length > 0) {
-      const startPos = activeBook.scenes.length;
-      const newScenesToAdd: Scene[] = parts.map((content, idx) => ({
-        id: `s-manual-${Date.now()}-${idx}`,
-        plotlineId: bulkPlotlineId,
-        title: `סצנה ${startPos + idx + 1}`,
-        content: content.trim(),
-        position: startPos + idx,
-        isCompleted: false
-      }));
-
-      updateActiveBook({
-        scenes: [...activeBook.scenes, ...newScenesToAdd].map((s, idx) => ({ ...s, position: idx }))
-      });
-      setIsImportTextOpen(false);
-      setImportLongText('');
-    }
-  };
-
   const addPlotline = () => {
     if (!activeBook) return;
     const newP: Plotline = {
@@ -324,6 +241,13 @@ const App: React.FC = () => {
     if (!activeBook) return;
     updateActiveBook({
       scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
+    });
+  };
+
+  const updateChapterTitle = (position: number, title: string) => {
+    if (!activeBook) return;
+    updateActiveBook({
+      scenes: activeBook.scenes.map(s => s.position === position ? { ...s, chapterTitle: title } : s)
     });
   };
 
@@ -395,34 +319,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendSuggestion = async () => {
-    if (!suggestionText.trim()) return;
-    setIsSendingSuggestion(true);
-    
-    // In a real scenario, you'd send this to an API or service like Formspree.
-    // For now, we simulate the 'sending' experience.
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setSuggestionSent(true);
-      setSuggestionText('');
-      setTimeout(() => {
-        setIsSuggestionsOpen(false);
-        setSuggestionSent(false);
-      }, 2000);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSendingSuggestion(false);
-    }
-  };
-
   const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#fdf6e3] text-[#4a4a4a] overflow-hidden">
-      <header className="flex-shrink-0 bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between shadow-sm z-30">
+    <div className="h-screen flex flex-col bg-[#fdf6e3] text-[#4a4a4a] overflow-y-auto scrollbar-hide">
+      <header className="flex-shrink-0 sticky top-0 bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between shadow-sm z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <button 
@@ -474,10 +377,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={exportManuscript} className="flex items-center gap-2 px-4 py-2.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-xl hover:bg-amber-200 transition-all text-sm font-bold">
-            <Download size={16} />
-            <span className="hidden sm:inline">ייצוא</span>
-          </button>
+          {/* Export button moved to Editor */}
         </div>
       </header>
 
@@ -594,20 +494,21 @@ const App: React.FC = () => {
                     onAddScene={addScene}
                     onMoveScene={moveScene} 
                     updateScene={updateScene} 
+                    onUpdateSummary={(summary) => updateActiveBook({ summary })}
                     onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
-                    onOpenSuggestions={() => setIsSuggestionsOpen(true)}
                     initialZoom={activeBook.uiState?.boardZoomLevel}
                     onZoomChange={(z) => updateBookUiState({ boardZoomLevel: z })}
                     onSceneDoubleClick={(id) => {
                       handleViewChange('editor');
                       updateBookUiState({ editorFocusedSceneId: id });
                     }}
+                    onUpdateChapterTitle={updateChapterTitle}
                   />
                 </div>
               )}
               {activeView === 'editor' && (
                 <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
-                  <Editor 
+                   <Editor 
                     project={activeBook} 
                     visiblePlotlines={visiblePlotlines} 
                     onUpdateScene={updateScene} 
@@ -616,6 +517,7 @@ const App: React.FC = () => {
                     onFocusScene={(id) => updateBookUiState({ editorFocusedSceneId: id })}
                     initialDisplayMode={activeBook.uiState?.editorDisplayMode}
                     onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
+                    onExport={exportManuscript}
                   />
                 </div>
               )}
@@ -623,6 +525,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 overflow-hidden">
                    <MapsManager 
                       characters={activeBook.characters || []}
+                      places={activeBook.places || []}
                       connections={activeBook.characterMapConnections || []}
                       maps={activeBook.maps || []}
                       mindMaps={activeBook.mindMaps || []}
@@ -703,87 +606,12 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                   <button onClick={handleBulkAdd} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2">
+                   <button onClick={handleBulkAdd} className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2">
                       <Plus size={20} />
                       <span>הוסף סצנות</span>
                    </button>
-                   <button onClick={() => setIsImportTextOpen(true)} className="px-6 bg-amber-100 text-amber-800 font-bold py-4 rounded-2xl hover:bg-amber-200 transition-all">
-                      ייבוא טקסט
-                   </button>
                 </div>
              </div>
-          </div>
-        </div>
-      )}
-
-      {isImportTextOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
-          <div className="bg-[#fdf6e3] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
-             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold handwritten text-3xl">ייבוא טקסט ארוך</h2>
-                <button onClick={() => setIsImportTextOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
-             </div>
-             <textarea 
-               value={importLongText} 
-               onChange={(e) => setImportLongText(e.target.value)} 
-               className="w-full h-80 bg-white border border-amber-100 rounded-2xl p-6 mb-6 focus:ring-4 focus:ring-amber-200/20 outline-none resize-none"
-               placeholder="הדבק טקסט ארוך כאן..."
-             />
-             <div className="flex gap-4">
-                <button onClick={handleAiTextSplit} className="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700">
-                   {isSplittingAi ? <Loader2 className="animate-spin" /> : <Sparkles />} פירוק AI
-                </button>
-                <button onClick={handleManualSplit} className="flex-1 bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900">פירוק ידני</button>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {isSuggestionsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
-          <div className="bg-[#fdf6e3] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
-             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold handwritten text-3xl">הצעות לשיפור</h2>
-                <button onClick={() => setIsSuggestionsOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
-             </div>
-             
-             {suggestionSent ? (
-               <div className="py-12 flex flex-col items-center justify-center text-center animate-in zoom-in duration-300">
-                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <h3 className="text-xl font-bold text-amber-900 mb-2">תודה רבה!</h3>
-                  <p className="text-sm text-amber-800/60">ההצעה שלך התקבלה ותיקרא בתשומת לב.</p>
-               </div>
-             ) : (
-               <div className="space-y-6">
-                  <p className="text-sm text-amber-800/60 leading-relaxed">
-                    יש לך רעיון לפיצ'ר חדש? משהו לא עובד כמו שצריך?
-                    כתוב לי כאן ואנסה לשפר את האפליקציה!
-                  </p>
-                  
-                  <textarea 
-                    value={suggestionText} 
-                    onChange={(e) => setSuggestionText(e.target.value)} 
-                    className="w-full h-40 bg-white border border-amber-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none resize-none shadow-inner"
-                    placeholder="מה דעתך להוסיף..."
-                    autoFocus
-                  />
-
-                  <button 
-                    onClick={handleSendSuggestion}
-                    disabled={isSendingSuggestion || !suggestionText.trim()}
-                    className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                  >
-                    {isSendingSuggestion ? (
-                      <Loader2 className="animate-spin" size={20} />
-                    ) : (
-                      <Send size={20} />
-                    )}
-                    <span>שלח הצעה</span>
-                  </button>
-               </div>
-             )}
           </div>
         </div>
       )}

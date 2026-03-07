@@ -9,11 +9,12 @@ import {
   ChevronRight, ChevronLeft, Plus, Minus, Maximize,
   Image as ImageIcon, X, Building2, Castle, Dog, TreePine, Download
 } from 'lucide-react';
-import { WorldMap, MapElement } from '../types';
+import { WorldMap, MapElement, QuestionnaireEntry } from '../types';
 import useImage from 'use-image';
 
 interface WorldMapEditorProps {
   map: WorldMap;
+  places: QuestionnaireEntry[];
   onUpdateMap: (updates: Partial<WorldMap>) => void;
 }
 
@@ -25,10 +26,11 @@ const ICON_COMPONENTS = {
   valley: Mountain, // Using Mountain for both for now
 };
 
-const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => {
+const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpdateMap }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<'select' | 'pencil' | 'road' | 'river' | 'pool' | 'text' | 'icon'>('select');
+  const [tool, setTool] = useState<'select' | 'pencil' | 'road' | 'river' | 'pool' | 'text' | 'icon' | 'place'>('select');
   const [selectedIcon, setSelectedIcon] = useState<'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'animal'>('house');
+  const [showPlacesList, setShowPlacesList] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [previewPos, setPreviewPos] = useState<{x: number, y: number} | null>(null);
   const [scale, setScale] = useState(1);
@@ -124,7 +126,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
         iconType: selectedIcon,
         x: pos.x,
         y: pos.y,
-        fill: (selectedIcon === 'tree' || selectedIcon === 'trees') ? '#059669' : selectedIcon === 'mountain' ? '#92400e' : '#8b4513'
+        fill: (selectedIcon === 'tree' || selectedIcon === 'trees') ? '#059669' : selectedIcon === 'mountain' ? '#92400e' : (['house', 'houses', 'buildings', 'palace'].includes(selectedIcon) ? '#000000' : '#8b4513')
       };
       onUpdateMap({ elements: [...map.elements, newElement] });
       setSelectedId(id);
@@ -230,7 +232,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
   return (
     <div className="h-full flex relative bg-[#fdf6e3]">
       {/* Toolbar */}
-      <div className="w-16 bg-white border-l border-amber-100 flex flex-col items-center py-6 gap-4 shadow-xl z-20">
+      <div className="w-16 bg-white border-l border-amber-100 flex flex-col items-center py-6 gap-4 shadow-xl z-20 overflow-y-auto scrollbar-hide">
         <button 
           onClick={exportAsImage}
           className="p-3 text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
@@ -290,6 +292,13 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
         >
           <Home size={20} />
         </button>
+        <button 
+          onClick={() => { setTool('place'); setShowPlacesList(true); }}
+          className={`p-3 rounded-xl transition-all ${tool === 'place' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          title="הוסף מקום מהשאלון"
+        >
+          <MapPin size={20} />
+        </button>
         <div className="h-px w-8 bg-amber-50" />
         <label className="p-3 text-amber-200 hover:bg-amber-50 rounded-xl cursor-pointer transition-all" title="העלה מפה">
           <ImageIcon size={20} />
@@ -308,6 +317,47 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
       {/* Main Editor Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Tool Sub-options */}
+        {tool === 'place' && showPlacesList && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-amber-100 shadow-2xl z-30 flex flex-col gap-3 min-w-[300px] max-h-[60vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-amber-50 pb-2">
+              <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest">בחר מקום מהשאלון</h3>
+              <button onClick={() => setShowPlacesList(false)} className="text-amber-300 hover:text-amber-800"><X size={16} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-1 pr-1">
+              {places.length === 0 ? (
+                <div className="text-center py-8 text-amber-800/40 text-xs">אין מקומות בשאלון</div>
+              ) : (
+                places.map(place => (
+                  <button 
+                    key={place.id}
+                    onClick={() => {
+                      const id = `el-${Date.now()}`;
+                      const newElement: MapElement = {
+                        id,
+                        type: 'text',
+                        x: stageSize.width / 2 - stagePos.x,
+                        y: stageSize.height / 2 - stagePos.y,
+                        text: place.name,
+                        fontSize: 24,
+                        fill: '#8b4513',
+                        ...( { questionnaireId: place.id, isPlace: true } as any)
+                      };
+                      onUpdateMap({ elements: [...map.elements, newElement] });
+                      setSelectedId(id);
+                      setShowPlacesList(false);
+                      setTool('select');
+                    }}
+                    className="w-full text-right px-4 py-3 rounded-xl hover:bg-amber-50 text-sm text-amber-900 font-medium transition-all flex items-center justify-between group"
+                  >
+                    <span>{place.name}</span>
+                    <Plus size={14} className="opacity-0 group-hover:opacity-100 text-amber-400" />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {tool === 'icon' && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-amber-100 shadow-xl z-10 flex gap-2 overflow-x-auto max-w-[90vw]">
             {(['house', 'houses', 'tree', 'trees', 'mountain', 'valley', 'buildings', 'palace', 'bridge', 'animal'] as const).map(icon => (
@@ -401,16 +451,23 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
                         fill="white"
                         opacity={1}
                         cornerRadius={4}
-                        width={(el.text?.length || 0) * (el.fontSize || 20) * 0.55 + 15}
+                        width={(el.text?.length || 0) * (el.fontSize || 20) * 0.55 + (el.isPlace ? 35 : 15)}
                         height={(el.fontSize || 20) * 1.2}
                         x={-5}
                         y={-2}
+                        stroke={el.isPlace ? '#8b4513' : 'transparent'}
+                        strokeWidth={el.isPlace ? 1 : 0}
                       />
+                      {el.isPlace && (
+                        <Circle x={10} y={(el.fontSize || 20) * 0.5} radius={4} fill="#8b4513" />
+                      )}
                       <Text
+                        x={el.isPlace ? 20 : 0}
                         text={el.text}
                         fontSize={el.fontSize}
                         fill={el.fill}
                         onDblClick={() => {
+                          if (el.isPlace) return; // Don't edit linked places directly
                           const newText = prompt('ערוך טקסט:', el.text);
                           if (newText !== null) {
                             onUpdateMap({
@@ -466,23 +523,23 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
                     >
                       {el.iconType === 'house' && (
                         <Group>
-                          <Rect width={20} height={15} y={10} fill={el.fill || '#amber-800'} cornerRadius={2} />
-                          <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#amber-800'} />
+                          <Rect width={20} height={15} y={10} fill={el.fill || '#92400e'} cornerRadius={2} />
+                          <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#92400e'} />
                         </Group>
                       )}
                       {el.iconType === 'houses' && (
                         <Group>
                           <Group x={0} y={5} scaleX={0.7} scaleY={0.7}>
-                            <Rect width={20} height={15} y={10} fill={el.fill || '#amber-800'} cornerRadius={2} />
-                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#amber-800'} />
+                            <Rect width={20} height={15} y={10} fill={el.fill || '#92400e'} cornerRadius={2} />
+                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#92400e'} />
                           </Group>
                           <Group x={12} y={0} scaleX={0.8} scaleY={0.8}>
-                            <Rect width={20} height={15} y={10} fill={el.fill || '#amber-800'} cornerRadius={2} />
-                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#amber-800'} />
+                            <Rect width={20} height={15} y={10} fill={el.fill || '#92400e'} cornerRadius={2} />
+                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#92400e'} />
                           </Group>
                           <Group x={8} y={12} scaleX={0.7} scaleY={0.7}>
-                            <Rect width={20} height={15} y={10} fill={el.fill || '#amber-800'} cornerRadius={2} />
-                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#amber-800'} />
+                            <Rect width={20} height={15} y={10} fill={el.fill || '#92400e'} cornerRadius={2} />
+                            <Line points={[0, 10, 10, 0, 20, 10]} closed fill={el.fill || '#92400e'} />
                           </Group>
                         </Group>
                       )}
@@ -529,9 +586,9 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
                       )}
                       {el.iconType === 'palace' && (
                         <Group>
-                          <Rect width={60} height={30} y={10} fill={el.fill || '#amber-800'} cornerRadius={2} />
-                          <Rect x={0} width={15} height={40} fill={el.fill || '#amber-800'} />
-                          <Rect x={45} width={15} height={40} fill={el.fill || '#amber-800'} />
+                          <Rect width={60} height={30} y={10} fill={el.fill || '#92400e'} cornerRadius={2} />
+                          <Rect x={0} width={15} height={40} fill={el.fill || '#92400e'} />
+                          <Rect x={45} width={15} height={40} fill={el.fill || '#92400e'} />
                           <Line points={[0, 0, 7.5, -10, 15, 0]} closed fill={el.fill || '#ef4444'} />
                           <Line points={[45, 0, 52.5, -10, 60, 0]} closed fill={el.fill || '#ef4444'} />
                         </Group>
@@ -592,6 +649,23 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, onUpdateMap }) => 
             </div>
 
             <div className="space-y-4">
+              {selectedElement.isPlace && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mb-4">
+                  <div className="text-[10px] font-bold text-amber-900/50 uppercase mb-2">מקושר לשאלון</div>
+                  <div className="text-xs text-amber-900 font-bold mb-3">{selectedElement.text}</div>
+                  <button 
+                    onClick={() => {
+                      // This would need to trigger a view change in App.tsx
+                      // For now, we'll just show a message or we could implement a callback
+                      alert('כדי לערוך את פרטי המקום, עבור ללשונית "שאלונים"');
+                    }}
+                    className="w-full py-2 bg-white border border-amber-200 text-amber-800 rounded-xl text-[10px] font-bold hover:bg-amber-100 transition-all"
+                  >
+                    צפה בשאלון
+                  </button>
+                </div>
+              )}
+
               {selectedElement.type === 'text' && (
                 <div>
                   <label className="text-[10px] font-bold text-amber-900/50 uppercase mb-1 block">טקסט</label>

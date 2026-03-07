@@ -7,6 +7,7 @@ import MindMapEditor from './MindMapEditor';
 
 interface MapsManagerProps {
   characters: QuestionnaireEntry[];
+  places: QuestionnaireEntry[];
   connections: CharacterMapConnection[];
   maps: WorldMap[];
   mindMaps: MindMap[];
@@ -24,6 +25,7 @@ interface MapsManagerProps {
 
 const MapsManager: React.FC<MapsManagerProps> = ({
   characters,
+  places = [],
   connections,
   maps,
   mindMaps = [],
@@ -132,7 +134,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   return (
     <div className="h-full flex flex-col bg-[#fdf6e3]">
       <div className="flex-shrink-0 bg-white border-b border-amber-100 px-6 py-2 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-100/50">
+        <div className="flex items-center gap-1 bg-amber-50 p-1 rounded-xl border border-amber-100/50 overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => handleTabChange('characterDiagram')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'characterDiagram' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
@@ -261,6 +263,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
               currentMap && (
                 <WorldMapEditor 
                   map={currentMap}
+                  places={places}
                   onUpdateMap={(updates) => updateMap(currentMap.id, updates)}
                 />
               )
