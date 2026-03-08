@@ -7,6 +7,7 @@ import {
   Download, LayoutList, Globe, Home, Eye, PencilLine, ClipboardList,
   Search,
   Zap,
+  Users,
   PanelLeftClose,
   PanelLeftOpen,
   MessageSquarePlus,
@@ -21,14 +22,16 @@ interface QuestionnairesProps {
   periods: QuestionnaireEntry[];
   twists: QuestionnaireEntry[];
   fantasyWorlds: QuestionnaireEntry[];
+  backgrounds: QuestionnaireEntry[];
   onUpdateCharacters: (entries: QuestionnaireEntry[]) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
   onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
-  initialTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds';
+  onUpdateBackgrounds: (entries: QuestionnaireEntry[]) => void;
+  initialTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
   initialSelectedEntryId?: string | null;
-  onTabChange?: (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds') => void;
+  onTabChange?: (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds') => void;
   onEntrySelect?: (id: string | null) => void;
 }
 
@@ -221,12 +224,20 @@ const CHARACTER_ROLES = [
   { id: 'others', label: 'נוספים' },
 ];
 
+const BACKGROUND_TYPES = [
+  { id: 'framework', label: 'סיפור מסגרת', icon: FileText, addButton: 'הוסף סיפור מסגרת' },
+  { id: 'legends', label: 'אגדות', icon: Sparkles, addButton: 'הוסף אגדה' },
+  { id: 'prophecies', label: 'נבואות', icon: Eye, addButton: 'הוסף נבואה' },
+  { id: 'folklore', label: 'סיפורי עם ומסורת', icon: Users, addButton: 'הוסף סיפור עם' },
+  { id: 'children', label: 'שירים וסיפורי ילדים', icon: MessageSquarePlus, addButton: 'הוסף סיפור ילדים או שיר' },
+];
+
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
-  characters, places, periods, twists, fantasyWorlds,
-  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds,
+  characters, places, periods, twists, fantasyWorlds, backgrounds,
+  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
-  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds'>(initialTab || 'characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds'>(initialTab || 'characters');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(initialSelectedEntryId || null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
@@ -237,7 +248,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
 
-  const handleTabChange = (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds') => {
+  const handleTabChange = (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds') => {
     setActiveTab(tab);
     setSelectedEntryId(null);
     setActiveCategory(null);
@@ -258,8 +269,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     onEntrySelect?.(id);
   };
 
-  const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : fantasyWorlds;
-  const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : onUpdateFantasyWorlds;
+  const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
+  const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
   
   const currentGender = selectedEntry?.data.gender || 'female';
@@ -269,9 +280,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     ? (currentGender === 'male' ? MALE_QUESTIONS_CONFIG : FEMALE_QUESTIONS_CONFIG)
     : activeTab === 'places' 
       ? (currentPlaceType === 'macro' ? MACRO_PLACE_QUESTIONS : MICRO_PLACE_QUESTIONS)
-      : activeTab === 'periods' ? PERIOD_QUESTIONS : activeTab === 'twists' ? TWIST_QUESTIONS : FANTASY_WORLD_QUESTIONS;
+      : activeTab === 'periods' ? PERIOD_QUESTIONS : activeTab === 'twists' ? TWIST_QUESTIONS : activeTab === 'fantasyWorlds' ? FANTASY_WORLD_QUESTIONS : [];
 
   const categories = Array.from(new Set(questionsConfig.map(q => q.category))).filter(c => c !== "");
+  if (activeTab === 'backgrounds' && selectedEntry) {
+    categories.push("תוכן");
+  }
   if (activeTab === 'characters') {
     categories.push("פיתוח דמות");
   }
@@ -288,7 +302,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
   const currentCategory = activeCategory || categories[currentCategoryIndex] || categories[0];
 
-  const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : Wand2;
+  const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : activeTab === 'fantasyWorlds' ? Wand2 : FileText;
 
   const filteredQuestions = questionsConfig.filter(q => {
     const matchesCategory = mode === 'edit' ? q.category === currentCategory : (activeCategory ? q.category === activeCategory : true);
@@ -495,6 +509,31 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateEntry({ specificLocations: updatedLocs });
   };
 
+  const addLoreItem = () => {
+    if (!selectedEntry) return;
+    const newItem = {
+      id: `lore-${Date.now()}`,
+      title: `פריט חדש ${ (selectedEntry.loreItems?.length || 0) + 1}`,
+      content: ''
+    };
+    const updatedLore = [...(selectedEntry.loreItems || []), newItem];
+    updateEntry({ loreItems: updatedLore });
+  };
+
+  const updateLoreItem = (loreId: string, updates: Partial<{ title: string; content: string }>) => {
+    if (!selectedEntry) return;
+    const updatedLore = (selectedEntry.loreItems || []).map(l => 
+      l.id === loreId ? { ...l, ...updates } : l
+    );
+    updateEntry({ loreItems: updatedLore });
+  };
+
+  const removeLoreItem = (loreId: string) => {
+    if (!selectedEntry) return;
+    const updatedLore = (selectedEntry.loreItems || []).filter(l => l.id !== loreId);
+    updateEntry({ loreItems: updatedLore });
+  };
+
   const exportCurrentEntry = () => {
     if (!selectedEntry) return;
     let text = `שאלון: ${selectedEntry.name}\n`;
@@ -576,6 +615,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
             { id: 'periods', label: 'תקופות', icon: Clock },
             { id: 'twists', label: 'טוויסטים', icon: Zap },
             { id: 'fantasyWorlds', label: 'עולם פנטזיה', icon: Wand2 },
+            { id: 'backgrounds', label: 'רקע', icon: FileText },
           ].map(tab => (
             <button 
               key={tab.id}
@@ -591,13 +631,49 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
       <div className="flex-1 flex gap-6 min-h-0">
         <div className="w-64 flex flex-col gap-4 flex-shrink-0">
-          <button 
-            onClick={addEntry}
-            className="flex items-center justify-center gap-2 p-4 bg-white border-2 border-dashed border-amber-200 rounded-2xl text-amber-600 font-bold hover:bg-amber-50 hover:border-amber-400 transition-all shadow-sm"
-          >
-            <Plus size={20} />
-            <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם'}</span>
-          </button>
+          {activeTab === 'backgrounds' ? (
+            <div className="flex flex-col gap-2">
+              <div className="text-[10px] font-black text-amber-900/40 uppercase tracking-widest px-2 mb-1">קטגוריות רקע</div>
+              {BACKGROUND_TYPES.map(type => {
+                const isSelected = selectedEntry?.role === type.id;
+                return (
+                  <button 
+                    key={type.id}
+                    onClick={() => {
+                      let entry = backgrounds.find(e => e.role === type.id);
+                      if (!entry) {
+                        entry = {
+                          id: `bg-${type.id}`,
+                          name: type.label,
+                          role: type.id,
+                          data: {},
+                          loreItems: [],
+                          customFields: []
+                        };
+                        onUpdateBackgrounds([...backgrounds, entry]);
+                      }
+                      handleEntrySelect(entry.id);
+                      setMode('edit');
+                    }}
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-white border-transparent hover:border-amber-100'}`}
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <type.icon size={16} className={isSelected ? 'text-amber-800' : 'text-amber-300'} />
+                      <span className={`font-bold text-sm truncate ${isSelected ? 'text-amber-900' : 'text-amber-700'}`}>{type.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <button 
+              onClick={addEntry}
+              className="flex items-center justify-center gap-2 p-4 bg-white border-2 border-dashed border-amber-200 rounded-2xl text-amber-600 font-bold hover:bg-amber-50 hover:border-amber-400 transition-all shadow-sm"
+            >
+              <Plus size={20} />
+              <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם'}</span>
+            </button>
+          )}
           
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {activeTab === 'characters' ? (
@@ -633,6 +709,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                   </div>
                 );
               })
+            ) : activeTab === 'backgrounds' ? (
+              null // Categories are handled above for backgrounds
             ) : activeTab === 'places' ? (
               entries.map(entry => (
                 <div 
@@ -1115,6 +1193,64 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </div>
                         )}
                       </div>
+                    ) : activeTab === 'backgrounds' ? (
+                      <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-amber-900 handwritten text-3xl">
+                            {BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.label || 'רקע'}
+                          </h3>
+                          <button 
+                            onClick={addLoreItem}
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-800 text-white rounded-xl font-bold text-xs hover:bg-amber-900 transition-all shadow-md"
+                          >
+                            <Plus size={16} />
+                            <span>{BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.addButton || 'הוסף פריט'}</span>
+                          </button>
+                        </div>
+
+                        {(selectedEntry.loreItems || []).length === 0 ? (
+                          <div className="p-12 border-2 border-dashed border-amber-100 rounded-[2rem] text-center text-amber-800/30">
+                            <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold">טרם נוספו פריטים. לחץ על הכפתור למעלה כדי להתחיל.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-12">
+                            {(selectedEntry.loreItems || []).map((item, iIdx) => (
+                              <div key={item.id} className="bg-amber-50/30 p-8 rounded-[2rem] border border-amber-100 space-y-6 relative group/item">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                      {iIdx + 1}
+                                    </div>
+                                    <input 
+                                      value={item.title}
+                                      onChange={(e) => updateLoreItem(item.id, { title: e.target.value })}
+                                      className="text-xl font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      placeholder="כותרת..."
+                                    />
+                                  </div>
+                                  <button 
+                                    onClick={() => { if(confirm('למחוק את הפריט?')) removeLoreItem(item.id); }}
+                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/item:opacity-100"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-amber-900/60">תוכן</label>
+                                  <textarea 
+                                    value={item.content}
+                                    onChange={(e) => updateLoreItem(item.id, { content: e.target.value })}
+                                    className="w-full bg-white border border-amber-100 rounded-xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none min-h-[150px] shadow-sm"
+                                    placeholder="כתוב כאן..."
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {filteredQuestions.length > 0 ? (
@@ -1260,6 +1396,35 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                   <div className="max-w-2xl mx-auto space-y-12 py-8">
                      {categories.map(cat => {
                         let contentToRender: any[] = [];
+
+                        if (cat === "תוכן" && activeTab === 'backgrounds') {
+                           if (!selectedEntry.loreItems || selectedEntry.loreItems.length === 0) return null;
+                           return (
+                             <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-4">
+                                   <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest bg-amber-100 px-3 py-1 rounded-lg">
+                                     {BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.label || 'תוכן'}
+                                   </h3>
+                                   <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                <div className="space-y-8">
+                                  {selectedEntry.loreItems.map((item, idx) => (
+                                    <div key={item.id} className="space-y-4 bg-amber-50/20 p-8 rounded-[2rem] border border-amber-100/50">
+                                       <div className="flex items-center gap-4">
+                                          <div className="w-8 h-8 bg-amber-800/10 text-amber-800 rounded-lg flex items-center justify-center text-xs font-black">
+                                            {idx + 1}
+                                          </div>
+                                          <h4 className="text-xl font-bold text-amber-900 handwritten text-3xl">{item.title}</h4>
+                                       </div>
+                                       <div className="text-amber-900 leading-relaxed whitespace-pre-wrap border-r-2 border-amber-100 pr-6">
+                                          {item.content}
+                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                             </section>
+                           );
+                        }
 
                         if (cat === "פיתוח דמות") {
                            if (!selectedEntry.developmentStages || selectedEntry.developmentStages.length === 0) return null;

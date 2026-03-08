@@ -60,17 +60,25 @@ const DEFAULT_PROJECT_DATA = {
   periods: [],
   twists: [],
   fantasyWorlds: [],
+  backgrounds: [],
   summary: '',
   characterMapConnections: [],
   maps: [],
   mindMaps: []
 };
 
-const createNewBook = (title: string): Book => ({
+const SHARED_FIELDS = [
+  'characters', 'places', 'periods', 'twists', 'fantasyWorlds', 'backgrounds',
+  'characterMapConnections', 'maps', 'mindMaps'
+];
+
+const createNewBook = (title: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
   id: `book-${Date.now()}`,
   title,
+  universeId,
   lastModified: Date.now(),
-  ...DEFAULT_PROJECT_DATA
+  ...DEFAULT_PROJECT_DATA,
+  ...(sharedData || {})
 });
 
 const App: React.FC = () => {
@@ -116,6 +124,9 @@ const App: React.FC = () => {
   
   // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
+  const [isNewBookModalOpen, setIsNewBookModalOpen] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState('');
+  const [linkToBookId, setLinkToBookId] = useState<string>('');
 
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
@@ -139,12 +150,40 @@ const App: React.FC = () => {
   }, [activeBook?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
-    setLastSaved(new Date());
+    const timeout = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+      setLastSaved(new Date());
+    }, 1000); // Debounce save by 1 second
+    return () => clearTimeout(timeout);
   }, [books]);
 
   const updateActiveBook = (updates: Partial<Book>) => {
-    setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, ...updates, lastModified: Date.now() } : b));
+    setBooks(prev => {
+      const updatedBooks = prev.map(b => b.id === activeBookId ? { ...b, ...updates, lastModified: Date.now() } : b);
+      
+      const currentBook = updatedBooks.find(b => b.id === activeBookId);
+      if (currentBook?.universeId) {
+        const sharedUpdates: any = {};
+        let hasSharedUpdates = false;
+        
+        SHARED_FIELDS.forEach(field => {
+          if (field in updates) {
+            sharedUpdates[field] = (updates as any)[field];
+            hasSharedUpdates = true;
+          }
+        });
+
+        if (hasSharedUpdates) {
+          return updatedBooks.map(b => 
+            b.universeId === currentBook.universeId && b.id !== activeBookId 
+              ? { ...b, ...sharedUpdates, lastModified: Date.now() } 
+              : b
+          );
+        }
+      }
+      
+      return updatedBooks;
+    });
   };
 
   const updateBookUiState = (updates: Partial<NonNullable<Book['uiState']>>) => {
@@ -293,9 +332,48 @@ const App: React.FC = () => {
   };
 
   const addNewBookToLibrary = () => {
-    const newBook = createNewBook(`ספר חדש ${books.length + 1}`);
-    setBooks(prev => [...prev, newBook]);
-    setActiveBookId(newBook.id);
+    setNewBookTitle('ספר חדש');
+    setLinkToBookId('');
+    setIsNewBookModalOpen(true);
+  };
+
+  const handleCreateNewBook = () => {
+    if (!newBookTitle.trim()) return;
+    
+    setBooks(prev => {
+      let newBook: Book;
+      let updatedPrev = [...prev];
+      
+      if (linkToBookId) {
+        const sourceBookIndex = updatedPrev.findIndex(b => b.id === linkToBookId);
+        if (sourceBookIndex !== -1) {
+          const sourceBook = updatedPrev[sourceBookIndex];
+          let universeId = sourceBook.universeId;
+          
+          if (!universeId) {
+            universeId = `universe-${Date.now()}`;
+            updatedPrev[sourceBookIndex] = { ...sourceBook, universeId };
+          }
+          
+          const sharedData: Partial<Project> = {};
+          SHARED_FIELDS.forEach(field => {
+            (sharedData as any)[field] = (sourceBook as any)[field];
+          });
+          
+          newBook = createNewBook(newBookTitle, universeId, sharedData);
+        } else {
+          newBook = createNewBook(newBookTitle);
+        }
+      } else {
+        newBook = createNewBook(newBookTitle);
+      }
+      
+      const nextBooks = [...updatedPrev, newBook];
+      setActiveBookId(newBook.id);
+      return nextBooks;
+    });
+    
+    setIsNewBookModalOpen(false);
   };
 
   const renameBook = (id: string, title: string) => {
@@ -319,7 +397,7 @@ const App: React.FC = () => {
     }
   };
 
-  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
+  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
@@ -550,11 +628,13 @@ const App: React.FC = () => {
                     periods={activeBook.periods || []}
                     twists={activeBook.twists || []}
                     fantasyWorlds={activeBook.fantasyWorlds || []}
+                    backgrounds={activeBook.backgrounds || []}
                     onUpdateCharacters={(e) => updateEntries('characters', e)}
                     onUpdatePlaces={(e) => updateEntries('places', e)}
                     onUpdatePeriods={(e) => updateEntries('periods', e)}
                     onUpdateTwists={(e) => updateEntries('twists', e)}
                     onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
+                    onUpdateBackgrounds={(e) => updateEntries('backgrounds', e)}
                     initialTab={activeBook.uiState?.questionnaireActiveTab}
                     initialSelectedEntryId={activeBook.uiState?.questionnaireSelectedEntryId}
                     onTabChange={(tab) => updateBookUiState({ questionnaireActiveTab: tab })}
@@ -609,6 +689,58 @@ const App: React.FC = () => {
                    <button onClick={handleBulkAdd} className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2">
                       <Plus size={20} />
                       <span>הוסף סצנות</span>
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isNewBookModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
+          <div className="bg-[#fdf6e3] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold handwritten text-3xl">הוספת ספר חדש</h2>
+                <button onClick={() => setIsNewBookModalOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
+             </div>
+             
+             <div className="space-y-6">
+                <div>
+                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">שם הספר</label>
+                   <input 
+                      type="text"
+                      value={newBookTitle}
+                      onChange={(e) => setNewBookTitle(e.target.value)}
+                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                      placeholder="הזן שם לספר..."
+                      autoFocus
+                   />
+                </div>
+
+                <div>
+                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">שיוך לספר קיים (סנכרון שאלונים ומפות)</label>
+                   <select 
+                      value={linkToBookId}
+                      onChange={(e) => setLinkToBookId(e.target.value)}
+                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                   >
+                      <option value="">ספר עצמאי (ללא שיוך)</option>
+                      {books.map(book => (
+                        <option key={book.id} value={book.id}>{book.title}</option>
+                      ))}
+                   </select>
+                   <p className="mt-2 text-[10px] text-amber-800/60 leading-relaxed">
+                      * שיוך ספרים יגרום לכך שכל שינוי בדמויות, מקומות, תקופות ומפות יתעדכן אוטומטית בכל הספרים המשויכים.
+                   </p>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                   <button 
+                    onClick={handleCreateNewBook} 
+                    className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2"
+                   >
+                      <Plus size={20} />
+                      <span>צור ספר</span>
                    </button>
                 </div>
              </div>

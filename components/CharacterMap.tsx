@@ -18,6 +18,21 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  const [localCharacters, setLocalCharacters] = useState<QuestionnaireEntry[]>(characters);
+  const [localConnections, setLocalConnections] = useState<CharacterMapConnection[]>(connections);
+
+  useEffect(() => {
+    if (!draggingNodeId && !draggingLabelId) {
+      setLocalCharacters(characters);
+    }
+  }, [characters, draggingNodeId, draggingLabelId]);
+
+  useEffect(() => {
+    if (!draggingNodeId && !draggingLabelId) {
+      setLocalConnections(connections);
+    }
+  }, [connections, draggingNodeId, draggingLabelId]);
+
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (tool === 'move') {
       setSelectedNodeId(null);
@@ -69,12 +84,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     const y = e.clientY - rect.top;
 
     if (draggingNodeId && tool === 'move') {
-      onUpdateCharacters(characters.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
+      setLocalCharacters(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
     } else if (draggingLabelId) {
-      const conn = connections.find(c => c.id === draggingLabelId);
+      const conn = localConnections.find(c => c.id === draggingLabelId);
       if (!conn) return;
-      const from = characters.find(n => n.id === conn.fromId);
-      const to = characters.find(n => n.id === conn.toId);
+      const from = localCharacters.find(n => n.id === conn.fromId);
+      const to = localCharacters.find(n => n.id === conn.toId);
       if (!from || !to) return;
 
       const x1 = from.x ?? 0;
@@ -91,11 +106,17 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       let t = ((x - x1) * dx + (y - y1) * dy) / lenSq;
       t = Math.max(0.1, Math.min(0.9, t)); // Keep it within bounds and not exactly on nodes
 
-      onUpdateConnections(connections.map(c => c.id === draggingLabelId ? { ...c, labelPosition: t } : c));
+      setLocalConnections(prev => prev.map(c => c.id === draggingLabelId ? { ...c, labelPosition: t } : c));
     }
   };
 
   const handleMouseUp = () => {
+    if (draggingNodeId) {
+      onUpdateCharacters(localCharacters);
+    }
+    if (draggingLabelId) {
+      onUpdateConnections(localConnections);
+    }
     setDraggingNodeId(null);
     setDraggingLabelId(null);
   };
@@ -187,6 +208,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         backgroundColor: '#fdf6e3',
         useCORS: true,
         scale: 2, // Higher quality
+        logging: false,
+        removeContainer: true,
       });
       
       const link = document.createElement('a');
@@ -252,9 +275,9 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         onClick={handleCanvasClick}
       >
         <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
-          {connections.map(conn => {
-            const fromNode = characters.find(n => n.id === conn.fromId);
-            const toNode = characters.find(n => n.id === conn.toId);
+          {localConnections.map(conn => {
+            const fromNode = localCharacters.find(n => n.id === conn.fromId);
+            const toNode = localCharacters.find(n => n.id === conn.toId);
             if (!fromNode || !toNode) return null;
 
             return (
@@ -275,9 +298,9 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         </svg>
 
         {/* Relationship Text Boxes on Lines */}
-        {connections.map(conn => {
-          const fromNode = characters.find(n => n.id === conn.fromId);
-          const toNode = characters.find(n => n.id === conn.toId);
+        {localConnections.map(conn => {
+          const fromNode = localCharacters.find(n => n.id === conn.fromId);
+          const toNode = localCharacters.find(n => n.id === conn.toId);
           if (!fromNode || !toNode) return null;
 
           const t = conn.labelPosition ?? 0.5;
@@ -306,16 +329,16 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                   <Move size={14} />
                 </div>
                 <textarea 
-                  className="handwritten text-lg min-w-[120px] max-w-[200px] bg-white/90 border-2 border-amber-100 rounded-xl p-3 shadow-lg focus:ring-4 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-tight"
+                  className="handwritten text-2xl min-w-[120px] max-w-[200px] bg-white/90 border-2 border-amber-100 rounded-xl p-3 pb-6 shadow-lg focus:ring-4 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-relaxed overflow-visible"
                   value={conn.description}
                   onChange={(e) => {
                     updateConnection(conn.id, e.target.value);
                     e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
+                    e.target.style.height = (e.target.scrollHeight + 10) + 'px';
                   }}
                   onFocus={(e) => {
                     e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
+                    e.target.style.height = (e.target.scrollHeight + 10) + 'px';
                   }}
                   rows={1}
                 />
@@ -331,7 +354,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         })}
 
         {/* Character Nodes */}
-        {characters.map(node => (
+        {localCharacters.map(node => (
           <div 
             key={node.id}
             className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-2 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
@@ -346,17 +369,17 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
               )}
             </div>
             
-            <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg border border-amber-100 shadow-sm">
+            <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 pb-4 rounded-lg border border-amber-100 shadow-sm overflow-visible">
                {selectedNodeId === node.id ? (
                  <input 
                    autoFocus
-                   className="text-center font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 text-sm w-24"
+                   className="text-center font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 text-sm w-24 leading-relaxed"
                    value={node.name}
                    onChange={(e) => updateNode(node.id, { name: e.target.value })}
                    onClick={(e) => e.stopPropagation()}
                  />
                ) : (
-                 <span className="text-sm font-bold text-amber-900 truncate max-w-[100px] block">{node.name}</span>
+                 <span className="text-sm font-bold text-amber-900 truncate max-w-[100px] block leading-relaxed">{node.name}</span>
                )}
             </div>
 

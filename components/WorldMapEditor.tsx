@@ -66,6 +66,14 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
     }
   }, [selectedId]);
 
+  const [localElements, setLocalElements] = useState<MapElement[]>(map.elements);
+
+  useEffect(() => {
+    if (!isDrawing) {
+      setLocalElements(map.elements);
+    }
+  }, [map.elements, isDrawing]);
+
   const handleMouseDown = (e: any) => {
     if (tool === 'select') {
       const clickedOnEmpty = e.target === e.target.getStage();
@@ -91,7 +99,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         strokeWidth: tool === 'pencil' ? 2 : tool === 'road' ? 4 : 6,
         ...(tool === 'road' && { dash: [10, 5] } as any)
       };
-      onUpdateMap({ elements: [...map.elements, newElement] });
+      setLocalElements([...localElements, newElement]);
       setSelectedId(id);
     } else if (tool === 'pool') {
       const newElement: MapElement = {
@@ -140,18 +148,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
     if (!isDrawing) return;
 
-    const lastElement = map.elements[map.elements.length - 1];
+    const lastElement = localElements[localElements.length - 1];
     if (lastElement && lastElement.type === 'line') {
-      const updatedElements = map.elements.slice(0, -1);
+      const updatedElements = localElements.slice(0, -1);
       const updatedElement = {
         ...lastElement,
         points: [...(lastElement.points || []), pos.x, pos.y]
       };
-      onUpdateMap({ elements: [...updatedElements, updatedElement] });
+      setLocalElements([...updatedElements, updatedElement]);
     }
   };
 
   const handleMouseUp = () => {
+    if (isDrawing) {
+      onUpdateMap({ elements: localElements });
+    }
     setIsDrawing(false);
   };
 
@@ -417,7 +428,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
               {/* Grid (Optional, can add later) */}
 
               {/* Map Elements */}
-              {map.elements.map((el) => {
+              {localElements.map((el) => {
                 if (el.type === 'line') {
                   return (
                     <Line

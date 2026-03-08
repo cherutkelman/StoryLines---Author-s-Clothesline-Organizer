@@ -39,6 +39,12 @@ export interface SpecificLocation {
   data: Record<string, string>;
 }
 
+export interface LoreItem {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface QuestionnaireEntry {
   id: string;
   name: string;
@@ -53,6 +59,7 @@ export interface QuestionnaireEntry {
   specialItems?: SpecialItem[]; // For fantasy world special items
   uniquePowers?: UniquePower[]; // For fantasy world unique powers
   specificLocations?: SpecificLocation[]; // For geographical locations
+  loreItems?: LoreItem[]; // For background lore items
 }
 
 export interface CharacterMapConnection {
@@ -117,6 +124,7 @@ export interface Project {
   periods?: QuestionnaireEntry[];
   twists?: QuestionnaireEntry[];
   fantasyWorlds?: QuestionnaireEntry[];
+  backgrounds?: QuestionnaireEntry[];
   characterMapConnections?: CharacterMapConnection[];
   maps?: WorldMap[];
   mindMaps?: MindMap[];
@@ -125,12 +133,13 @@ export interface Project {
 export interface Book extends Project {
   id: string;
   title: string;
+  universeId?: string;
   lastModified: number;
   uiState?: {
     lastView?: 'board' | 'editor' | 'questionnaires' | 'maps';
     editorFocusedSceneId?: string | null;
     editorDisplayMode?: 'full' | 'focus';
-    questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds';
+    questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
     questionnaireSelectedEntryId?: string | null;
     boardZoomLevel?: number;
     mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
