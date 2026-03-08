@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download } from 'lucide-react';
+import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface CharacterMapProps {
@@ -16,6 +16,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const [localCharacters, setLocalCharacters] = useState<QuestionnaireEntry[]>(characters);
@@ -80,8 +82,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
 
     if (draggingNodeId && tool === 'move') {
       setLocalCharacters(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
@@ -194,14 +196,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const exportAsImage = async () => {
     if (!canvasRef.current) return;
     
-    // Temporarily hide UI elements that shouldn't be in the image
-    const toolbar = document.querySelector('.character-map-toolbar') as HTMLElement;
-    const instructions = document.querySelector('.character-map-instructions') as HTMLElement;
-    const nodeControls = document.querySelectorAll('.node-controls');
+    setIsExporting(true);
     
-    if (toolbar) toolbar.style.display = 'none';
-    if (instructions) instructions.style.display = 'none';
-    nodeControls.forEach(el => (el as HTMLElement).style.display = 'none');
+    // Small delay to allow React to re-render without controls
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       const canvas = await html2canvas(canvasRef.current, {
@@ -219,10 +217,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     } catch (err) {
       console.error('Failed to export image:', err);
     } finally {
-      // Restore UI elements
-      if (toolbar) toolbar.style.display = 'flex';
-      if (instructions) instructions.style.display = 'block';
-      nodeControls.forEach(el => (el as HTMLElement).style.display = 'flex');
+      setIsExporting(false);
     }
   };
 
@@ -231,39 +226,68 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   return (
     <div className="h-full flex flex-col relative select-none bg-[#fdf6e3]">
       {/* Tool Bar */}
-      <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200 flex items-center gap-2">
-        <button 
-          onClick={() => setTool('move')}
-          className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
-        >
-          <Move size={18} />
-          <span className="text-xs font-bold">הזזה</span>
-        </button>
-        <button 
-          onClick={() => setTool('link')}
-          className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'link' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
-        >
-          <LinkIcon size={18} />
-          <span className="text-xs font-bold">קישור דמויות</span>
-        </button>
-        <div className="w-px h-6 bg-amber-200 mx-1" />
-        <button 
-          onClick={addNode}
-          className="p-3 bg-amber-100 text-amber-800 rounded-xl hover:bg-amber-200 transition-all flex items-center gap-2"
-        >
-          <Plus size={18} />
-          <span className="text-xs font-bold">דמות חדשה</span>
-        </button>
-        <div className="w-px h-6 bg-amber-200 mx-1" />
-        <button 
-          onClick={exportAsImage}
-          className="p-3 bg-white text-amber-800 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all flex items-center gap-2"
-          title="ייצוא תמונה"
-        >
-          <Download size={18} />
-          <span className="text-xs font-bold">ייצוא תמונה</span>
-        </button>
-      </div>
+      {!isExporting && (
+        <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200 flex items-center gap-2">
+          <button 
+            onClick={() => setTool('move')}
+            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
+          >
+            <Move size={18} />
+            <span className="text-xs font-bold">הזזה</span>
+          </button>
+          <button 
+            onClick={() => setTool('link')}
+            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'link' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
+          >
+            <LinkIcon size={18} />
+            <span className="text-xs font-bold">קישור דמויות</span>
+          </button>
+          <div className="w-px h-6 bg-amber-200 mx-1" />
+          <div className="flex items-center gap-1 bg-amber-50 rounded-xl p-1 border border-amber-100">
+            <button 
+              onClick={() => setZoom(prev => Math.max(0.2, prev - 0.1))}
+              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              title="זום אאוט"
+            >
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-[10px] font-bold text-amber-900 w-10 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button 
+              onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
+              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              title="זום אין"
+            >
+              <ZoomIn size={16} />
+            </button>
+            <button 
+              onClick={() => setZoom(1)}
+              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              title="איפוס זום"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+          <div className="w-px h-6 bg-amber-200 mx-1" />
+          <button 
+            onClick={addNode}
+            className="p-3 bg-amber-100 text-amber-800 rounded-xl hover:bg-amber-200 transition-all flex items-center gap-2"
+          >
+            <Plus size={18} />
+            <span className="text-xs font-bold">דמות חדשה</span>
+          </button>
+          <div className="w-px h-6 bg-amber-200 mx-1" />
+          <button 
+            onClick={exportAsImage}
+            className="p-3 bg-white text-amber-800 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all flex items-center gap-2"
+            title="ייצוא תמונה"
+          >
+            <Download size={18} />
+            <span className="text-xs font-bold">ייצוא תמונה</span>
+          </button>
+        </div>
+      )}
 
       {/* Canvas Area */}
       <div 
@@ -274,8 +298,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         onMouseLeave={handleMouseUp}
         onClick={handleCanvasClick}
       >
-        <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
-          {localConnections.map(conn => {
+        <div 
+          className="absolute inset-0 transition-transform duration-75 ease-out origin-top-right"
+          style={{ transform: `scale(${zoom})`, width: `${100/zoom}%`, height: `${100/zoom}%` }}
+        >
+          <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
+            {localConnections.map(conn => {
             const fromNode = localCharacters.find(n => n.id === conn.fromId);
             const toNode = localCharacters.find(n => n.id === conn.toId);
             if (!fromNode || !toNode) return null;
@@ -322,32 +350,41 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                 <div 
                   className="cursor-grab active:cursor-grabbing p-1 text-amber-300 hover:text-amber-500 transition-colors"
                   onMouseDown={(e) => {
+                    if (isExporting) return;
                     e.stopPropagation();
                     setDraggingLabelId(conn.id);
                   }}
                 >
-                  <Move size={14} />
+                  {!isExporting && <Move size={14} />}
                 </div>
-                <textarea 
-                  className="handwritten text-2xl min-w-[120px] max-w-[200px] bg-white/90 border-2 border-amber-100 rounded-xl p-3 pb-6 shadow-lg focus:ring-4 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-relaxed overflow-visible"
-                  value={conn.description}
-                  onChange={(e) => {
-                    updateConnection(conn.id, e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = (e.target.scrollHeight + 10) + 'px';
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.height = 'auto';
-                    e.target.style.height = (e.target.scrollHeight + 10) + 'px';
-                  }}
-                  rows={1}
-                />
-                <button 
-                  onClick={() => deleteConnection(conn.id)}
-                  className="absolute -top-2 -right-2 bg-red-50 text-red-400 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
-                >
-                  <X size={12} />
-                </button>
+                {isExporting ? (
+                  <div className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-amber-100 rounded-lg p-2 shadow-md text-center leading-tight whitespace-pre-wrap">
+                    {conn.description}
+                  </div>
+                ) : (
+                  <textarea 
+                    className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-amber-100 rounded-lg p-1 shadow-md focus:ring-2 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-tight overflow-visible"
+                    value={conn.description}
+                    onChange={(e) => {
+                      updateConnection(conn.id, e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = (e.target.scrollHeight + 10) + 'px';
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.height = 'auto';
+                      e.target.style.height = (e.target.scrollHeight + 10) + 'px';
+                    }}
+                    rows={1}
+                  />
+                )}
+                {!isExporting && (
+                  <button 
+                    onClick={() => deleteConnection(conn.id)}
+                    className="absolute -top-2 -right-2 bg-red-50 text-red-400 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -357,29 +394,29 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         {localCharacters.map(node => (
           <div 
             key={node.id}
-            className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-2 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
+            className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-1.5 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
             style={{ left: node.x ?? 200, top: node.y ?? 200, transform: 'translate(-50%, -50%)' }}
             onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
           >
-            <div className={`w-24 h-24 rounded-full border-4 shadow-xl overflow-hidden bg-white flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-amber-500 ring-4 ring-amber-200' : 'border-amber-100 hover:border-amber-300'}`}>
+            <div className={`w-16 h-16 rounded-full border-2 shadow-lg overflow-hidden bg-white flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-amber-500 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'}`}>
               {node.imageUrl ? (
                 <img src={node.imageUrl} alt={node.name} className="w-full h-full object-cover" />
               ) : (
-                <User size={48} className="text-amber-100" />
+                <User size={32} className="text-amber-100" />
               )}
             </div>
             
-            <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 pb-4 rounded-lg border border-amber-100 shadow-sm overflow-visible">
-               {selectedNodeId === node.id ? (
+            <div className="bg-white/90 backdrop-blur-sm px-2 py-1.5 rounded-md border border-amber-100 shadow-sm overflow-visible">
+               {selectedNodeId === node.id && !isExporting ? (
                  <input 
                    autoFocus
-                   className="text-center font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 text-sm w-24 leading-relaxed"
+                   className="text-center font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 text-[10px] w-20 leading-tight"
                    value={node.name}
                    onChange={(e) => updateNode(node.id, { name: e.target.value })}
                    onClick={(e) => e.stopPropagation()}
                  />
                ) : (
-                 <span className="text-sm font-bold text-amber-900 truncate max-w-[100px] block leading-relaxed">{node.name}</span>
+                 <span className="text-[10px] font-bold text-amber-900 truncate max-w-[80px] block leading-normal py-0.5">{node.name}</span>
                )}
             </div>
 
@@ -432,13 +469,16 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             בחר דמות נוספת כדי ליצור קישור
           </div>
         )}
+        </div>
       </div>
 
       {/* Floating Instructions */}
-      <div className="character-map-instructions absolute bottom-8 right-8 text-right pointer-events-none">
-        <h4 className="handwritten text-3xl text-amber-900/40 mb-1">מפת דמויות</h4>
-        <p className="text-[10px] text-amber-900/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
-      </div>
+      {!isExporting && (
+        <div className="character-map-instructions absolute bottom-8 right-8 text-right pointer-events-none">
+          <h4 className="handwritten text-3xl text-amber-900/40 mb-1">מפת דמויות</h4>
+          <p className="text-[10px] text-amber-900/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
+        </div>
+      )}
     </div>
   );
 };

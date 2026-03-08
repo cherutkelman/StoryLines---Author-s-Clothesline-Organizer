@@ -72,6 +72,53 @@ const SHARED_FIELDS = [
   'characterMapConnections', 'maps', 'mindMaps'
 ];
 
+const THEMES = {
+  classic: {
+    name: 'קלאסי',
+    bg: '#fdf6e3',
+    card: '#ffffff',
+    primary: '#78350f',
+    accent: '#92400e',
+    secondary: '#fef3c7',
+    border: '#fde68a',
+    text: '#4a4a4a',
+    muted: '#92400e99'
+  },
+  midnight: {
+    name: 'חצות',
+    bg: '#0f172a',
+    card: '#1e293b',
+    primary: '#f8fafc',
+    accent: '#38bdf8',
+    secondary: '#334155',
+    border: '#475569',
+    text: '#cbd5e1',
+    muted: '#94a3b8'
+  },
+  rose: {
+    name: 'ורד',
+    bg: '#fff1f2',
+    card: '#ffffff',
+    primary: '#881337',
+    accent: '#be123c',
+    secondary: '#ffe4e6',
+    border: '#fecdd3',
+    text: '#4c0519',
+    muted: '#be123c99'
+  },
+  forest: {
+    name: 'יער',
+    bg: '#f0fdf4',
+    card: '#ffffff',
+    primary: '#064e3b',
+    accent: '#059669',
+    secondary: '#dcfce7',
+    border: '#bbf7d0',
+    text: '#064e3b',
+    muted: '#05966999'
+  }
+};
+
 const createNewBook = (title: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
   id: `book-${Date.now()}`,
   title,
@@ -130,6 +177,15 @@ const App: React.FC = () => {
 
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
+
+  const [theme, setTheme] = useState<keyof typeof THEMES>(() => {
+    const saved = localStorage.getItem('storylines_theme');
+    return (saved as any) || 'classic';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('storylines_theme', theme);
+  }, [theme]);
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -402,52 +458,64 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#fdf6e3] text-[#4a4a4a] overflow-y-auto scrollbar-hide">
-      <header className="flex-shrink-0 sticky top-0 bg-white border-b border-amber-100 px-6 py-3 flex items-center justify-between shadow-sm z-30">
+    <div className="h-screen flex flex-col bg-[var(--bg-page)] text-[var(--text-main)] overflow-y-auto scrollbar-hide">
+      <style>{`
+        :root {
+          --bg-page: ${THEMES[theme].bg};
+          --bg-card: ${THEMES[theme].card};
+          --text-main: ${THEMES[theme].text};
+          --text-accent: ${THEMES[theme].primary};
+          --color-primary: ${THEMES[theme].accent};
+          --color-secondary: ${THEMES[theme].secondary};
+          --color-border: ${THEMES[theme].border};
+          --color-muted: ${THEMES[theme].muted};
+        }
+      `}</style>
+      <header className="flex-shrink-0 sticky top-0 bg-[var(--bg-card)] border-b border-[var(--color-border)] px-6 py-3 flex items-center justify-between shadow-sm z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-2 text-amber-800 hover:bg-amber-50 rounded-lg transition-colors lg:flex hidden"
+              className="p-2 text-[var(--color-primary)] hover:bg-[var(--color-secondary)] rounded-lg transition-colors lg:flex hidden"
               title={isSidebarCollapsed ? "פתח תפריט" : "סגור תפריט"}
             >
               {isSidebarCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
             </button>
-            <div className="bg-amber-800 p-2 rounded-lg text-white transition-transform hover:scale-110">
+            <div className="bg-[var(--color-primary)] p-2 rounded-lg text-white transition-transform hover:scale-110">
               <BookOpen size={20} />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-xl font-bold text-amber-900 handwritten text-3xl select-none leading-none">StoryLines</h1>
-              <span className="text-[10px] font-bold text-amber-700/60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
+              <h1 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl select-none leading-none">StoryLines</h1>
+              <span className="text-[10px] font-bold text-[var(--color-primary)] opacity-60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-amber-50 p-1.5 rounded-2xl border border-amber-100/50 shadow-inner">
+        <div className="flex items-center gap-1 bg-[var(--color-secondary)] p-1.5 rounded-2xl border border-[var(--color-border)] shadow-inner">
           <button 
             onClick={() => handleViewChange('board')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-[var(--color-primary)] text-white shadow-lg' : 'text-[var(--color-primary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}
           >
             <Layout size={18} />
             <span className="hidden sm:inline">לוח עלילה</span>
           </button>
           <button 
             onClick={() => handleViewChange('editor')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-[var(--color-primary)] text-white shadow-lg' : 'text-[var(--color-primary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}
           >
             <LucideType size={18} />
             <span className="hidden sm:inline">עורך טקסט</span>
           </button>
           <button 
             onClick={() => handleViewChange('maps')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-[var(--color-primary)] text-white shadow-lg' : 'text-[var(--color-primary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}
           >
             <Map size={18} />
             <span className="hidden sm:inline">מפות</span>
           </button>
           <button 
             onClick={() => handleViewChange('questionnaires')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-amber-800 text-white shadow-lg' : 'text-amber-800/60 hover:text-amber-800 hover:bg-amber-100'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-[var(--color-primary)] text-white shadow-lg' : 'text-[var(--color-primary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}
           >
             <ListChecks size={18} />
             <span className="hidden sm:inline">שאלונים</span>
@@ -455,23 +523,33 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Export button moved to Editor */}
+          <div className="flex items-center gap-1 bg-[var(--color-secondary)] p-1 rounded-xl border border-[var(--color-border)]">
+            {Object.entries(THEMES).map(([key, t]) => (
+              <button
+                key={key}
+                onClick={() => setTheme(key as any)}
+                className={`w-6 h-6 rounded-full border-2 transition-all ${theme === key ? 'border-[var(--color-primary)] scale-110' : 'border-transparent hover:scale-105'}`}
+                style={{ backgroundColor: t.accent }}
+                title={t.name}
+              />
+            ))}
+          </div>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
         <aside 
-          className={`border-l border-amber-100 bg-white overflow-hidden hidden lg:flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-80'}`}
+          className={`border-l border-[var(--color-border)] bg-[var(--bg-card)] overflow-hidden hidden lg:flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-80'}`}
         >
           {isSidebarCollapsed ? (
             <div className="flex flex-col items-center py-8 gap-4">
-              <button onClick={addNewBookToLibrary} className="p-3 text-amber-600 hover:bg-amber-50 rounded-xl"><Plus size={20} /></button>
-              <div className="h-px w-8 bg-amber-50" />
+              <button onClick={addNewBookToLibrary} className="p-3 text-[var(--color-primary)] hover:bg-[var(--color-secondary)] rounded-xl"><Plus size={20} /></button>
+              <div className="h-px w-8 bg-[var(--color-border)]" />
               {books.map(book => (
                 <button 
                   key={book.id} 
                   onClick={() => setActiveBookId(book.id)}
-                  className={`p-3 rounded-xl transition-all ${activeBookId === book.id ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+                  className={`p-3 rounded-xl transition-all ${activeBookId === book.id ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-primary)] opacity-20 hover:bg-[var(--color-secondary)]'}`}
                   title={book.title}
                 >
                   <BookIcon size={20} />
@@ -480,54 +558,52 @@ const App: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
-              <div className="p-8 border-b border-amber-50">
+              <div className="p-8 border-b border-[var(--color-border)]">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">הספרים שלי</h3>
-                  <button onClick={addNewBookToLibrary} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
+                  <h3 className="flex items-center gap-2 text-xs font-black text-[var(--text-accent)] uppercase tracking-[0.2em]">הספרים שלי</h3>
+                  <button onClick={addNewBookToLibrary} className="text-[var(--color-primary)] hover:opacity-80 p-2 rounded-xl hover:bg-[var(--color-secondary)] transition-all"><Plus size={20} /></button>
                 </div>
                 <div className="space-y-2">
                   {books.map(book => (
-                    <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-amber-50 border-amber-200' : 'hover:bg-amber-50/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
-                      <div className="flex items-center gap-3">
-                        <BookIcon size={18} className={activeBookId === book.id ? 'text-amber-800' : 'text-amber-200'} />
-                        <input 
-                          value={book.title} 
-                          onClick={(e) => e.stopPropagation()} 
-                          onChange={(e) => renameBook(book.id, e.target.value)} 
-                          className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-amber-900' : 'text-amber-700/40'}`} 
-                        />
-                        <button 
-                          onClick={(e) => deleteBook(book.id, e)} 
-                          className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                          title="מחיקת ספר"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                    <div 
+                      key={book.id}
+                      onClick={() => setActiveBookId(book.id)}
+                      className={`group flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all ${activeBookId === book.id ? 'bg-[var(--color-primary)] text-white shadow-lg' : 'hover:bg-[var(--color-secondary)] text-[var(--text-main)]'}`}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <BookIcon size={18} className={activeBookId === book.id ? 'text-white' : 'text-[var(--color-primary)]'} />
+                        <span className="font-bold truncate text-sm">{book.title}</span>
                       </div>
+                      <button 
+                        onClick={(e) => deleteBook(book.id, e)}
+                        className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${activeBookId === book.id ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-400'}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="p-8 border-b border-amber-50">
+              <div className="p-8 border-b border-[var(--color-border)]">
                 {activeBook && (
                   <>
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-[0.2em]">קווי עלילה</h3>
-                      <button onClick={addPlotline} className="text-amber-600 hover:text-amber-800 p-2 rounded-xl hover:bg-amber-50 transition-all"><Plus size={20} /></button>
+                      <h3 className="flex items-center gap-2 text-xs font-black text-[var(--text-accent)] uppercase tracking-[0.2em]">קווי עלילה</h3>
+                      <button onClick={addPlotline} className="text-[var(--color-primary)] hover:opacity-80 p-2 rounded-xl hover:bg-[var(--color-secondary)] transition-all"><Plus size={20} /></button>
                     </div>
                     <div className="space-y-2">
                       {activeBook.plotlines.map(plotline => (
-                        <div key={plotline.id} className="group flex items-center gap-3 p-3 rounded-2xl bg-amber-50/30 border border-transparent hover:border-amber-100 transition-all">
+                        <div key={plotline.id} className="group flex items-center gap-3 p-3 rounded-2xl bg-[var(--color-secondary)]/30 border border-transparent hover:border-[var(--color-border)] transition-all">
                           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: plotline.color }} />
                           <input 
                             value={plotline.name} 
                             onChange={(e) => renamePlotline(plotline.id, e.target.value)}
-                            className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-amber-900"
+                            className="text-xs font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 text-[var(--text-accent)]"
                           />
                           <button 
                             onClick={() => togglePlotlineVisibility(plotline.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${visiblePlotlines.includes(plotline.id) ? 'text-amber-800 hover:bg-amber-100' : 'text-amber-300 hover:bg-amber-50'}`}
+                            className={`p-1.5 rounded-lg transition-colors ${visiblePlotlines.includes(plotline.id) ? 'text-[var(--color-primary)] hover:bg-[var(--color-secondary)]' : 'text-[var(--color-primary)] opacity-30 hover:opacity-100'}`}
                             title={visiblePlotlines.includes(plotline.id) ? "מוצג בעורך" : "מוסתר מהעורך"}
                           >
                             {visiblePlotlines.includes(plotline.id) ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -547,11 +623,11 @@ const App: React.FC = () => {
 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em]">ניהול נתונים</h3>
+                  <h3 className="text-xs font-black text-[var(--text-accent)] uppercase tracking-[0.2em]">ניהול נתונים</h3>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <button onClick={exportDataBackup} className="flex items-center gap-3 px-4 py-3 bg-white border border-amber-200 text-amber-800 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm">
-                    <FileJson size={16} className="text-amber-500" />
+                  <button onClick={exportDataBackup} className="flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] border border-[var(--color-border)] text-[var(--color-primary)] rounded-xl text-xs font-bold hover:bg-[var(--color-secondary)] transition-all shadow-sm">
+                    <FileJson size={16} className="opacity-60" />
                     <span>גיבוי מלא</span>
                   </button>
                 </div>
@@ -560,7 +636,7 @@ const App: React.FC = () => {
           )}
         </aside>
 
-        <main className="flex-1 relative overflow-hidden bg-[#fdf6e3]">
+        <main className="flex-1 relative overflow-hidden bg-[var(--bg-page)]">
           {activeBook ? (
             <>
               {activeView === 'board' && (
@@ -585,7 +661,7 @@ const App: React.FC = () => {
                 </div>
               )}
               {activeView === 'editor' && (
-                <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
+                <div className="absolute inset-0 bg-[var(--bg-card)] overflow-auto shadow-2xl">
                    <Editor 
                     project={activeBook} 
                     visiblePlotlines={visiblePlotlines} 
@@ -601,7 +677,7 @@ const App: React.FC = () => {
               )}
               {activeView === 'maps' && (
                 <div className="absolute inset-0 overflow-hidden">
-                   <MapsManager 
+                    <MapsManager 
                       characters={activeBook.characters || []}
                       places={activeBook.places || []}
                       connections={activeBook.characterMapConnections || []}
@@ -617,7 +693,7 @@ const App: React.FC = () => {
                       onMapSelect={(id) => updateBookUiState({ mapsSelectedMapId: id })}
                       selectedMindMapId={activeBook.uiState?.mapsSelectedMindMapId}
                       onMindMapSelect={(id) => updateBookUiState({ mapsSelectedMindMapId: id })}
-                   />
+                    />
                 </div>
               )}
               {activeView === 'questionnaires' && (
@@ -644,7 +720,7 @@ const App: React.FC = () => {
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-amber-800/20">
+            <div className="absolute inset-0 flex items-center justify-center text-[var(--color-primary)] opacity-20">
               <p className="text-xl font-bold">אנא בחר ספר או צור אחד חדש</p>
             </div>
           )}
@@ -652,21 +728,21 @@ const App: React.FC = () => {
       </div>
 
       {isBulkAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
-          <div className="bg-[#fdf6e3] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="bg-[var(--bg-card)] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-[var(--color-border)] p-8 animate-in zoom-in-95 duration-200">
              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold handwritten text-3xl">הוספה מרובה של סצנות</h2>
-                <button onClick={() => setIsBulkAddOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
+                <h2 className="text-2xl font-bold handwritten text-3xl text-[var(--text-accent)]">הוספה מרובה של סצנות</h2>
+                <button onClick={() => setIsBulkAddOpen(false)} className="text-[var(--color-primary)] opacity-40 hover:opacity-100 p-1"><X size={28} /></button>
              </div>
              
              <div className="space-y-4">
                 {activeBook && (
                   <div>
-                    <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">בחר קו עלילה</label>
+                    <label className="text-xs font-black text-[var(--text-accent)] uppercase tracking-widest mb-2 block">בחר קו עלילה</label>
                     <select 
                         value={bulkPlotlineId} 
                         onChange={(e) => setBulkPlotlineId(e.target.value)}
-                        className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                        className="w-full bg-[var(--bg-page)] border border-[var(--color-border)] rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-[var(--color-secondary)] outline-none text-[var(--text-main)]"
                     >
                         {activeBook.plotlines.map(p => (
                           <option key={p.id} value={p.id}>{p.name}</option>
@@ -676,17 +752,17 @@ const App: React.FC = () => {
                 )}
                 
                 <div>
-                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">כותרות הסצנות (אחת בכל שורה)</label>
+                   <label className="text-xs font-black text-[var(--text-accent)] uppercase tracking-widest mb-2 block">כותרות הסצנות (אחת בכל שורה)</label>
                    <textarea 
                       value={bulkTitles} 
                       onChange={(e) => setBulkTitles(e.target.value)} 
-                      className="w-full h-48 bg-white border border-amber-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none resize-none"
+                      className="w-full h-48 bg-[var(--bg-page)] border border-[var(--color-border)] rounded-2xl p-4 text-sm focus:ring-4 focus:ring-[var(--color-secondary)] outline-none resize-none text-[var(--text-main)]"
                       placeholder="התחלה&#10;המשבר&#10;הפתרון..."
                    />
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                   <button onClick={handleBulkAdd} className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2">
+                   <button onClick={handleBulkAdd} className="w-full bg-[var(--color-primary)] text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2">
                       <Plus size={20} />
                       <span>הוסף סצנות</span>
                    </button>
@@ -697,39 +773,39 @@ const App: React.FC = () => {
       )}
 
       {isNewBookModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-900/60 backdrop-blur-md">
-          <div className="bg-[#fdf6e3] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-amber-200 p-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="bg-[var(--bg-card)] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-[var(--color-border)] p-8 animate-in zoom-in-95 duration-200">
              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold handwritten text-3xl">הוספת ספר חדש</h2>
-                <button onClick={() => setIsNewBookModalOpen(false)} className="text-amber-300 hover:text-amber-800 p-1"><X size={28} /></button>
+                <h2 className="text-2xl font-bold handwritten text-3xl text-[var(--text-accent)]">הוספת ספר חדש</h2>
+                <button onClick={() => setIsNewBookModalOpen(false)} className="text-[var(--color-primary)] opacity-40 hover:opacity-100 p-1"><X size={28} /></button>
              </div>
              
              <div className="space-y-6">
                 <div>
-                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">שם הספר</label>
+                   <label className="text-xs font-black text-[var(--text-accent)] uppercase tracking-widest mb-2 block">שם הספר</label>
                    <input 
                       type="text"
                       value={newBookTitle}
                       onChange={(e) => setNewBookTitle(e.target.value)}
-                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                      className="w-full bg-[var(--bg-page)] border border-[var(--color-border)] rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-[var(--color-secondary)] outline-none text-[var(--text-main)]"
                       placeholder="הזן שם לספר..."
                       autoFocus
                    />
                 </div>
 
                 <div>
-                   <label className="text-xs font-black text-amber-900 uppercase tracking-widest mb-2 block">שיוך לספר קיים (סנכרון שאלונים ומפות)</label>
+                   <label className="text-xs font-black text-[var(--text-accent)] uppercase tracking-widest mb-2 block">שיוך לספר קיים (סנכרון שאלונים ומפות)</label>
                    <select 
                       value={linkToBookId}
                       onChange={(e) => setLinkToBookId(e.target.value)}
-                      className="w-full bg-white border border-amber-100 rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-amber-200/20 outline-none"
+                      className="w-full bg-[var(--bg-page)] border border-[var(--color-border)] rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-[var(--color-secondary)] outline-none text-[var(--text-main)]"
                    >
                       <option value="">ספר עצמאי (ללא שיוך)</option>
                       {books.map(book => (
                         <option key={book.id} value={book.id}>{book.title}</option>
                       ))}
                    </select>
-                   <p className="mt-2 text-[10px] text-amber-800/60 leading-relaxed">
+                   <p className="mt-2 text-[10px] text-[var(--text-main)] opacity-60 leading-relaxed">
                       * שיוך ספרים יגרום לכך שכל שינוי בדמויות, מקומות, תקופות ומפות יתעדכן אוטומטית בכל הספרים המשויכים.
                    </p>
                 </div>
@@ -737,7 +813,7 @@ const App: React.FC = () => {
                 <div className="flex gap-3 pt-4">
                    <button 
                     onClick={handleCreateNewBook} 
-                    className="w-full bg-amber-800 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-amber-900 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-[var(--color-primary)] text-white font-bold py-4 rounded-2xl shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
                    >
                       <Plus size={20} />
                       <span>צור ספר</span>
