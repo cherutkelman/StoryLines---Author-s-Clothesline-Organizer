@@ -36,7 +36,7 @@ import {
   // Added missing CheckCircle2 import
   CheckCircle2
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -72,60 +72,16 @@ const SHARED_FIELDS = [
   'characterMapConnections', 'maps', 'mindMaps'
 ];
 
-const THEMES = {
-  classic: {
-    name: 'קלאסי',
-    bg: '#fdf6e3',
-    card: '#ffffff',
-    primary: '#78350f',
-    accent: '#92400e',
-    secondary: '#fef3c7',
-    border: '#fde68a',
-    text: '#4a4a4a',
-    muted: '#92400e99'
-  },
-  midnight: {
-    name: 'חצות',
-    bg: '#0f172a',
-    card: '#1e293b',
-    primary: '#f8fafc',
-    accent: '#38bdf8',
-    secondary: '#334155',
-    border: '#475569',
-    text: '#cbd5e1',
-    muted: '#94a3b8'
-  },
-  rose: {
-    name: 'ורד',
-    bg: '#fff1f2',
-    card: '#ffffff',
-    primary: '#881337',
-    accent: '#be123c',
-    secondary: '#ffe4e6',
-    border: '#fecdd3',
-    text: '#4c0519',
-    muted: '#be123c99'
-  },
-  forest: {
-    name: 'יער',
-    bg: '#f0fdf4',
-    card: '#ffffff',
-    primary: '#064e3b',
-    accent: '#059669',
-    secondary: '#dcfce7',
-    border: '#bbf7d0',
-    text: '#064e3b',
-    muted: '#05966999'
-  }
-};
-
 const createNewBook = (title: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
   id: `book-${Date.now()}`,
   title,
   universeId,
   lastModified: Date.now(),
   ...DEFAULT_PROJECT_DATA,
-  ...(sharedData || {})
+  ...(sharedData || {}),
+  uiState: {
+    theme: 'classic'
+  }
 });
 
 const App: React.FC = () => {
@@ -178,19 +134,12 @@ const App: React.FC = () => {
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
 
-  const [theme, setTheme] = useState<keyof typeof THEMES>(() => {
-    const saved = localStorage.getItem('storylines_theme');
-    return (saved as any) || 'classic';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('storylines_theme', theme);
-  }, [theme]);
-
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
     [books, activeBookId]
   );
+
+  const theme = activeBook?.uiState?.theme || 'classic';
 
   useEffect(() => {
     if (activeBook?.uiState?.lastView) {
@@ -307,6 +256,20 @@ const App: React.FC = () => {
     }
   };
 
+  const reorderPlotline = (id: string, direction: 'up' | 'down') => {
+    if (!activeBook) return;
+    const index = activeBook.plotlines.findIndex(p => p.id === id);
+    if (index === -1) return;
+    
+    const newPlotlines = [...activeBook.plotlines];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIndex >= 0 && targetIndex < newPlotlines.length) {
+      [newPlotlines[index], newPlotlines[targetIndex]] = [newPlotlines[targetIndex], newPlotlines[index]];
+      updateActiveBook({ plotlines: newPlotlines });
+    }
+  };
+
   const togglePlotlineVisibility = (id: string) => {
     setVisiblePlotlines(prev => 
       prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]
@@ -337,6 +300,15 @@ const App: React.FC = () => {
     updateActiveBook({
       scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
     });
+  };
+
+  const deleteScene = (id: string) => {
+    if (!activeBook) return;
+    if (confirm('האם אתה בטוח שברצונך למחוק את הסצנה?')) {
+      updateActiveBook({
+        scenes: activeBook.scenes.filter(s => s.id !== id).map((s, idx) => ({ ...s, position: idx }))
+      });
+    }
   };
 
   const updateChapterTitle = (position: number, title: string) => {
@@ -527,7 +499,7 @@ const App: React.FC = () => {
             {Object.entries(THEMES).map(([key, t]) => (
               <button
                 key={key}
-                onClick={() => setTheme(key as any)}
+                onClick={() => updateBookUiState({ theme: key as any })}
                 className={`w-6 h-6 rounded-full border-2 transition-all ${theme === key ? 'border-[var(--color-primary)] scale-110' : 'border-transparent hover:scale-105'}`}
                 style={{ backgroundColor: t.accent }}
                 title={t.name}
@@ -657,6 +629,8 @@ const App: React.FC = () => {
                       updateBookUiState({ editorFocusedSceneId: id });
                     }}
                     onUpdateChapterTitle={updateChapterTitle}
+                    onReorderPlotline={reorderPlotline}
+                    onDeleteScene={deleteScene}
                   />
                 </div>
               )}
@@ -666,6 +640,7 @@ const App: React.FC = () => {
                     project={activeBook} 
                     visiblePlotlines={visiblePlotlines} 
                     onUpdateScene={updateScene} 
+                    onDeleteScene={deleteScene}
                     onOpenBulkAdd={() => setIsBulkAddOpen(true)} 
                     initialFocusedSceneId={activeBook.uiState?.editorFocusedSceneId}
                     onFocusScene={(id) => updateBookUiState({ editorFocusedSceneId: id })}

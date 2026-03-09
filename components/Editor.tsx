@@ -19,13 +19,15 @@ import {
   X,
   MapPin,
   Plus,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 
 interface EditorProps {
   project: Project;
   visiblePlotlines: string[];
   onUpdateScene: (id: string, updates: Partial<Scene>) => void;
+  onDeleteScene: (id: string) => void;
   onOpenBulkAdd: () => void;
   initialFocusedSceneId?: string | null;
   onFocusScene?: (id: string | null) => void;
@@ -34,7 +36,7 @@ interface EditorProps {
   onExport?: () => void;
 }
 
-const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport }) => {
+const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [bridgeType, setBridgeType] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | null>(null);
@@ -288,6 +290,13 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                       >
                         <CheckCircle2 size={16} />
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
+                      </button>
+                      <button 
+                        onClick={() => onDeleteScene(scene.id)}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                        title="מחק סצנה"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </header>

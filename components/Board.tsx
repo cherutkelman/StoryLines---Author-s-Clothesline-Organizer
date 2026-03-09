@@ -1,7 +1,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Scene, Project } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download } from 'lucide-react';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 interface BoardProps {
   project: Project;
@@ -16,9 +16,11 @@ interface BoardProps {
   onSceneDoubleClick?: (sceneId: string) => void;
   onUpdateSummary: (summary: string) => void;
   onUpdateChapterTitle: (position: number, title: string) => void;
+  onReorderPlotline: (id: string, direction: 'up' | 'down') => void;
+  onDeleteScene: (id: string) => void;
 }
 
-const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, initialZoom, onZoomChange, onSceneDoubleClick, onUpdateSummary, onUpdateChapterTitle }) => {
+const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddScene, onMoveScene, updateScene, onBulkAdd, initialZoom, onZoomChange, onSceneDoubleClick, onUpdateSummary, onUpdateChapterTitle, onReorderPlotline, onDeleteScene }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -174,6 +176,22 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
                 <div className="sticky right-0 z-30 flex items-center h-full pr-12 pl-16 bg-gradient-to-l from-[var(--bg-page)] via-[var(--bg-page)]/95 to-transparent -mr-32 group/label pointer-events-none">
                   <div className="flex flex-col gap-1 min-w-[160px] pointer-events-auto">
                     <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col opacity-0 group-hover/label:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => onReorderPlotline(plotline.id, 'up')}
+                          className="p-0.5 hover:bg-[var(--color-secondary)] rounded text-[var(--color-primary)]"
+                          title="העלה למעלה"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button 
+                          onClick={() => onReorderPlotline(plotline.id, 'down')}
+                          className="p-0.5 hover:bg-[var(--color-secondary)] rounded text-[var(--color-primary)]"
+                          title="הורד למטה"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
                       <span className="text-xl font-black uppercase tracking-tighter text-[var(--text-accent)] block truncate handwritten text-3xl drop-shadow-sm">
                         {plotline.name}
                       </span>
@@ -211,6 +229,17 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
                                 <CheckCircle2 size={18} />
                               </div>
                             )}
+
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteScene(sceneInThisSlot.id);
+                              }}
+                              className="absolute -top-2 -left-2 text-red-400 opacity-0 group-hover:opacity-100 bg-[var(--bg-card)] rounded-full shadow-md p-1 z-30 hover:text-red-600 transition-all"
+                              title="מחק סצנה"
+                            >
+                              <Trash2 size={14} />
+                            </button>
 
                             <input 
                               className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--text-accent)] handwritten"

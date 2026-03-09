@@ -1,4 +1,51 @@
 
+export const THEMES = {
+  classic: {
+    name: 'קלאסי',
+    bg: '#fdf6e3',
+    card: '#ffffff',
+    primary: '#78350f',
+    accent: '#92400e',
+    secondary: '#fffbeb', // Changed from #fef3c7 to #fffbeb (amber-50)
+    border: '#fde68a',
+    text: '#4a4a4a',
+    muted: '#92400e99'
+  },
+  midnight: {
+    name: 'חצות',
+    bg: '#0f172a',
+    card: '#1e293b',
+    primary: '#f8fafc',
+    accent: '#38bdf8',
+    secondary: '#334155',
+    border: '#475569',
+    text: '#cbd5e1',
+    muted: '#94a3b8'
+  },
+  rose: {
+    name: 'ורד',
+    bg: '#fff1f2',
+    card: '#ffffff',
+    primary: '#881337',
+    accent: '#be123c',
+    secondary: '#ffe4e6',
+    border: '#fecdd3',
+    text: '#4c0519',
+    muted: '#be123c99'
+  },
+  forest: {
+    name: 'יער',
+    bg: '#f0fdf4',
+    card: '#ffffff',
+    primary: '#064e3b',
+    accent: '#059669',
+    secondary: '#dcfce7',
+    border: '#bbf7d0',
+    text: '#064e3b',
+    muted: '#05966999'
+  }
+};
+
 export interface Scene {
   id: string;
   plotlineId: string;
@@ -145,5 +192,6 @@ export interface Book extends Project {
     mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
     mapsSelectedMapId?: string | null;
     mapsSelectedMindMapId?: string | null;
+    theme?: keyof typeof THEMES;
   };
 }
