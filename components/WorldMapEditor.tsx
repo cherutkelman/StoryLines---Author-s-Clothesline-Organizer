@@ -43,6 +43,42 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const stage = stageRef.current;
+        if (!stage) return;
+
+        const oldScale = stage.scaleX();
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale,
+          y: (pointer.y - stage.y()) / oldScale,
+        };
+
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newScale = Math.min(Math.max(0.5, oldScale + delta), 3);
+
+        setScale(newScale);
+
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale,
+          y: pointer.y - mousePointTo.y * newScale,
+        };
+        setStagePos(newPos);
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [scale, stagePos]);
+
+  useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         setStageSize({
@@ -254,7 +290,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         <div className="h-px w-8 bg-amber-50" />
         <button 
           onClick={() => setTool('select')}
-          className={`p-3 rounded-xl transition-all ${tool === 'select' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'select' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="בחירה"
         >
           <MousePointer2 size={20} />
@@ -262,28 +298,28 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         <div className="h-px w-8 bg-amber-50" />
         <button 
           onClick={() => setTool('pencil')}
-          className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="מפה (עיפרון שחור)"
         >
           <Pencil size={20} />
         </button>
         <button 
           onClick={() => setTool('road')}
-          className={`p-3 rounded-xl transition-all ${tool === 'road' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'road' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="דרך (חום)"
         >
           <Route size={20} />
         </button>
         <button 
           onClick={() => setTool('river')}
-          className={`p-3 rounded-xl transition-all ${tool === 'river' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'river' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="נחל (כחול)"
         >
           <Waves size={20} />
         </button>
         <button 
           onClick={() => setTool('pool')}
-          className={`p-3 rounded-xl transition-all ${tool === 'pool' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'pool' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="בריכה"
         >
           <CircleIcon size={20} />
@@ -291,21 +327,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         <div className="h-px w-8 bg-amber-50" />
         <button 
           onClick={() => setTool('text')}
-          className={`p-3 rounded-xl transition-all ${tool === 'text' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'text' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="טקסט"
         >
           <LucideType size={20} />
         </button>
         <button 
           onClick={() => setTool('icon')}
-          className={`p-3 rounded-xl transition-all ${tool === 'icon' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'icon' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="אייקונים"
         >
           <Home size={20} />
         </button>
         <button 
           onClick={() => { setTool('place'); setShowPlacesList(true); }}
-          className={`p-3 rounded-xl transition-all ${tool === 'place' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-200 hover:bg-amber-50'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'place' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
           title="הוסף מקום מהשאלון"
         >
           <MapPin size={20} />

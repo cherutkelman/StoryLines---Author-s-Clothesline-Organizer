@@ -608,7 +608,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   return (
     <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto overflow-hidden">
       <div className="flex justify-center flex-shrink-0">
-        <div className="bg-[var(--bg-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-[var(--color-border)]/50 overflow-x-auto max-w-full">
+        <div className="bg-[var(--theme-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-[var(--theme-border)]/50 overflow-x-auto max-w-full">
           {[
             { id: 'characters', label: 'דמויות', icon: User },
             { id: 'places', label: 'מקומות', icon: MapPin },
@@ -620,7 +620,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
             <button 
               key={tab.id}
               onClick={() => handleTabChange(tab.id as any)}
-              className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-primary)]/60 hover:bg-[var(--color-secondary)]'}`}
+              className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
             >
               <tab.icon size={18} />
               <span>{tab.label}</span>
@@ -633,7 +633,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         <div className="w-64 flex flex-col gap-4 flex-shrink-0">
           {activeTab === 'backgrounds' ? (
             <div className="flex flex-col gap-2">
-              <div className="text-[10px] font-black text-[var(--text-accent)]/40 uppercase tracking-widest px-2 mb-1">קטגוריות רקע</div>
+              <div className="text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest px-2 mb-1">קטגוריות רקע</div>
               {BACKGROUND_TYPES.map(type => {
                 const isSelected = selectedEntry?.role === type.id;
                 return (
@@ -655,11 +655,11 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       handleEntrySelect(entry.id);
                       setMode('edit');
                     }}
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-[var(--color-secondary)] border-[var(--color-primary)]/30 shadow-sm' : 'bg-[var(--bg-card)] border-transparent hover:border-[var(--color-border)]/50'}`}
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-[var(--theme-secondary)] border-[var(--theme-primary)]/30 shadow-sm' : 'bg-[var(--theme-card)] border-transparent hover:border-[var(--theme-border)]/50'}`}
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <type.icon size={16} className={isSelected ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]/30'} />
-                      <span className={`font-bold text-sm truncate ${isSelected ? 'text-[var(--text-accent)]' : 'text-[var(--text-main)]/70'}`}>{type.label}</span>
+                      <type.icon size={16} className={isSelected ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/30'} />
+                      <span className={`font-bold text-sm truncate ${isSelected ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{type.label}</span>
                     </div>
                   </button>
                 );
@@ -668,7 +668,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           ) : (
             <button 
               onClick={addEntry}
-              className="flex items-center justify-center gap-2 p-4 bg-[var(--bg-card)] border-2 border-dashed border-[var(--color-border)]/50 rounded-2xl text-[var(--color-primary)] font-bold hover:bg-[var(--color-secondary)] hover:border-[var(--color-primary)]/40 transition-all shadow-sm"
+              className="flex items-center justify-center gap-2 p-4 bg-[var(--theme-card)] border-2 border-dashed border-[var(--theme-border)]/50 rounded-2xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] hover:border-[var(--theme-primary)]/40 transition-all shadow-sm"
             >
               <Plus size={20} />
               <span>הוסף {activeTab === 'characters' ? 'דמות' : activeTab === 'places' ? 'מקום' : activeTab === 'periods' ? 'תקופה' : activeTab === 'twists' ? 'טוויסט' : 'עולם'}</span>
@@ -683,20 +683,20 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 
                 return (
                   <div key={role.id} className="space-y-2">
-                    <h4 className="text-[10px] font-black text-[var(--text-accent)]/40 uppercase tracking-widest px-2">{role.label}</h4>
+                    <h4 className="text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest px-2">{role.label}</h4>
                     {roleEntries.map(entry => (
                       <div 
                         key={entry.id}
                         onClick={() => handleEntrySelect(entry.id)}
-                        className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--color-secondary)] border-[var(--color-primary)]/30 shadow-sm' : 'bg-[var(--bg-card)] border-transparent hover:border-[var(--color-border)]/50'}`}
+                        className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-primary)]/30 shadow-sm' : 'bg-[var(--theme-card)] border-transparent hover:border-[var(--theme-border)]/50'}`}
                       >
                         <div className="flex items-center gap-3 overflow-hidden">
                           {entry.imageUrl ? (
-                            <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--color-border)]/30" />
+                            <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--theme-border)]/30" />
                           ) : (
-                            <Icon size={16} className={selectedEntryId === entry.id ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]/30'} />
+                            <Icon size={16} className={selectedEntryId === entry.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/30'} />
                           )}
-                          <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--text-accent)]' : 'text-[var(--text-main)]/70'}`}>{entry.name}</span>
+                          <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{entry.name}</span>
                         </div>
                         <button 
                           onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
@@ -716,15 +716,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 <div 
                   key={entry.id}
                   onClick={() => handleEntrySelect(entry.id)}
-                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--color-secondary)] border-[var(--color-primary)]/30 shadow-sm' : 'bg-[var(--bg-card)] border-transparent hover:border-[var(--color-border)]/50'}`}
+                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-primary)]/30 shadow-sm' : 'bg-[var(--theme-card)] border-transparent hover:border-[var(--theme-border)]/50'}`}
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     {entry.imageUrl ? (
-                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--color-border)]/30" />
+                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--theme-border)]/30" />
                     ) : (
-                      <Globe size={16} className="text-[var(--color-primary)]/40" />
+                      <Globe size={16} className="text-[var(--theme-primary)]/40" />
                     )}
-                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--text-accent)]' : 'text-[var(--text-main)]/70'}`}>{entry.name}</span>
+                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{entry.name}</span>
                   </div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
@@ -739,15 +739,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 <div 
                   key={entry.id}
                   onClick={() => handleEntrySelect(entry.id)}
-                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--color-secondary)] border-[var(--color-primary)]/30 shadow-sm' : 'bg-[var(--bg-card)] border-transparent hover:border-[var(--color-border)]/50'}`}
+                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === entry.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-primary)]/30 shadow-sm' : 'bg-[var(--theme-card)] border-transparent hover:border-[var(--theme-border)]/50'}`}
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     {entry.imageUrl ? (
-                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--color-border)]/30" />
+                      <img src={entry.imageUrl} className="w-6 h-6 rounded-full object-cover border border-[var(--theme-border)]/30" />
                     ) : (
-                      <Icon size={16} className={selectedEntryId === entry.id ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]/30'} />
+                      <Icon size={16} className={selectedEntryId === entry.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/30'} />
                     )}
-                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--text-accent)]' : 'text-[var(--text-main)]/70'}`}>{entry.name}</span>
+                    <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{entry.name}</span>
                   </div>
                   <button 
                     onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
@@ -763,13 +763,13 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
         {selectedEntry && mode === 'edit' && isCategoriesVisible && (
           <div className="w-56 flex flex-col gap-2 flex-shrink-0 animate-in slide-in-from-right-4 duration-300">
-             <div className="p-2 text-[10px] font-black text-[var(--text-accent)]/40 uppercase tracking-widest mb-2 px-4 flex items-center justify-between">
+             <div className="p-2 text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-2 px-4 flex items-center justify-between">
                 <span>קטגוריות שאלון</span>
-                <button onClick={() => setIsCategoriesVisible(false)} className="text-[var(--color-primary)]/40 hover:text-[var(--color-primary)]"><X size={14} /></button>
+                <button onClick={() => setIsCategoriesVisible(false)} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"><X size={14} /></button>
              </div>
              <button 
                 onClick={() => setActiveCategory(null)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all ${activeCategory === null ? 'bg-[var(--color-secondary)] text-[var(--text-accent)] shadow-sm' : 'text-[var(--color-primary)]/60 hover:bg-[var(--color-secondary)]'}`}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all ${activeCategory === null ? 'bg-[var(--theme-secondary)] text-[var(--theme-accent)] shadow-sm' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
              >
                 <LayoutList size={14} />
                 <span>הכל</span>
@@ -784,7 +784,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       setActiveCategory(cat);
                     }
                   }}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-right transition-all ${currentCategoryIndex === index ? 'bg-[var(--color-secondary)] text-[var(--text-accent)] shadow-sm' : 'text-[var(--color-primary)]/60 hover:bg-[var(--color-secondary)]'}`}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-right transition-all ${currentCategoryIndex === index ? 'bg-[var(--theme-secondary)] text-[var(--theme-accent)] shadow-sm' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
                >
                   <span>{cat}</span>
                </button>
@@ -792,16 +792,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         )}
 
-        <div className="flex-1 bg-[var(--bg-card)] rounded-[2.5rem] shadow-2xl border border-[var(--color-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
+        <div className="flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
           {selectedEntry ? (
             <>
-              <div className="p-8 border-b border-[var(--color-border)]/30 bg-[var(--color-secondary)]/10 flex flex-col gap-6">
+              <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                      {!isCategoriesVisible && mode === 'edit' && (
                        <button 
                         onClick={() => setIsCategoriesVisible(true)}
-                        className="p-2 text-[var(--color-primary)] hover:bg-[var(--bg-card)] rounded-xl transition-all shadow-sm border border-[var(--color-border)]/50"
+                        className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50"
                         title="הצג קטגוריות"
                        >
                          <LayoutList size={20} />
@@ -809,16 +809,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      )}
                      
                       <div className="relative group/img">
-                        <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-[var(--color-border)]/50 overflow-hidden bg-[var(--bg-card)] flex items-center justify-center relative">
+                        <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-[var(--theme-border)]/50 overflow-hidden bg-[var(--theme-card)] flex items-center justify-center relative">
                           {selectedEntry.imageUrl ? (
                             <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
                           ) : (
-                            <Icon size={24} className="text-[var(--color-primary)]/20" />
+                            <Icon size={24} className="text-[var(--theme-primary)]/20" />
                           )}
                           
                           {mode === 'edit' && (
                             <label 
-                              className="absolute inset-0 flex items-center justify-center bg-[var(--color-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-white"
+                              className="absolute inset-0 flex items-center justify-center bg-[var(--theme-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-[var(--theme-card)]"
                               onClick={(e) => {
                                 let isElectron = false;
                                 try {
@@ -842,7 +842,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         {mode === 'edit' && selectedEntry.imageUrl && (
                           <button 
                             onClick={handleRemoveImage}
-                            className="absolute -top-2 -right-2 bg-[var(--bg-card)] text-red-500 p-1 rounded-full shadow-md border border-red-100 hover:bg-red-50 transition-all z-10"
+                            className="absolute -top-2 -right-2 bg-[var(--theme-card)] text-red-500 p-1 rounded-full shadow-md border border-red-100 hover:bg-red-50 transition-all z-10"
                             title="הסרת תמונה"
                           >
                             <X size={12} />
@@ -856,7 +856,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <input 
                               value={selectedEntry.name}
                               onChange={(e) => updateEntry({ name: e.target.value })}
-                              className="text-2xl font-bold text-[var(--text-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
+                              className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
                               placeholder="שם..."
                             />
                             {activeTab === 'characters' && (
@@ -865,7 +865,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                   <button
                                     key={role.id}
                                     onClick={() => updateEntry({ role: role.id })}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm' : 'bg-[var(--bg-card)] text-[var(--color-primary)]/60 border-[var(--color-border)]/50 hover:bg-[var(--color-secondary)]'}`}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
                                   >
                                     {role.label}
                                   </button>
@@ -875,10 +875,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </>
                         ) : (
                           <>
-                            <h2 className="text-3xl font-bold text-[var(--text-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
+                            <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
                             {activeTab === 'characters' && selectedEntry.role && (
                               <div className="mt-2">
-                                <span className="px-3 py-1 bg-[var(--color-secondary)] text-[var(--color-primary)] rounded-full text-[10px] font-bold">
+                                <span className="px-3 py-1 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-full text-[10px] font-bold">
                                   {CHARACTER_ROLES.find(r => r.id === selectedEntry.role)?.label}
                                 </span>
                               </div>
@@ -897,13 +897,13 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             placeholder="חפש שאלה..."
                             value={questionSearchQuery}
                             onChange={(e) => setQuestionSearchQuery(e.target.value)}
-                            className="bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none w-40 animate-in slide-in-from-left-2"
+                            className="bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none w-40 animate-in slide-in-from-left-2"
                             autoFocus
                           />
                         )}
                         <button 
                           onClick={() => setIsSearchActive(!isSearchActive)}
-                          className={`p-2.5 rounded-xl transition-all shadow-sm border ${isSearchActive ? 'bg-[var(--color-secondary)] text-[var(--color-primary)] border-[var(--color-primary)]/30' : 'bg-[var(--bg-card)] text-[var(--color-primary)] border-[var(--color-border)]/50 hover:bg-[var(--color-secondary)]'}`}
+                          className={`p-2.5 rounded-xl transition-all shadow-sm border ${isSearchActive ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] border-[var(--theme-primary)]/30' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
                           title="חיפוש שאלה"
                         >
                           <Search size={18} />
@@ -913,7 +913,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
                     <button 
                       onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
-                      className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] hover:opacity-90' : 'bg-[var(--bg-card)] text-[var(--color-primary)] border-[var(--color-border)]/50 hover:bg-[var(--color-secondary)]'}`}
+                      className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] hover:opacity-90' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
                     >
                       {mode === 'edit' ? <Eye size={18} /> : <PencilLine size={18} />}
                       <span>{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
@@ -921,7 +921,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     
                     <button 
                       onClick={exportCurrentEntry}
-                      className="p-2.5 bg-[var(--bg-card)] border border-[var(--color-border)]/50 text-[var(--color-primary)] rounded-xl hover:bg-[var(--color-secondary)] transition-all shadow-sm"
+                      className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
                       title="ייצוא נתונים"
                     >
                       <Download size={18} />
@@ -929,7 +929,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
                     <button 
                       onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
-                      className="p-2.5 bg-[var(--bg-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                      className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
                       title="מחיקת פריט"
                     >
                       <Trash2 size={18} />
@@ -942,10 +942,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     {currentCategory === "פיתוח דמות" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">שלבי פיתוח דמות</h3>
+                          <h3 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">שלבי פיתוח דמות</h3>
                           <button 
                             onClick={addDevelopmentStage}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
                           >
                             <Plus size={16} />
                             <span>הוסף שלב פיתוח</span>
@@ -953,23 +953,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </div>
 
                         {(selectedEntry.developmentStages || []).length === 0 ? (
-                          <div className="p-12 border-2 border-dashed border-[var(--color-border)]/50 rounded-[2rem] text-center text-[var(--text-main)]/30">
+                          <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
                             <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
                             <p className="text-sm">עדיין לא הוספת שלבי פיתוח לדמות זו.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
                             {(selectedEntry.developmentStages || []).map((stage, sIdx) => (
-                              <div key={stage.id} className="bg-[var(--bg-card)] p-8 rounded-[2rem] border border-[var(--color-border)]/50 shadow-sm relative group animate-in slide-in-from-bottom-4 duration-500">
+                              <div key={stage.id} className="bg-[var(--theme-card)] p-8 rounded-[2rem] border border-[var(--theme-border)]/50 shadow-sm relative group animate-in slide-in-from-bottom-4 duration-500">
                                 <button 
                                   onClick={() => removeDevelopmentStage(stage.id)}
-                                  className="absolute -top-3 -left-3 w-8 h-8 bg-[var(--bg-card)] border border-red-100 text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-red-50"
+                                  className="absolute -top-3 -left-3 w-8 h-8 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-red-50"
                                 >
                                   <Trash2 size={14} />
                                 </button>
                                 
                                 <div className="flex items-center gap-4 mb-8">
-                                  <div className="w-10 h-10 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-xl flex items-center justify-center font-black">
+                                  <div className="w-10 h-10 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-xl flex items-center justify-center font-black">
                                     {sIdx + 1}
                                   </div>
                                   <input 
@@ -977,18 +977,18 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                     value={stage.title}
                                     onChange={(e) => updateDevelopmentStage(stage.id, { title: e.target.value })}
                                     placeholder="שם שלב הפיתוח (למשל: ילדות, המשבר הגדול...)"
-                                    className="flex-1 bg-transparent border-b-2 border-[var(--color-border)]/30 py-2 text-2xl font-bold text-[var(--text-accent)] handwritten outline-none focus:border-[var(--color-primary)] transition-all"
+                                    className="flex-1 bg-transparent border-b-2 border-[var(--theme-border)]/30 py-2 text-2xl font-bold text-[var(--theme-accent)] handwritten outline-none focus:border-[var(--theme-primary)] transition-all"
                                   />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                   {DEVELOPMENT_STAGE_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
-                                      <label className="text-[10px] font-black text-[var(--text-accent)]/40 uppercase tracking-widest px-1">{q.question}</label>
+                                      <label className="text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest px-1">{q.question}</label>
                                       <textarea 
                                         value={stage.data[q.id] || ''}
                                         onChange={(e) => updateDevelopmentStage(stage.id, { data: { ...stage.data, [q.id]: e.target.value } })}
-                                        className="w-full bg-[var(--color-secondary)]/30 border border-[var(--color-border)]/50 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition-all resize-none"
+                                        className="w-full bg-[var(--theme-secondary)]/30 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none transition-all resize-none"
                                         placeholder="הקלד תשובה..."
                                       />
                                     </div>
@@ -1002,10 +1002,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     ) : currentCategory === "מיקום ספציפי" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">מיקומים ספציפיים</h3>
+                          <h3 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">מיקומים ספציפיים</h3>
                           <button 
                             onClick={addSpecificLocation}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
                           >
                             <Plus size={16} />
                             <span>הוסף מיקום ספציפי</span>
@@ -1013,23 +1013,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </div>
 
                         {(selectedEntry.specificLocations || []).length === 0 ? (
-                          <div className="p-12 border-2 border-dashed border-[var(--color-border)]/50 rounded-[2rem] text-center text-[var(--text-main)]/30">
+                          <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
                             <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
                             <p className="text-sm font-bold">טרם נוספו מיקומים ספציפיים. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
                             {(selectedEntry.specificLocations || []).map((loc, lIdx) => (
-                              <div key={loc.id} className="bg-[var(--color-secondary)]/30 p-8 rounded-[2rem] border border-[var(--color-border)]/50 space-y-6 relative group/loc">
+                              <div key={loc.id} className="bg-[var(--theme-secondary)]/30 p-8 rounded-[2rem] border border-[var(--theme-border)]/50 space-y-6 relative group/loc">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                    <div className="w-10 h-10 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl flex items-center justify-center font-black shadow-lg">
                                       {lIdx + 1}
                                     </div>
                                     <input 
                                       value={loc.name}
                                       onChange={(e) => updateSpecificLocation(loc.id, { name: e.target.value })}
-                                      className="text-xl font-bold text-[var(--text-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      className="text-xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
                                       placeholder="שם המיקום..."
                                     />
                                   </div>
@@ -1044,14 +1044,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <div className="grid gap-6">
                                   {SPECIFIC_LOCATION_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
-                                      <label className="text-xs font-bold text-[var(--text-accent)]/60">{q.question}</label>
+                                      <label className="text-xs font-bold text-[var(--theme-accent)]/60">{q.question}</label>
                                       <textarea 
                                         value={loc.data[q.id] || ''}
                                         onChange={(e) => {
                                           const newData = { ...loc.data, [q.id]: e.target.value };
                                           updateSpecificLocation(loc.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1065,10 +1065,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     ) : currentCategory === "כוחות ייחודיים" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">כוחות ייחודיים</h3>
+                          <h3 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">כוחות ייחודיים</h3>
                           <button 
                             onClick={addUniquePower}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
                           >
                             <Plus size={16} />
                             <span>הוסף כוח ייחודי</span>
@@ -1076,23 +1076,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </div>
 
                         {(selectedEntry.uniquePowers || []).length === 0 ? (
-                          <div className="p-12 border-2 border-dashed border-[var(--color-border)]/50 rounded-[2rem] text-center text-[var(--text-main)]/30">
+                          <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
                             <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
                             <p className="text-sm font-bold">טרם נוספו כוחות ייחודיים. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
                             {(selectedEntry.uniquePowers || []).map((power, pIdx) => (
-                              <div key={power.id} className="bg-[var(--color-secondary)]/30 p-8 rounded-[2rem] border border-[var(--color-border)]/50 space-y-6 relative group/power">
+                              <div key={power.id} className="bg-[var(--theme-secondary)]/30 p-8 rounded-[2rem] border border-[var(--theme-border)]/50 space-y-6 relative group/power">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                    <div className="w-10 h-10 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl flex items-center justify-center font-black shadow-lg">
                                       {pIdx + 1}
                                     </div>
                                     <input 
                                       value={power.name}
                                       onChange={(e) => updateUniquePower(power.id, { name: e.target.value })}
-                                      className="text-xl font-bold text-[var(--text-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      className="text-xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
                                       placeholder="שם הכוח..."
                                     />
                                   </div>
@@ -1107,14 +1107,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <div className="grid gap-6">
                                   {UNIQUE_POWER_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
-                                      <label className="text-xs font-bold text-[var(--text-accent)]/60">{q.question}</label>
+                                      <label className="text-xs font-bold text-[var(--theme-accent)]/60">{q.question}</label>
                                       <textarea 
                                         value={power.data[q.id] || ''}
                                         onChange={(e) => {
                                           const newData = { ...power.data, [q.id]: e.target.value };
                                           updateUniquePower(power.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1128,10 +1128,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     ) : currentCategory === "חפצים מיוחדים" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">חפצים מיוחדים</h3>
+                          <h3 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">חפצים מיוחדים</h3>
                           <button 
                             onClick={addSpecialItem}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
                           >
                             <Plus size={16} />
                             <span>הוסף חפץ מיוחד</span>
@@ -1139,23 +1139,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </div>
 
                         {(selectedEntry.specialItems || []).length === 0 ? (
-                          <div className="p-12 border-2 border-dashed border-[var(--color-border)]/50 rounded-[2rem] text-center text-[var(--text-main)]/30">
+                          <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
                             <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
                             <p className="text-sm font-bold">טרם נוספו חפצים מיוחדים. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
                             {(selectedEntry.specialItems || []).map((item, iIdx) => (
-                              <div key={item.id} className="bg-[var(--color-secondary)]/30 p-8 rounded-[2rem] border border-[var(--color-border)]/50 space-y-6 relative group/item">
+                              <div key={item.id} className="bg-[var(--theme-secondary)]/30 p-8 rounded-[2rem] border border-[var(--theme-border)]/50 space-y-6 relative group/item">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                    <div className="w-10 h-10 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl flex items-center justify-center font-black shadow-lg">
                                       {iIdx + 1}
                                     </div>
                                     <input 
                                       value={item.name}
                                       onChange={(e) => updateSpecialItem(item.id, { name: e.target.value })}
-                                      className="text-xl font-bold text-[var(--text-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      className="text-xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
                                       placeholder="שם החפץ..."
                                     />
                                   </div>
@@ -1170,14 +1170,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <div className="grid gap-6">
                                   {SPECIAL_ITEM_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
-                                      <label className="text-xs font-bold text-[var(--text-accent)]/60">{q.question}</label>
+                                      <label className="text-xs font-bold text-[var(--theme-accent)]/60">{q.question}</label>
                                       <textarea 
                                         value={item.data[q.id] || ''}
                                         onChange={(e) => {
                                           const newData = { ...item.data, [q.id]: e.target.value };
                                           updateSpecialItem(item.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1191,12 +1191,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     ) : activeTab === 'backgrounds' ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">
+                          <h3 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">
                             {BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.label || 'רקע'}
                           </h3>
                           <button 
                             onClick={addLoreItem}
-                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold text-xs hover:opacity-90 transition-all shadow-md"
                           >
                             <Plus size={16} />
                             <span>{BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.addButton || 'הוסף פריט'}</span>
@@ -1204,23 +1204,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </div>
 
                         {(selectedEntry.loreItems || []).length === 0 ? (
-                          <div className="p-12 border-2 border-dashed border-[var(--color-border)]/50 rounded-[2rem] text-center text-[var(--text-main)]/30">
+                          <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
                             <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
                             <p className="text-sm font-bold">טרם נוספו פריטים. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
                             {(selectedEntry.loreItems || []).map((item, iIdx) => (
-                              <div key={item.id} className="bg-[var(--color-secondary)]/30 p-8 rounded-[2rem] border border-[var(--color-border)]/50 space-y-6 relative group/item">
+                              <div key={item.id} className="bg-[var(--theme-secondary)]/30 p-8 rounded-[2rem] border border-[var(--theme-border)]/50 space-y-6 relative group/item">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-xl flex items-center justify-center font-black shadow-lg">
+                                    <div className="w-10 h-10 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl flex items-center justify-center font-black shadow-lg">
                                       {iIdx + 1}
                                     </div>
                                     <input 
                                       value={item.title}
                                       onChange={(e) => updateLoreItem(item.id, { title: e.target.value })}
-                                      className="text-xl font-bold text-[var(--text-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
+                                      className="text-xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-3xl"
                                       placeholder="כותרת..."
                                     />
                                   </div>
@@ -1233,11 +1233,11 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 </div>
 
                                 <div className="space-y-2">
-                                  <label className="text-xs font-bold text-[var(--text-accent)]/60">תוכן</label>
+                                  <label className="text-xs font-bold text-[var(--theme-accent)]/60">תוכן</label>
                                   <textarea 
                                     value={item.content}
                                     onChange={(e) => updateLoreItem(item.id, { content: e.target.value })}
-                                    className="w-full bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 outline-none min-h-[150px] shadow-sm"
+                                    className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[150px] shadow-sm"
                                     placeholder="כתוב כאן..."
                                   />
                                 </div>
@@ -1262,7 +1262,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <textarea 
                                   value={selectedEntry.data[q.id] || ''}
                                   onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                                  className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
                                   placeholder="כתוב כאן..."
                                 />
                               ) : (
@@ -1270,7 +1270,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                   type="text"
                                   value={selectedEntry.data[q.id] || ''}
                                   onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                                  className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none shadow-inner"
+                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none shadow-inner"
                                   placeholder="כתוב כאן..."
                                 />
                               )}
@@ -1300,19 +1300,19 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         )}
 
                         {currentCategory === "שאלות נוספות" && (
-                          <div className="pt-10 border-t border-[var(--color-border)]/50 mt-10">
-                            <div className="text-xs font-black text-[var(--text-accent)]/40 uppercase tracking-widest mb-4">הוספת שאלה מותאמת אישית</div>
+                          <div className="pt-10 border-t border-[var(--theme-border)]/50 mt-10">
+                            <div className="text-xs font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-4">הוספת שאלה מותאמת אישית</div>
                             <div className="flex gap-3">
                               <input 
                                 type="text"
                                 value={newQuestionLabel}
                                 onChange={(e) => setNewQuestionLabel(e.target.value)}
                                 placeholder="מה ברצונך לשאול?"
-                                className="flex-1 bg-[var(--bg-card)] border-2 border-[var(--color-border)]/50 rounded-2xl px-5 py-3 text-sm focus:border-[var(--color-primary)]/50 outline-none"
+                                className="flex-1 bg-[var(--theme-card)] border-2 border-[var(--theme-border)]/50 rounded-2xl px-5 py-3 text-sm focus:border-[var(--theme-primary)]/50 outline-none"
                               />
                               <button 
                                 onClick={addCustomQuestion}
-                                className="bg-[var(--color-primary)] text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
+                                className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
                               >
                                 <MessageSquarePlus size={18} />
                                 <span>הוסף</span>
@@ -1322,8 +1322,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         )}
 
                         {activeTab === 'fantasyWorlds' && currentCategory === 'יום יום' && (
-                          <div className="pt-10 border-t border-[var(--color-border)]/50 mt-10">
-                            <div className="text-xs font-black text-[var(--text-accent)]/40 uppercase tracking-widest mb-4">כוחות ייחודיים</div>
+                          <div className="pt-10 border-t border-[var(--theme-border)]/50 mt-10">
+                            <div className="text-xs font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-4">כוחות ייחודיים</div>
                             <button 
                               onClick={() => {
                                 const index = categories.indexOf("כוחות ייחודיים");
@@ -1332,7 +1332,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                   addUniquePower();
                                 }
                               }}
-                              className="bg-[var(--color-primary)] text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
+                              className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
                             >
                               <Plus size={18} />
                               <span>הוסף כוח ייחודי</span>
@@ -1341,8 +1341,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         )}
 
                         {activeTab === 'places' && currentCategory === 'מיקום גיאוגרפי' && (
-                          <div className="pt-10 border-t border-[var(--color-border)]/50 mt-10">
-                            <div className="text-xs font-black text-[var(--text-accent)]/40 uppercase tracking-widest mb-4">מיקומים ספציפיים</div>
+                          <div className="pt-10 border-t border-[var(--theme-border)]/50 mt-10">
+                            <div className="text-xs font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-4">מיקומים ספציפיים</div>
                             <button 
                               onClick={() => {
                                 const index = categories.indexOf("מיקום ספציפי");
@@ -1351,7 +1351,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                   addSpecificLocation();
                                 }
                               }}
-                              className="bg-[var(--color-primary)] text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
+                              className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
                             >
                               <Plus size={18} />
                               <span>הוסף מיקום ספציפי</span>
@@ -1360,14 +1360,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         )}
 
                         {/* Navigation Buttons at bottom */}
-                        <div className="flex items-center justify-between pt-10 border-t border-[var(--color-border)]/50 mt-10">
+                        <div className="flex items-center justify-between pt-10 border-t border-[var(--theme-border)]/50 mt-10">
                           <button 
                             disabled={currentCategoryIndex === 0}
                             onClick={(e) => { 
                               setCurrentCategoryIndex(prev => prev - 1); 
                               e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl text-[var(--color-primary)] font-bold hover:bg-[var(--color-secondary)] transition-all disabled:opacity-30 shadow-sm"
+                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] transition-all disabled:opacity-30 shadow-sm"
                           >
                             <ChevronLeft size={18} className="rotate-180" />
                             <span>קטגוריה קודמת</span>
@@ -1378,7 +1378,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                               setCurrentCategoryIndex(prev => prev + 1); 
                               e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-30 shadow-md"
+                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-30 shadow-md"
                           >
                             <span>קטגוריה הבאה</span>
                             <ChevronLeft size={18} />
@@ -1397,21 +1397,21 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                            return (
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
-                                   <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">
+                                   <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">
                                      {BACKGROUND_TYPES.find(t => t.id === selectedEntry.role)?.label || 'תוכן'}
                                    </h3>
-                                   <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                   <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                                 </div>
                                 <div className="space-y-8">
                                   {selectedEntry.loreItems.map((item, idx) => (
-                                    <div key={item.id} className="space-y-4 bg-[var(--color-secondary)]/20 p-8 rounded-[2rem] border border-[var(--color-border)]/30">
+                                    <div key={item.id} className="space-y-4 bg-[var(--theme-secondary)]/20 p-8 rounded-[2rem] border border-[var(--theme-border)]/30">
                                        <div className="flex items-center gap-4">
-                                          <div className="w-8 h-8 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center justify-center text-xs font-black">
+                                          <div className="w-8 h-8 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-lg flex items-center justify-center text-xs font-black">
                                             {idx + 1}
                                           </div>
-                                          <h4 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">{item.title}</h4>
+                                          <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{item.title}</h4>
                                        </div>
-                                       <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap border-r-2 border-[var(--color-border)]/30 pr-6">
+                                       <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap border-r-2 border-[var(--theme-border)]/30 pr-6">
                                           {item.content}
                                        </div>
                                     </div>
@@ -1426,26 +1426,26 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                            return (
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
-                                   <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
-                                   <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                   <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                                 </div>
                                 <div className="space-y-8">
                                   {(selectedEntry.developmentStages || []).map((stage, sIdx) => (
-                                    <div key={stage.id} className="space-y-6 bg-[var(--color-secondary)]/20 p-8 rounded-[2rem] border border-[var(--color-border)]/30">
+                                    <div key={stage.id} className="space-y-6 bg-[var(--theme-secondary)]/20 p-8 rounded-[2rem] border border-[var(--theme-border)]/30">
                                        <div className="flex items-center gap-4">
-                                          <div className="w-8 h-8 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center justify-center text-xs font-black">
+                                          <div className="w-8 h-8 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-lg flex items-center justify-center text-xs font-black">
                                             {sIdx + 1}
                                           </div>
-                                          <h4 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">{stage.title}</h4>
+                                          <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{stage.title}</h4>
                                        </div>
-                                       <div className="grid gap-6 border-r-2 border-[var(--color-border)]/30 pr-6">
+                                       <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
                                           {DEVELOPMENT_STAGE_QUESTIONS.map(q => {
                                             const val = stage.data[q.id];
                                             if (!val) return null;
                                             return (
                                               <div key={q.id} className="space-y-1">
-                                                 <div className="text-[10px] font-bold text-[var(--text-accent)]/40 uppercase tracking-tight">{q.question}</div>
-                                                 <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val}</div>
+                                                 <div className="text-[10px] font-bold text-[var(--theme-accent)]/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">{val}</div>
                                               </div>
                                             );
                                           })}
@@ -1462,26 +1462,26 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                            return (
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
-                                   <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
-                                   <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                   <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                                 </div>
                                 <div className="space-y-8">
                                   {(selectedEntry.specificLocations || []).map((loc, lIdx) => (
-                                    <div key={loc.id} className="space-y-6 bg-[var(--color-secondary)]/20 p-8 rounded-[2rem] border border-[var(--color-border)]/30">
+                                    <div key={loc.id} className="space-y-6 bg-[var(--theme-secondary)]/20 p-8 rounded-[2rem] border border-[var(--theme-border)]/30">
                                        <div className="flex items-center gap-4">
-                                          <div className="w-8 h-8 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center justify-center text-xs font-black">
+                                          <div className="w-8 h-8 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-lg flex items-center justify-center text-xs font-black">
                                             {lIdx + 1}
                                           </div>
-                                          <h4 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">{loc.name}</h4>
+                                          <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{loc.name}</h4>
                                        </div>
-                                       <div className="grid gap-6 border-r-2 border-[var(--color-border)]/30 pr-6">
+                                       <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
                                           {SPECIFIC_LOCATION_QUESTIONS.map(q => {
                                             const val = loc.data[q.id];
                                             if (!val) return null;
                                             return (
                                               <div key={q.id} className="space-y-1">
-                                                 <div className="text-[10px] font-bold text-[var(--text-accent)]/40 uppercase tracking-tight">{q.question}</div>
-                                                 <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val}</div>
+                                                 <div className="text-[10px] font-bold text-[var(--theme-accent)]/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">{val}</div>
                                               </div>
                                             );
                                           })}
@@ -1498,26 +1498,26 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                            return (
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
-                                   <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
-                                   <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                   <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                                 </div>
                                 <div className="space-y-8">
                                   {(selectedEntry.uniquePowers || []).map((power, pIdx) => (
-                                    <div key={power.id} className="space-y-6 bg-[var(--color-secondary)]/20 p-8 rounded-[2rem] border border-[var(--color-border)]/30">
+                                    <div key={power.id} className="space-y-6 bg-[var(--theme-secondary)]/20 p-8 rounded-[2rem] border border-[var(--theme-border)]/30">
                                        <div className="flex items-center gap-4">
-                                          <div className="w-8 h-8 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center justify-center text-xs font-black">
+                                          <div className="w-8 h-8 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-lg flex items-center justify-center text-xs font-black">
                                             {pIdx + 1}
                                           </div>
-                                          <h4 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">{power.name}</h4>
+                                          <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{power.name}</h4>
                                        </div>
-                                       <div className="grid gap-6 border-r-2 border-[var(--color-border)]/30 pr-6">
+                                       <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
                                           {UNIQUE_POWER_QUESTIONS.map(q => {
                                             const val = power.data[q.id];
                                             if (!val) return null;
                                             return (
                                               <div key={q.id} className="space-y-1">
-                                                 <div className="text-[10px] font-bold text-[var(--text-accent)]/40 uppercase tracking-tight">{q.question}</div>
-                                                 <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val}</div>
+                                                 <div className="text-[10px] font-bold text-[var(--theme-accent)]/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">{val}</div>
                                               </div>
                                             );
                                           })}
@@ -1534,26 +1534,26 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                            return (
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
-                                   <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
-                                   <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                   <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
+                                   <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                                 </div>
                                 <div className="space-y-8">
                                   {(selectedEntry.specialItems || []).map((item, iIdx) => (
-                                    <div key={item.id} className="space-y-6 bg-[var(--color-secondary)]/20 p-8 rounded-[2rem] border border-[var(--color-border)]/30">
+                                    <div key={item.id} className="space-y-6 bg-[var(--theme-secondary)]/20 p-8 rounded-[2rem] border border-[var(--theme-border)]/30">
                                        <div className="flex items-center gap-4">
-                                          <div className="w-8 h-8 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-lg flex items-center justify-center text-xs font-black">
+                                          <div className="w-8 h-8 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-lg flex items-center justify-center text-xs font-black">
                                             {iIdx + 1}
                                           </div>
-                                          <h4 className="text-xl font-bold text-[var(--text-accent)] handwritten text-3xl">{item.name}</h4>
+                                          <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{item.name}</h4>
                                        </div>
-                                       <div className="grid gap-6 border-r-2 border-[var(--color-border)]/30 pr-6">
+                                       <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
                                           {SPECIAL_ITEM_QUESTIONS.map(q => {
                                             const val = item.data[q.id];
                                             if (!val) return null;
                                             return (
                                               <div key={q.id} className="space-y-1">
-                                                 <div className="text-[10px] font-bold text-[var(--text-accent)]/40 uppercase tracking-tight">{q.question}</div>
-                                                 <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val}</div>
+                                                 <div className="text-[10px] font-bold text-[var(--theme-accent)]/40 uppercase tracking-tight">{q.question}</div>
+                                                 <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">{val}</div>
                                               </div>
                                             );
                                           })}
@@ -1577,8 +1577,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         return (
                           <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                              <div className="flex items-center gap-4">
-                                <h3 className="text-xs font-black text-[var(--color-primary)] uppercase tracking-widest bg-[var(--color-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
-                                <div className="flex-1 h-px bg-[var(--color-border)]/30" />
+                                <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
+                                <div className="flex-1 h-px bg-[var(--theme-border)]/30" />
                              </div>
                              <div className="grid gap-6">
                                 {contentToRender.map(item => {
@@ -1587,9 +1587,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                    const question = isCustom ? item.label : item.question;
                                    const val = selectedEntry.data[id];
                                    return (
-                                     <div key={id} className="space-y-1.5 border-r-2 border-[var(--color-border)]/30 pr-4">
-                                        <div className="text-[10px] font-bold text-[var(--text-accent)]/40 uppercase tracking-tight">{question}</div>
-                                        <div className="text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val}</div>
+                                     <div key={id} className="space-y-1.5 border-r-2 border-[var(--theme-border)]/30 pr-4">
+                                        <div className="text-[10px] font-bold text-[var(--theme-accent)]/40 uppercase tracking-tight">{question}</div>
+                                        <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">{val}</div>
                                      </div>
                                    );
                                 })}
@@ -1597,8 +1597,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </section>
                         );
                      })}
-                     <div className="pt-12 flex flex-col items-center gap-4 opacity-30 border-t border-[var(--color-border)]/30">
-                        <ClipboardList size={32} className="text-[var(--color-primary)]" />
+                     <div className="pt-12 flex flex-col items-center gap-4 opacity-30 border-t border-[var(--theme-border)]/30">
+                        <ClipboardList size={32} className="text-[var(--theme-primary)]" />
                         <div className="text-[10px] font-black uppercase tracking-[0.4em]">סוף תעודת זהות</div>
                      </div>
                   </div>
@@ -1607,14 +1607,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-main)]/20 p-12 text-center">
-              <div className="bg-[var(--color-secondary)]/50 p-10 rounded-full mb-8 shadow-inner">
+            <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text)]/20 p-12 text-center">
+              <div className="bg-[var(--theme-secondary)]/50 p-10 rounded-full mb-8 shadow-inner">
                 <Icon size={80} className="opacity-20" />
               </div>
-              <h3 className="text-2xl font-bold text-[var(--text-accent)]/40 handwritten text-4xl mb-3">
+              <h3 className="text-2xl font-bold text-[var(--theme-accent)]/40 handwritten text-4xl mb-3">
                 {activeTab === 'places' ? 'ניהול מקומות' : activeTab === 'periods' ? 'ניהול תקופות' : activeTab === 'twists' ? 'ניהול טוויסטים' : activeTab === 'fantasyWorlds' ? 'ניהול עולמות פנטזיה' : 'שאלון בניית דמות'}
               </h3>
-              <p className="max-w-xs text-sm text-[var(--text-main)]/30 leading-relaxed">
+              <p className="max-w-xs text-sm text-[var(--theme-text)]/30 leading-relaxed">
                 בחר פריט מהרשימה או צור חדש כדי להתחיל.
               </p>
             </div>

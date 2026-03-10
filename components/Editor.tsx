@@ -106,12 +106,12 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
 
   if (activeScenes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-[var(--text-main)]/20 p-10">
+      <div className="flex flex-col items-center justify-center h-full text-[var(--theme-primary)]/20 p-10">
         <BookOpen size={64} className="mb-4 opacity-10" />
         <p className="text-lg font-medium mb-4">אין סצנות להצגה</p>
         <button 
           onClick={onOpenBulkAdd}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all"
+          className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all"
         >
           <CopyPlus size={18} />
           <span>הוספה מהירה של סצנות</span>
@@ -154,47 +154,48 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
   return (
     <div className="max-w-4xl mx-auto py-12 px-8 relative">
       <div className="sticky top-4 z-40 mb-12 flex flex-col items-center gap-4">
-        <div className="bg-[var(--text-accent)]/90 backdrop-blur-md text-white px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-6 border border-[var(--color-border)]/50">
-          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-            <Hash size={16} className="text-[var(--color-secondary)]" />
-            <span className="text-lg font-black tabular-nums">{totalWords.toLocaleString()} מילים</span>
+        <div className="bg-[var(--theme-primary)]/90 backdrop-blur-md text-[var(--theme-bg)] px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-6 border border-[var(--theme-primary)]/50">
+          <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg shadow-sm">
+            <Hash size={16} className="opacity-70" />
+            <span className="text-sm font-black tabular-nums">{totalWords.toLocaleString()} מילים</span>
           </div>
 
-          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg">
-            <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--color-secondary)] text-[var(--color-primary)] shadow-sm' : 'text-white/60 hover:text-white'}`}><Focus size={14} /><span>מיקוד</span></button>
-            <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--color-secondary)] text-[var(--color-primary)] shadow-sm' : 'text-white/60 hover:text-white'}`}><AlignJustify size={14} /><span>מלא</span></button>
+          <div className="flex items-center gap-1 bg-black/10 p-1 rounded-lg">
+            <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
+            <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
           </div>
 
-          <div className="w-px h-6 bg-white/10 mx-1" />
+          <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
 
           <div className="flex items-center gap-2">
             {isSearchOpen ? (
-              <div className="flex items-center bg-black/20 rounded-lg px-3 py-1 animate-in fade-in slide-in-from-right-2">
-                <Search size={14} className="text-[var(--color-secondary)] mr-2" />
+              <div className="flex items-center bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg px-3 py-1.5 shadow-sm animate-in fade-in slide-in-from-right-2">
+                <Search size={14} className="opacity-70 mr-2" />
                 <input 
                   autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="חפש מילים..."
-                  className="bg-transparent border-none focus:ring-0 text-xs text-white placeholder:text-white/40 w-32"
+                  className="bg-transparent border-none focus:ring-0 text-xs text-[var(--theme-primary)] placeholder:text-[var(--theme-primary)]/40 w-32"
                 />
-                <button onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }} className="text-white/40 hover:text-white ml-2">
+                <button onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] ml-2">
                   <X size={14} />
                 </button>
               </div>
             ) : (
               <button 
                 onClick={() => setIsSearchOpen(true)}
-                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
                 title="חיפוש"
               >
-                <Search size={18} />
+                <Search size={14} />
+                <span>חיפוש</span>
               </button>
             )}
             
             <button 
               onClick={onOpenBulkAdd}
-              className="flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-900 rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="הוספת סצנות חדשות"
             >
               <Plus size={14} />
@@ -202,16 +203,16 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
             </button>
             <button 
               onClick={() => setBridgeType('characters')} 
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--color-secondary)] text-[var(--color-primary)] rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="שליפת מידע מהשאלונים"
             >
               <BookOpen size={14} />
               <span>שלוף משאלון</span>
             </button>
-            <div className="w-px h-6 bg-white/10 mx-1" />
+            <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
             <button 
               onClick={onExport}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--color-secondary)] text-[var(--color-primary)] rounded-lg text-xs font-bold hover:bg-white transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="ייצוא כתב יד"
             >
               <Download size={14} />
@@ -231,8 +232,8 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           return (
             <React.Fragment key={scene.id}>
               {isNewChapter && scene.chapterTitle && (
-                <div className="pt-12 pb-4 border-b-2 border-[var(--text-accent)]/10 mb-8">
-                  <h2 className="text-4xl font-black text-[var(--text-accent)]/20 handwritten uppercase tracking-widest">
+                <div className="pt-12 pb-4 border-b-2 border-[var(--theme-primary)]/10 mb-8">
+                  <h2 className="text-4xl font-black text-[var(--theme-primary)]/20 handwritten uppercase tracking-widest">
                     {scene.chapterTitle}
                   </h2>
                 </div>
@@ -240,24 +241,24 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
               
               <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
                 {!isExpanded ? (
-                  <div className={`group flex items-center justify-between bg-[var(--bg-card)] border border-[var(--color-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
+                  <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                     <div className="flex items-center gap-4">
-                      <span className="text-lg font-black text-[var(--text-accent)]/10 handwritten w-6">{idx + 1}</span>
+                      <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
                       <div className="flex flex-col">
-                        <h3 className="font-bold text-[var(--text-accent)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
-                        {scene.chapterTitle && <span className="text-[10px] text-[var(--color-primary)] font-bold">{scene.chapterTitle}</span>}
+                        <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
+                        {scene.chapterTitle && <span className="text-[10px] text-[var(--theme-accent)] font-bold">{scene.chapterTitle}</span>}
                       </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]/30 px-2 py-0.5 bg-[var(--color-secondary)] rounded">{plotline?.name}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
                       {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
                     </div>
-                    <ChevronDown size={16} className="text-[var(--color-border)] group-hover:text-[var(--color-primary)]" />
+                    <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
                   </div>
                 ) : (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="mb-6 flex items-center gap-4 group/chapter">
                       <div className="flex-1 relative">
                         <input 
-                          className="w-full bg-[var(--color-secondary)]/50 border-none border-b border-transparent focus:border-[var(--color-border)] focus:ring-0 text-sm font-bold text-[var(--color-primary)] p-2 rounded-lg placeholder:text-[var(--color-border)]"
+                          className="w-full bg-[var(--theme-secondary)]/50 border-none border-b border-transparent focus:border-[var(--theme-border)] focus:ring-0 text-sm font-bold text-[var(--theme-primary)] p-2 rounded-lg placeholder:text-[var(--theme-primary)]/20"
                           value={scene.chapterTitle || ''} 
                           placeholder="כותרת פרק (אופציונלי)..." 
                           onChange={(e) => onUpdateScene(scene.id, { chapterTitle: e.target.value })} 
@@ -265,7 +266,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover/chapter:opacity-100 transition-opacity">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handlePullChapterTitle(scene.id, scene.chapterTitle || ''); }}
-                            className="flex items-center gap-1 px-2 py-1 bg-[var(--color-secondary)] text-[var(--color-primary)] rounded text-[10px] font-bold hover:bg-[var(--color-border)]"
+                            className="flex items-center gap-1 px-2 py-1 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded text-[10px] font-bold hover:bg-[var(--theme-border)]"
                             title="החל כותרת פרק זו על כל הסצנות הבאות"
                           >
                             <Download size={10} className="rotate-180" />
@@ -280,27 +281,27 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                       <div className="flex flex-col flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="h-2 w-2 rounded-full" style={{ backgroundColor: plotline?.color }} />
-                          <span className="text-[10px] font-black text-[var(--text-accent)]/40 uppercase tracking-widest">{plotline?.name}</span>
+                          <span className="text-[10px] font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">{plotline?.name}</span>
                         </div>
-                        <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--text-accent)] handwritten w-full" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                        <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten w-full" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
                       </div>
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--bg-card)] text-[var(--color-primary)] border-[var(--color-border)] hover:bg-[var(--color-secondary)]'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
                       >
                         <CheckCircle2 size={16} />
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
                       </button>
                       <button 
                         onClick={() => onDeleteScene(scene.id)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                         title="מחק סצנה"
                       >
                         <Trash2 size={18} />
                       </button>
                     </div>
                   </header>
-                  <textarea className={`w-full min-h-[400px] rounded-[2.5rem] border border-[var(--color-border)] p-10 text-xl leading-relaxed focus:ring-4 focus:ring-[var(--color-primary)]/10 focus:border-[var(--color-primary)] resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[var(--bg-card)]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
+                  <textarea className={`w-full min-h-[400px] rounded-[2rem] border border-[var(--theme-border)] p-10 text-xl leading-relaxed focus:ring-4 focus:ring-[var(--theme-primary)]/10 focus:border-[var(--theme-border)] resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[var(--theme-card)]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
                 </div>
               )}
             </article>
@@ -310,22 +311,22 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
       </div>
 
       {bridgeType && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[var(--text-accent)]/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[var(--bg-card)] w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-[var(--color-border)] overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="p-8 border-b border-[var(--color-border)]/50 flex items-center justify-between bg-[var(--color-secondary)]/20">
-              <h2 className="text-2xl font-bold text-[var(--text-accent)] handwritten text-3xl">שלוף מידע מהשאלונים</h2>
-              <button onClick={() => { setBridgeType(null); setSelectedItemId(null); }} className="text-[var(--color-primary)] hover:opacity-70 transition-colors p-1"><X size={28} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-[var(--theme-card)] w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-8 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-secondary)]/20">
+              <h2 className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-3xl">שלוף מידע מהשאלונים</h2>
+              <button onClick={() => { setBridgeType(null); setSelectedItemId(null); }} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] transition-colors p-1"><X size={28} /></button>
             </div>
             
             <div className="flex-1 flex min-h-0">
                {/* Categories Sidebar */}
-               <div className="w-48 border-l border-[var(--color-border)]/50 p-4 bg-[var(--color-secondary)]/30 space-y-1 overflow-y-auto">
-                  <div className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-widest mb-2 px-2">קטגוריה</div>
+               <div className="w-48 border-l border-[var(--theme-border)] p-4 bg-[var(--theme-secondary)]/30 space-y-1 overflow-y-auto">
+                  <div className="text-[10px] font-black text-[var(--theme-primary)]/30 uppercase tracking-widest mb-2 px-2">קטגוריה</div>
                   {categories.map(cat => (
                     <button 
                       key={cat.id} 
                       onClick={() => { setBridgeType(cat.id); setSelectedItemId(null); }} 
-                      className={`w-full flex items-center gap-2 text-right p-3 rounded-xl text-xs font-bold transition-all ${bridgeType === cat.id ? 'bg-[var(--color-secondary)] text-[var(--color-primary)] shadow-sm' : 'text-[var(--color-primary)] hover:bg-[var(--color-secondary)]'}`}
+                      className={`w-full flex items-center gap-2 text-right p-3 rounded-xl text-xs font-bold transition-all ${bridgeType === cat.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-sm' : 'text-[var(--theme-primary)]/70 hover:bg-[var(--theme-secondary)]'}`}
                     >
                       {cat.icon}
                       <span>{cat.label}</span>
@@ -334,21 +335,21 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                </div>
 
                {/* Items List */}
-               <div className="w-1/3 border-l border-[var(--color-border)]/50 p-4 overflow-y-auto space-y-2">
-                  <div className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-widest mb-2 px-2">בחר פריט</div>
+               <div className="w-1/3 border-l border-[var(--theme-border)] p-4 overflow-y-auto space-y-2">
+                  <div className="text-[10px] font-black text-[var(--theme-primary)]/30 uppercase tracking-widest mb-2 px-2">בחר פריט</div>
                   {bridgeItems.map(item => (
-                    <button key={item.id} onClick={() => setSelectedItemId(item.id)} className={`w-full text-right p-3 rounded-xl text-sm font-bold transition-all ${selectedItemId === item.id ? 'bg-[var(--color-primary)] text-white shadow-md' : 'text-[var(--color-primary)] hover:bg-[var(--color-secondary)]'}`}>{item.name}</button>
+                    <button key={item.id} onClick={() => setSelectedItemId(item.id)} className={`w-full text-right p-3 rounded-xl text-sm font-bold transition-all ${selectedItemId === item.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/70 hover:bg-[var(--theme-secondary)]'}`}>{item.name}</button>
                   ))}
-                  {bridgeItems.length === 0 && <div className="text-xs text-[var(--color-primary)]/40 italic p-4 text-center">אין פריטים רשומים</div>}
+                  {bridgeItems.length === 0 && <div className="text-xs text-[var(--theme-primary)]/30 italic p-4 text-center">אין פריטים רשומים</div>}
                </div>
 
                {/* Content Area */}
-               <div className="flex-1 p-6 overflow-y-auto bg-[var(--color-secondary)]/10">
+               <div className="flex-1 p-6 overflow-y-auto bg-[var(--theme-secondary)]/10">
                   {activeItem ? (
                     <div className="space-y-6">
                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-widest">מידע זמין</div>
-                          <div className="text-xs font-bold text-[var(--color-primary)]">{activeItem.name}</div>
+                          <div className="text-[10px] font-black text-[var(--theme-primary)]/30 uppercase tracking-widest">מידע זמין</div>
+                          <div className="text-xs font-bold text-[var(--theme-primary)]">{activeItem.name}</div>
                        </div>
 
                        {/* Main Data */}
@@ -357,11 +358,11 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                             if (['gender', 'placeType'].includes(key)) return null;
                             if (!val) return null;
                             return (
-                              <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-4 bg-[var(--bg-card)] border border-[var(--color-border)] rounded-2xl hover:border-[var(--color-primary)] hover:shadow-md transition-all group relative overflow-hidden">
-                                <div className="text-[10px] text-[var(--color-primary)]/40 mb-1 font-bold">{getQuestionLabel(key, bridgeType)}</div>
-                                <div className="text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">{val as string}</div>
-                                <div className="absolute top-0 right-0 h-full w-10 bg-[var(--color-secondary)] translate-x-full group-hover:translate-x-0 transition-transform flex items-center justify-center">
-                                    <ArrowRight size={16} className="text-[var(--color-primary)]" />
+                              <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-4 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-2xl hover:border-[var(--theme-accent)] hover:shadow-md transition-all group relative overflow-hidden">
+                                <div className="text-[10px] text-[var(--theme-primary)]/30 mb-1 font-bold">{getQuestionLabel(key, bridgeType)}</div>
+                                <div className="text-sm text-[var(--theme-primary)] leading-relaxed whitespace-pre-wrap">{val as string}</div>
+                                <div className="absolute top-0 right-0 h-full w-10 bg-[var(--theme-secondary)] translate-x-full group-hover:translate-x-0 transition-transform flex items-center justify-center">
+                                    <ArrowRight size={16} className="text-[var(--theme-primary)]" />
                                 </div>
                               </button>
                             );
@@ -371,12 +372,12 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                        {/* Development Stages */}
                        {activeItem.developmentStages && activeItem.developmentStages.length > 0 && (
                          <div className="space-y-3 pt-4">
-                            <div className="text-[10px] font-black text-[var(--text-accent)]/20 uppercase tracking-widest">שלבי פיתוח</div>
+                            <div className="text-[10px] font-black text-[var(--theme-primary)]/20 uppercase tracking-widest">שלבי פיתוח</div>
                             {activeItem.developmentStages.map(stage => (
                               <div key={stage.id} className="space-y-2">
-                                <div className="text-xs font-bold text-[var(--color-primary)]/60 px-2">{stage.title}</div>
+                                <div className="text-xs font-bold text-[var(--theme-primary)]/60 px-2">{stage.title}</div>
                                 {Object.entries(stage.data || {}).map(([key, val]) => val && (
-                                  <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-3 bg-[var(--bg-card)]/50 border border-[var(--color-border)]/50 rounded-xl hover:border-[var(--color-primary)] transition-all text-xs text-[var(--text-main)]">
+                                  <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-3 bg-[var(--theme-card)]/50 border border-[var(--theme-border)]/50 rounded-xl hover:border-[var(--theme-accent)] transition-all text-xs text-[var(--theme-primary)]">
                                     {val as string}
                                   </button>
                                 ))}
@@ -392,12 +393,12 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                          { list: activeItem.specificLocations, label: 'מיקומים ספציפיים' }
                        ].map(group => group.list && group.list.length > 0 && (
                          <div key={group.label} className="space-y-3 pt-4">
-                            <div className="text-[10px] font-black text-[var(--text-accent)]/20 uppercase tracking-widest">{group.label}</div>
+                            <div className="text-[10px] font-black text-[var(--theme-primary)]/20 uppercase tracking-widest">{group.label}</div>
                             {group.list.map(item => (
                               <div key={item.id} className="space-y-2">
-                                <div className="text-xs font-bold text-[var(--color-primary)]/60 px-2">{item.name}</div>
+                                <div className="text-xs font-bold text-[var(--theme-primary)]/60 px-2">{item.name}</div>
                                 {Object.entries(item.data || {}).map(([key, val]) => val && (
-                                  <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-3 bg-[var(--bg-card)]/50 border border-[var(--color-border)]/50 rounded-xl hover:border-[var(--color-primary)] transition-all text-xs text-[var(--text-main)]">
+                                  <button key={key} onClick={() => handlePullInfo(val as string)} className="w-full text-right p-3 bg-[var(--theme-card)]/50 border border-[var(--theme-border)]/50 rounded-xl hover:border-[var(--theme-accent)] transition-all text-xs text-[var(--theme-primary)]">
                                     {val as string}
                                   </button>
                                 ))}
@@ -407,7 +408,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                        ))}
                     </div>
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-[var(--color-primary)]/20 gap-4">
+                    <div className="h-full flex flex-col items-center justify-center text-[var(--theme-primary)]/20 gap-4">
                        <Search size={48} className="opacity-20" />
                        <p className="text-sm font-bold">בחר פריט מהרשימה</p>
                     </div>

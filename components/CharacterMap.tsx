@@ -20,6 +20,23 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newZoom = Math.min(Math.max(0.2, zoom + delta), 3);
+        setZoom(newZoom);
+      }
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [zoom]);
+
   const [localCharacters, setLocalCharacters] = useState<QuestionnaireEntry[]>(characters);
   const [localConnections, setLocalConnections] = useState<CharacterMapConnection[]>(connections);
 

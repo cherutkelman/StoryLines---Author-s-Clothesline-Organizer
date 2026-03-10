@@ -6,7 +6,7 @@ export const THEMES = {
     card: '#ffffff',
     primary: '#78350f',
     accent: '#92400e',
-    secondary: '#fffbeb', // Changed from #fef3c7 to #fffbeb (amber-50)
+    secondary: '#fffbeb',
     border: '#fde68a',
     text: '#4a4a4a',
     muted: '#92400e99'
@@ -43,6 +43,61 @@ export const THEMES = {
     border: '#bbf7d0',
     text: '#064e3b',
     muted: '#05966999'
+  },
+  lavender: {
+    name: 'לבנדר',
+    bg: '#f5f3ff',
+    card: '#ffffff',
+    primary: '#4c1d95',
+    accent: '#7c3aed',
+    secondary: '#ede9fe',
+    border: '#ddd6fe',
+    text: '#1e1b4b',
+    muted: '#7c3aed99'
+  },
+  sunset: {
+    name: 'שקיעה',
+    bg: '#fff7ed',
+    card: '#ffffff',
+    primary: '#7c2d12',
+    accent: '#ea580c',
+    secondary: '#ffedd5',
+    border: '#fed7aa',
+    text: '#431407',
+    muted: '#ea580c99'
+  },
+  ocean: {
+    name: 'אוקיינוס',
+    bg: '#f0f9ff',
+    card: '#ffffff',
+    primary: '#0c4a6e',
+    accent: '#0284c7',
+    secondary: '#e0f2fe',
+    border: '#bae6fd',
+    text: '#082f49',
+    muted: '#0284c799'
+  },
+  coffee: {
+    name: 'קפה',
+    bg: '#fafaf9',
+    card: '#ffffff',
+    primary: '#44403c',
+    accent: '#78716c',
+    secondary: '#f5f5f4',
+    border: '#e7e5e4',
+    text: '#1c1917',
+    muted: '#78716c99'
+  },
+  monochrome: {
+    name: 'מונוכרום',
+    bg: '#ffffff',
+    card: '#ffffff',
+    primary: '#000000',
+    accent: '#404040',
+    secondary: '#f5f5f5',
+    border: '#e5e5e5',
+    text: '#000000',
+    muted: '#40404099'
   }
 };
 

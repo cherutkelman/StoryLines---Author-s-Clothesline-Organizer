@@ -10,9 +10,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;600;700&family=Amatic+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #fdf6e3;
+            --sidebar-bg: #f5e6d3;
+            --card-bg: #ffffff;
+            --text: #78350f;
+            --border: #fde68a;
+            --accent: #d97706;
+            --secondary-text: #92400e;
+            --hover: #fef3c7;
+        }
         body {
             font-family: 'Assistant', sans-serif;
-            background-color: #fdf6e3;
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         .handwritten {
             font-family: 'Amatic SC', cursive;

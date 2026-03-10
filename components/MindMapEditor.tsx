@@ -22,6 +22,42 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const stage = stageRef.current;
+        if (!stage) return;
+
+        const oldScale = stage.scaleX();
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale,
+          y: (pointer.y - stage.y()) / oldScale,
+        };
+
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newScale = Math.min(Math.max(0.5, oldScale + delta), 3);
+
+        setScale(newScale);
+
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale,
+          y: pointer.y - mousePointTo.y * newScale,
+        };
+        setStagePos(newPos);
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [scale, stagePos]);
+
+  useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         setStageSize({
