@@ -606,7 +606,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto overflow-hidden">
+    <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto">
       <div className="flex justify-center flex-shrink-0">
         <div className="bg-[var(--theme-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-[var(--theme-border)]/50 overflow-x-auto max-w-full">
           {[
@@ -795,8 +795,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         <div className="flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
           {selectedEntry ? (
             <>
-              <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex flex-col gap-6">
-                <div className="flex items-center justify-between">
+                  <div className="h-screen overflow-y-scroll p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
+                  <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                      {!isCategoriesVisible && mode === 'edit' && (
                        <button 
@@ -815,7 +815,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           ) : (
                             <Icon size={24} className="text-[var(--theme-primary)]/20" />
                           )}
-                          
+                          </div>
+                          <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-[var(--theme-secondary)]/10">
+
                           {mode === 'edit' && (
                             <label 
                               className="absolute inset-0 flex items-center justify-center bg-[var(--theme-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-[var(--theme-card)]"
@@ -888,7 +890,32 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      </div>
                   </div>
                   
-                 <div className="flex items-center gap-3">
+                 <div className="flex flex-col items-end gap-3">
+                  <button 
+                    onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] hover:opacity-90' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                  >
+                    {mode === 'edit' ? <Eye size={18} /> : <PencilLine size={18} />}
+                    <span>{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+
+                    <button 
+                      onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                      className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                      title="מחיקת פריט"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+
+                    <button 
+                      onClick={exportCurrentEntry}
+                      className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                      title="ייצוא נתונים"
+                    >
+                      <Download size={18} />
+                    </button>
+
                     {mode === 'edit' && (
                       <div className="flex items-center gap-2">
                         {isSearchActive && (
@@ -911,30 +938,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       </div>
                     )}
 
-                    <button 
-                      onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
-                      className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] hover:opacity-90' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
-                    >
-                      {mode === 'edit' ? <Eye size={18} /> : <PencilLine size={18} />}
-                      <span>{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
-                    </button>
-                    
-                    <button 
-                      onClick={exportCurrentEntry}
-                      className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
-                      title="ייצוא נתונים"
-                    >
-                      <Download size={18} />
-                    </button>
-
-                    <button 
-                      onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
-                      className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
-                      title="מחיקת פריט"
-                    >
-                      <Trash2 size={18} />
-                    </button>
                   </div>
+                </div>
                 </div>
 
                 {mode === 'edit' ? (
@@ -1460,6 +1465,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         if (cat === "מיקום ספציפי") {
                            if (!selectedEntry.specificLocations || selectedEntry.specificLocations.length === 0) return null;
                            return (
+                              
                              <section key={cat} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex items-center gap-4">
                                    <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-3 py-1 rounded-lg">{cat}</h3>
@@ -1605,6 +1611,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 )}
                 <div className="h-20" />
               </div>
+              
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text)]/20 p-12 text-center">
@@ -1623,6 +1630,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
       </div>
     </div>
   );
-};
+};   
+
 
 export default Questionnaires;
