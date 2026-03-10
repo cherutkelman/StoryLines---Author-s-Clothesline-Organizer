@@ -220,7 +220,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
 
     try {
       const canvas = await html2canvas(canvasRef.current, {
-        backgroundColor: '#fdf6e3',
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--theme-bg').trim() || '#fdf6e3',
         useCORS: true,
         scale: 2, // Higher quality
         logging: false,
@@ -241,63 +241,63 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const selectedNode = characters.find(n => n.id === selectedNodeId);
 
   return (
-    <div className="h-full flex flex-col relative select-none bg-[#fdf6e3]">
+    <div className="h-full flex flex-col relative select-none bg-[var(--theme-bg)]">
       {/* Tool Bar */}
       {!isExporting && (
-        <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-amber-200 flex items-center gap-2">
+        <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
           <button 
             onClick={() => setTool('move')}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
+            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
           >
             <Move size={18} />
             <span className="text-xs font-bold">הזזה</span>
           </button>
           <button 
             onClick={() => setTool('link')}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'link' ? 'bg-amber-800 text-white shadow-md' : 'text-amber-800/60 hover:bg-amber-50'}`}
+            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'link' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
           >
             <LinkIcon size={18} />
             <span className="text-xs font-bold">קישור דמויות</span>
           </button>
-          <div className="w-px h-6 bg-amber-200 mx-1" />
-          <div className="flex items-center gap-1 bg-amber-50 rounded-xl p-1 border border-amber-100">
+          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
+          <div className="flex items-center gap-1 bg-[var(--theme-secondary)] rounded-xl p-1 border border-[var(--theme-border)]/50">
             <button 
               onClick={() => setZoom(prev => Math.max(0.2, prev - 0.1))}
-              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
               title="זום אאוט"
             >
               <ZoomOut size={16} />
             </button>
-            <span className="text-[10px] font-bold text-amber-900 w-10 text-center">
+            <span className="text-[10px] font-bold text-[var(--theme-primary)] w-10 text-center">
               {Math.round(zoom * 100)}%
             </span>
             <button 
               onClick={() => setZoom(prev => Math.min(3, prev + 0.1))}
-              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
               title="זום אין"
             >
               <ZoomIn size={16} />
             </button>
             <button 
               onClick={() => setZoom(1)}
-              className="p-2 text-amber-800 hover:bg-white rounded-lg transition-all"
+              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
               title="איפוס זום"
             >
               <RotateCcw size={14} />
             </button>
           </div>
-          <div className="w-px h-6 bg-amber-200 mx-1" />
+          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={addNode}
-            className="p-3 bg-amber-100 text-amber-800 rounded-xl hover:bg-amber-200 transition-all flex items-center gap-2"
+            className="p-3 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-xl hover:opacity-80 transition-all flex items-center gap-2"
           >
             <Plus size={18} />
             <span className="text-xs font-bold">דמות חדשה</span>
           </button>
-          <div className="w-px h-6 bg-amber-200 mx-1" />
+          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={exportAsImage}
-            className="p-3 bg-white text-amber-800 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all flex items-center gap-2"
+            className="p-3 bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all flex items-center gap-2"
             title="ייצוא תמונה"
           >
             <Download size={18} />
@@ -332,7 +332,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                   y1={fromNode.y ?? 0} 
                   x2={toNode.x ?? 0} 
                   y2={toNode.y ?? 0} 
-                  stroke="#78350f" 
+                  stroke="currentColor" 
+                  className="text-[var(--theme-primary)]"
                   strokeWidth="2" 
                   strokeDasharray="5,5" 
                   opacity="0.3" 
@@ -365,7 +366,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             >
               <div className="relative flex flex-col items-center">
                 <div 
-                  className="cursor-grab active:cursor-grabbing p-1 text-amber-300 hover:text-amber-500 transition-colors"
+                  className="cursor-grab active:cursor-grabbing p-1 text-[var(--theme-accent)]/50 hover:text-[var(--theme-accent)] transition-colors"
                   onMouseDown={(e) => {
                     if (isExporting) return;
                     e.stopPropagation();
@@ -375,12 +376,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                   {!isExporting && <Move size={14} />}
                 </div>
                 {isExporting ? (
-                  <div className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-amber-100 rounded-lg p-2 shadow-md text-center leading-tight whitespace-pre-wrap">
+                  <div className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-2 shadow-md text-center leading-tight whitespace-pre-wrap text-slate-900">
                     {conn.description}
                   </div>
                 ) : (
                   <textarea 
-                    className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-amber-100 rounded-lg p-1 shadow-md focus:ring-2 focus:ring-amber-200/20 focus:border-amber-400 outline-none resize-none transition-all text-center leading-tight overflow-visible"
+                    className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-1 shadow-md focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none resize-none transition-all text-center leading-tight overflow-visible text-slate-900"
                     value={conn.description}
                     onChange={(e) => {
                       updateConnection(conn.id, e.target.value);
@@ -415,25 +416,25 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             style={{ left: node.x ?? 200, top: node.y ?? 200, transform: 'translate(-50%, -50%)' }}
             onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
           >
-            <div className={`w-16 h-16 rounded-full border-2 shadow-lg overflow-hidden bg-white flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-amber-500 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'}`}>
+            <div className={`w-16 h-16 rounded-full border-2 shadow-lg overflow-hidden bg-[var(--theme-card)] flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-[var(--theme-accent)] ring-2 ring-[var(--theme-accent)]/20' : 'border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50'}`}>
               {node.imageUrl ? (
                 <img src={node.imageUrl} alt={node.name} className="w-full h-full object-cover" />
               ) : (
-                <User size={32} className="text-amber-100" />
+                <User size={32} className="text-[var(--theme-border)]" />
               )}
             </div>
             
-            <div className="bg-white/90 backdrop-blur-sm px-2 py-1.5 rounded-md border border-amber-100 shadow-sm overflow-visible">
+            <div className="bg-[var(--theme-card)]/90 backdrop-blur-sm px-2 py-1.5 rounded-md border border-[var(--theme-border)] shadow-sm overflow-visible">
                {selectedNodeId === node.id && !isExporting ? (
                  <input 
                    autoFocus
-                   className="text-center font-bold text-amber-900 bg-transparent border-none focus:ring-0 p-0 text-[10px] w-20 leading-tight"
+                   className="text-center font-bold text-[var(--theme-primary)] bg-transparent border-none focus:ring-0 p-0 text-[10px] w-20 leading-tight"
                    value={node.name}
                    onChange={(e) => updateNode(node.id, { name: e.target.value })}
                    onClick={(e) => e.stopPropagation()}
                  />
                ) : (
-                 <span className="text-[10px] font-bold text-amber-900 truncate max-w-[80px] block leading-normal py-0.5">{node.name}</span>
+                 <span className="text-[10px] font-bold text-[var(--theme-primary)] truncate max-w-[80px] block leading-normal py-0.5">{node.name}</span>
                )}
             </div>
 
@@ -482,7 +483,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         ))}
 
         {tool === 'link' && selectedNodeId && (
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-xs font-black text-amber-900/40 uppercase tracking-widest bg-amber-50 px-4 py-2 rounded-full border border-amber-100">
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest bg-[var(--theme-secondary)] px-4 py-2 rounded-full border border-[var(--theme-border)]/50">
             בחר דמות נוספת כדי ליצור קישור
           </div>
         )}
@@ -492,8 +493,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       {/* Floating Instructions */}
       {!isExporting && (
         <div className="character-map-instructions absolute bottom-8 right-8 text-right pointer-events-none">
-          <h4 className="handwritten text-3xl text-amber-900/40 mb-1">מפת דמויות</h4>
-          <p className="text-[10px] text-amber-900/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
+          <h4 className="handwritten text-3xl text-[var(--theme-primary)]/40 mb-1">מפת דמויות</h4>
+          <p className="text-[10px] text-[var(--theme-primary)]/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
         </div>
       )}
     </div>

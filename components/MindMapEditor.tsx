@@ -170,7 +170,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   const selectedNode = map.nodes.find(n => n.id === selectedId);
 
   return (
-    <div className="h-full flex relative bg-[#f8fafc]">
+    <div className="h-full flex relative bg-[var(--theme-bg)]">
       {/* Main Editor Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative" ref={containerRef}>
         <Stage
@@ -201,7 +201,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                 <Line
                   key={edge.id}
                   points={[from.x, from.y, to.x, to.y]}
-                  stroke="#cbd5e1"
+                  stroke={getComputedStyle(document.documentElement).getPropertyValue('--theme-border').trim() || '#cbd5e1'}
                   strokeWidth={2}
                 />
               );
@@ -220,8 +220,8 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                 {node.type === 'circle' ? (
                   <Circle
                     radius={50}
-                    fill={node.isRoot ? '#1e293b' : '#334155'}
-                    stroke={selectedId === node.id ? '#3b82f6' : 'transparent'}
+                    fill={node.isRoot ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() || '#1e293b') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() + 'cc' || '#334155')}
+                    stroke={selectedId === node.id ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim() || '#3b82f6') : 'transparent'}
                     strokeWidth={3}
                     shadowBlur={5}
                     shadowOpacity={0.2}
@@ -232,8 +232,8 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                     y={-30}
                     width={100}
                     height={60}
-                    fill="#f1f5f9"
-                    stroke={selectedId === node.id ? '#3b82f6' : '#cbd5e1'}
+                    fill={getComputedStyle(document.documentElement).getPropertyValue('--theme-secondary').trim() || '#f1f5f9'}
+                    stroke={selectedId === node.id ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim() || '#3b82f6') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-border').trim() || '#cbd5e1')}
                     strokeWidth={2}
                     cornerRadius={8}
                     shadowBlur={5}
@@ -243,7 +243,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                 <Text
                   text={node.text}
                   fontSize={14}
-                  fill={node.type === 'circle' ? 'white' : '#1e293b'}
+                  fill={node.type === 'circle' ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-card').trim() || 'white') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() || '#1e293b')}
                   align="center"
                   verticalAlign="middle"
                   width={90}
@@ -261,42 +261,42 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
         <div className="absolute top-6 right-6 flex flex-col gap-2">
           <button 
             onClick={exportAsImage}
-            className="p-3 bg-white border border-slate-200 rounded-2xl shadow-lg text-slate-600 hover:text-blue-600 transition-all"
+            className="p-3 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-2xl shadow-lg text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-all"
             title="ייצוא כתמונה"
           >
             <Download size={20} />
           </button>
         </div>
 
-        <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-slate-200 shadow-xl">
-          <button onClick={zoomOut} className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all"><Minus size={18} /></button>
-          <div className="text-xs font-bold text-slate-900 w-12 text-center">{Math.round(scale * 100)}%</div>
-          <button onClick={zoomIn} className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all"><Plus size={18} /></button>
-          <div className="h-4 w-px bg-slate-200 mx-1" />
-          <button onClick={resetZoom} className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all"><Maximize size={18} /></button>
+        <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl border border-[var(--theme-border)] shadow-xl">
+          <button onClick={zoomOut} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Minus size={18} /></button>
+          <div className="text-xs font-bold text-[var(--theme-primary)] w-12 text-center">{Math.round(scale * 100)}%</div>
+          <button onClick={zoomIn} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Plus size={18} /></button>
+          <div className="h-4 w-px bg-[var(--theme-border)]/50 mx-1" />
+          <button onClick={resetZoom} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Maximize size={18} /></button>
         </div>
 
         {/* Node Actions (when selected) */}
         {selectedNode && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-4 flex items-center gap-4 z-10 animate-in fade-in slide-in-from-bottom-4">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-[2rem] shadow-2xl p-4 flex items-center gap-4 z-10 animate-in fade-in slide-in-from-bottom-4">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase px-2">טקסט</label>
+              <label className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase px-2">טקסט</label>
               <input 
                 type="text"
                 value={selectedNode.text}
                 onChange={(e) => updateNodeText(selectedNode.id, e.target.value)}
-                className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-200 w-48"
+                className="bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-xl px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/20 w-48 text-[var(--theme-primary)]"
                 autoFocus
               />
             </div>
             
-            <div className="h-8 w-px bg-slate-100 mx-2" />
+            <div className="h-8 w-px bg-[var(--theme-border)]/50 mx-2" />
             
             <div className="flex items-center gap-2">
               {selectedNode.type === 'circle' && (
                 <button 
                   onClick={() => addNode(selectedNode.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all"
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-xs font-bold hover:opacity-90 transition-all"
                 >
                   <Share2 size={14} />
                   <span>הוסף ענף</span>
@@ -305,7 +305,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
               
               <button 
                 onClick={() => toggleNodeType(selectedNode.id)}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"
                 title={selectedNode.type === 'circle' ? 'הפוך לריבוע' : 'הפוך לעיגול'}
               >
                 <RefreshCw size={18} />
@@ -322,7 +322,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
               )}
             </div>
 
-            <button onClick={() => setSelectedId(null)} className="p-2 text-slate-300 hover:text-slate-600">
+            <button onClick={() => setSelectedId(null)} className="p-2 text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]">
               <X size={18} />
             </button>
           </div>

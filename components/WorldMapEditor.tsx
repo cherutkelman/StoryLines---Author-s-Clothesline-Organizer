@@ -264,7 +264,10 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
   const exportAsImage = () => {
     if (stageRef.current) {
-      const uri = stageRef.current.toDataURL();
+      const uri = stageRef.current.toDataURL({
+        pixelRatio: 2,
+        backgroundColor: '#fdf6e3'
+      });
       const link = document.createElement('a');
       link.download = `${map.name || 'map'}.png`;
       link.href = uri;
@@ -277,77 +280,77 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const selectedElement = map.elements.find(el => el.id === selectedId);
 
   return (
-    <div className="h-full flex relative bg-[#fdf6e3]">
+    <div className="h-full flex relative bg-[var(--theme-bg)]">
       {/* Toolbar */}
-      <div className="w-16 bg-white border-l border-amber-100 flex flex-col items-center py-6 gap-4 shadow-xl z-20 overflow-y-auto scrollbar-hide">
+      <div className="w-16 bg-[var(--theme-card)] border-l border-[var(--theme-border)] flex flex-col items-center py-6 gap-4 shadow-xl z-20 overflow-y-auto scrollbar-hide">
         <button 
           onClick={exportAsImage}
-          className="p-3 text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+          className="p-3 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"
           title="ייצוא כתמונה"
         >
           <Download size={20} />
         </button>
-        <div className="h-px w-8 bg-amber-50" />
+        <div className="h-px w-8 bg-[var(--theme-border)]/50" />
         <button 
           onClick={() => setTool('select')}
-          className={`p-3 rounded-xl transition-all ${tool === 'select' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'select' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="בחירה"
         >
           <MousePointer2 size={20} />
         </button>
-        <div className="h-px w-8 bg-amber-50" />
+        <div className="h-px w-8 bg-[var(--theme-border)]/50" />
         <button 
           onClick={() => setTool('pencil')}
-          className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="מפה (עיפרון שחור)"
         >
           <Pencil size={20} />
         </button>
         <button 
           onClick={() => setTool('road')}
-          className={`p-3 rounded-xl transition-all ${tool === 'road' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'road' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="דרך (חום)"
         >
           <Route size={20} />
         </button>
         <button 
           onClick={() => setTool('river')}
-          className={`p-3 rounded-xl transition-all ${tool === 'river' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'river' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="נחל (כחול)"
         >
           <Waves size={20} />
         </button>
         <button 
           onClick={() => setTool('pool')}
-          className={`p-3 rounded-xl transition-all ${tool === 'pool' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'pool' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="בריכה"
         >
           <CircleIcon size={20} />
         </button>
-        <div className="h-px w-8 bg-amber-50" />
+        <div className="h-px w-8 bg-[var(--theme-border)]/50" />
         <button 
           onClick={() => setTool('text')}
-          className={`p-3 rounded-xl transition-all ${tool === 'text' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'text' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="טקסט"
         >
           <LucideType size={20} />
         </button>
         <button 
           onClick={() => setTool('icon')}
-          className={`p-3 rounded-xl transition-all ${tool === 'icon' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'icon' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="אייקונים"
         >
           <Home size={20} />
         </button>
         <button 
           onClick={() => { setTool('place'); setShowPlacesList(true); }}
-          className={`p-3 rounded-xl transition-all ${tool === 'place' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--accent)] opacity-30 hover:bg-[var(--hover)]'}`}
+          className={`p-3 rounded-xl transition-all ${tool === 'place' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
           title="הוסף מקום מהשאלון"
         >
           <MapPin size={20} />
         </button>
-        <div className="h-px w-8 bg-amber-50" />
-        <label className="p-3 text-amber-200 hover:bg-amber-50 rounded-xl cursor-pointer transition-all" title="העלה מפה">
+        <div className="h-px w-8 bg-[var(--theme-border)]/50" />
+        <label className="p-3 text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)] rounded-xl cursor-pointer transition-all" title="העלה מפה">
           <ImageIcon size={20} />
           <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
         </label>
@@ -365,14 +368,14 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Tool Sub-options */}
         {tool === 'place' && showPlacesList && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-amber-100 shadow-2xl z-30 flex flex-col gap-3 min-w-[300px] max-h-[60vh] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-amber-50 pb-2">
-              <h3 className="text-xs font-black text-amber-900 uppercase tracking-widest">בחר מקום מהשאלון</h3>
-              <button onClick={() => setShowPlacesList(false)} className="text-amber-300 hover:text-amber-800"><X size={16} /></button>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--theme-card)]/90 backdrop-blur-md p-4 rounded-3xl border border-[var(--theme-border)] shadow-2xl z-30 flex flex-col gap-3 min-w-[300px] max-h-[60vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[var(--theme-border)]/50 pb-2">
+              <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest">בחר מקום מהשאלון</h3>
+              <button onClick={() => setShowPlacesList(false)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]"><X size={16} /></button>
             </div>
-            <div className="overflow-y-auto flex-1 space-y-1 pr-1">
+            <div className="overflow-y-auto flex-1 space-y-1 pr-1 text-[var(--theme-primary)]">
               {places.length === 0 ? (
-                <div className="text-center py-8 text-amber-800/40 text-xs">אין מקומות בשאלון</div>
+                <div className="text-center py-8 text-[var(--theme-primary)]/40 text-xs">אין מקומות בשאלון</div>
               ) : (
                 places.map(place => (
                   <button 
@@ -394,10 +397,10 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       setShowPlacesList(false);
                       setTool('select');
                     }}
-                    className="w-full text-right px-4 py-3 rounded-xl hover:bg-amber-50 text-sm text-amber-900 font-medium transition-all flex items-center justify-between group"
+                    className="w-full text-right px-4 py-3 rounded-xl hover:bg-[var(--theme-secondary)] text-sm text-[var(--theme-primary)] font-medium transition-all flex items-center justify-between group"
                   >
                     <span>{place.name}</span>
-                    <Plus size={14} className="opacity-0 group-hover:opacity-100 text-amber-400" />
+                    <Plus size={14} className="opacity-0 group-hover:opacity-100 text-[var(--theme-accent)]" />
                   </button>
                 ))
               )}
@@ -406,12 +409,12 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         )}
 
         {tool === 'icon' && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-amber-100 shadow-xl z-10 flex gap-2 overflow-x-auto max-w-[90vw]">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl border border-[var(--theme-border)] shadow-xl z-10 flex gap-2 overflow-x-auto max-w-[90vw]">
             {(['house', 'houses', 'tree', 'trees', 'mountain', 'valley', 'buildings', 'palace', 'bridge', 'animal'] as const).map(icon => (
               <button 
                 key={icon}
                 onClick={() => setSelectedIcon(icon)}
-                className={`p-2 rounded-xl transition-all flex-shrink-0 ${selectedIcon === icon ? 'bg-amber-800 text-white' : 'text-amber-800 hover:bg-amber-100'}`}
+                className={`p-2 rounded-xl transition-all flex-shrink-0 ${selectedIcon === icon ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                 title={icon}
               >
                 {icon === 'house' && <Home size={18} />}
@@ -679,34 +682,34 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         </div>
 
         {/* Zoom Controls */}
-        <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-amber-100 shadow-xl z-10">
-          <button onClick={zoomOut} className="p-2 text-amber-800 hover:bg-amber-100 rounded-xl transition-all"><Minus size={18} /></button>
-          <div className="text-xs font-bold text-amber-900 w-12 text-center">{Math.round(scale * 100)}%</div>
-          <button onClick={zoomIn} className="p-2 text-amber-800 hover:bg-amber-100 rounded-xl transition-all"><Plus size={18} /></button>
-          <div className="h-4 w-px bg-amber-200 mx-1" />
-          <button onClick={resetZoom} className="p-2 text-amber-800 hover:bg-amber-100 rounded-xl transition-all"><Maximize size={18} /></button>
+        <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl border border-[var(--theme-border)] shadow-xl z-10">
+          <button onClick={zoomOut} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Minus size={18} /></button>
+          <div className="text-xs font-bold text-[var(--theme-primary)] w-12 text-center">{Math.round(scale * 100)}%</div>
+          <button onClick={zoomIn} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Plus size={18} /></button>
+          <div className="h-4 w-px bg-[var(--theme-border)]/50 mx-1" />
+          <button onClick={resetZoom} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Maximize size={18} /></button>
         </div>
 
         {/* Properties Panel */}
         {selectedElement && (
-          <div className="absolute top-6 right-6 w-64 bg-white border border-amber-100 rounded-[2rem] shadow-2xl p-6 z-10 animate-in slide-in-from-right duration-300">
+          <div className="absolute top-6 right-6 w-64 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-[2rem] shadow-2xl p-6 z-10 animate-in slide-in-from-right duration-300">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">מאפיינים</h3>
-              <button onClick={() => setSelectedId(null)} className="text-amber-300 hover:text-amber-800"><X size={18} /></button>
+              <h3 className="text-sm font-black text-[var(--theme-primary)] uppercase tracking-widest">מאפיינים</h3>
+              <button onClick={() => setSelectedId(null)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]"><X size={18} /></button>
             </div>
 
             <div className="space-y-4">
               {selectedElement.isPlace && (
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mb-4">
-                  <div className="text-[10px] font-bold text-amber-900/50 uppercase mb-2">מקושר לשאלון</div>
-                  <div className="text-xs text-amber-900 font-bold mb-3">{selectedElement.text}</div>
+                <div className="p-4 bg-[var(--theme-secondary)] rounded-2xl border border-[var(--theme-border)]/50 mb-4">
+                  <div className="text-[10px] font-bold text-[var(--theme-primary)]/50 uppercase mb-2">מקושר לשאלון</div>
+                  <div className="text-xs text-[var(--theme-primary)] font-bold mb-3">{selectedElement.text}</div>
                   <button 
                     onClick={() => {
                       // This would need to trigger a view change in App.tsx
                       // For now, we'll just show a message or we could implement a callback
                       alert('כדי לערוך את פרטי המקום, עבור ללשונית "שאלונים"');
                     }}
-                    className="w-full py-2 bg-white border border-amber-200 text-amber-800 rounded-xl text-[10px] font-bold hover:bg-amber-100 transition-all"
+                    className="w-full py-2 bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-primary)] rounded-xl text-[10px] font-bold hover:bg-[var(--theme-secondary)] transition-all"
                   >
                     צפה בשאלון
                   </button>
@@ -715,21 +718,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
               {selectedElement.type === 'text' && (
                 <div>
-                  <label className="text-[10px] font-bold text-amber-900/50 uppercase mb-1 block">טקסט</label>
+                  <label className="text-[10px] font-bold text-[var(--theme-primary)]/50 uppercase mb-1 block">טקסט</label>
                   <input 
                     type="text"
                     value={selectedElement.text}
                     onChange={(e) => onUpdateMap({
                       elements: map.elements.map(el => el.id === selectedId ? { ...el, text: e.target.value } : el)
                     })}
-                    className="w-full bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    className="w-full bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/20 text-[var(--theme-primary)]"
                   />
                 </div>
               )}
 
               {selectedElement.type !== 'line' && (
                 <div>
-                  <label className="text-[10px] font-bold text-amber-900/50 uppercase mb-1 block">צבע</label>
+                  <label className="text-[10px] font-bold text-[var(--theme-primary)]/50 uppercase mb-1 block">צבע</label>
                   <div className="flex flex-wrap gap-2">
                     {['#4a4a4a', '#ef4444', '#3b82f6', '#059669', '#92400e', '#8b4513', '#93c5fd', '#000000'].map(color => (
                       <button 
@@ -737,7 +740,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                         onClick={() => onUpdateMap({
                           elements: map.elements.map(el => el.id === selectedId ? { ...el, fill: color, stroke: color } : el)
                         })}
-                        className={`w-6 h-6 rounded-full border-2 ${selectedElement.fill === color || selectedElement.stroke === color ? 'border-amber-800' : 'border-transparent'}`}
+                        className={`w-6 h-6 rounded-full border-2 ${selectedElement.fill === color || selectedElement.stroke === color ? 'border-[var(--theme-primary)]' : 'border-transparent'}`}
                         style={{ backgroundColor: color }}
                       />
                     ))}
@@ -747,7 +750,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
               {selectedElement.type === 'text' && (
                 <div>
-                  <label className="text-[10px] font-bold text-amber-900/50 uppercase mb-1 block">גודל גופן</label>
+                  <label className="text-[10px] font-bold text-[var(--theme-primary)]/50 uppercase mb-1 block">גודל גופן</label>
                   <input 
                     type="range"
                     min="10"
@@ -756,7 +759,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                     onChange={(e) => onUpdateMap({
                       elements: map.elements.map(el => el.id === selectedId ? { ...el, fontSize: parseInt(e.target.value) } : el)
                     })}
-                    className="w-full accent-amber-800"
+                    className="w-full accent-[var(--theme-primary)]"
                   />
                 </div>
               )}
