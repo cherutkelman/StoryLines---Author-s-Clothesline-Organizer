@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface CharacterMapProps {
@@ -12,7 +12,10 @@ interface CharacterMapProps {
 }
 
 const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, onUpdateCharacters, onUpdateConnections }) => {
-  const [tool, setTool] = useState<'move' | 'link'>('move');
+  const [tool, setTool] = useState<'move' | 'link' | 'pan'>('move');
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPanPos, setStartPanPos] = useState({ x: 0, y: 0 });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
@@ -99,8 +102,16 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    const x = (e.clientX - rect.left) / zoom - panOffset.x;
+    const y = (e.clientY - rect.top) / zoom - panOffset.y;
+
+    if (isPanning && tool === 'pan') {
+      const dx = (e.clientX - startPanPos.x) / zoom;
+      const dy = (e.clientY - startPanPos.y) / zoom;
+      setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setStartPanPos({ x: e.clientX, y: e.clientY });
+      return;
+    }
 
     if (draggingNodeId && tool === 'move') {
       setLocalCharacters(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
@@ -130,6 +141,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   };
 
   const handleMouseUp = () => {
+    setIsPanning(false);
     if (draggingNodeId) {
       onUpdateCharacters(localCharacters);
     }
@@ -279,13 +291,22 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
               <ZoomIn size={16} />
             </button>
             <button 
-              onClick={() => setZoom(1)}
+              onClick={() => { setZoom(1); setPanOffset({ x: 0, y: 0 }); }}
               className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
-              title="איפוס זום"
+              title="איפוס זום ומיקום"
             >
               <RotateCcw size={14} />
             </button>
           </div>
+          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
+          <button 
+            onClick={() => setTool('pan')}
+            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
+            title="הזזת כל המפה"
+          >
+            <Grab size={18} />
+            <span className="text-xs font-bold">הזזת מפה</span>
+          </button>
           <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={addNode}
@@ -313,11 +334,21 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onMouseDown={(e) => {
+          if (tool === 'pan') {
+            setIsPanning(true);
+            setStartPanPos({ x: e.clientX, y: e.clientY });
+          }
+        }}
         onClick={handleCanvasClick}
       >
         <div 
-          className="absolute inset-0 transition-transform duration-75 ease-out origin-top-right"
-          style={{ transform: `scale(${zoom})`, width: `${100/zoom}%`, height: `${100/zoom}%` }}
+          className="absolute inset-0 transition-transform duration-75 ease-out origin-top-left"
+          style={{ 
+            transform: `scale(${zoom}) translate(${panOffset.x}px, ${panOffset.y}px)`, 
+            width: `${100/zoom}%`, 
+            height: `${100/zoom}%` 
+          }}
         >
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
             {localConnections.map(conn => {

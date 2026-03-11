@@ -316,7 +316,7 @@ const Board: React.FC<BoardProps> = ({ project, title, visiblePlotlines, onAddSc
             value={project.summary || ''}
             onChange={(e) => onUpdateSummary(e.target.value)}
             placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
-            className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none handwritten text-lg leading-relaxed"
+            className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none text-lg leading-relaxed"
           />
         </div>
       </div>

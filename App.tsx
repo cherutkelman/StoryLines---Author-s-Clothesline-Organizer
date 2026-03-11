@@ -36,7 +36,9 @@ import {
   CheckCircle2,
   ChevronUp,
   ChevronDown,
-  Palette
+  Palette,
+  Link2Off,
+  Link
 } from 'lucide-react';
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES } from './types';
 import Board from './components/Board';
@@ -449,6 +451,11 @@ const App: React.FC = () => {
     }
   };
 
+  const unlinkBook = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBooks(prev => prev.map(b => b.id === id ? { ...b, universeId: undefined } : b));
+  };
+
   const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
@@ -547,20 +554,36 @@ const App: React.FC = () => {
                   {books.map(book => (
                     <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-border)]' : 'hover:bg-[var(--theme-secondary)]/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
                       <div className="flex items-center gap-3">
-                        <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/20'} />
+                        <div className="relative">
+                          <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/20'} />
+                          {book.universeId && (
+                            <Link size={10} className="absolute -top-1 -right-1 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full" />
+                          )}
+                        </div>
                         <input 
                           value={book.title} 
                           onClick={(e) => e.stopPropagation()} 
                           onChange={(e) => renameBook(book.id, e.target.value)} 
                           className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/40'}`} 
                         />
-                        <button 
-                          onClick={(e) => deleteBook(book.id, e)} 
-                          className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                          title="מחיקת ספר"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          {book.universeId && (
+                            <button 
+                              onClick={(e) => unlinkBook(book.id, e)} 
+                              className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="הפוך לספר עצמאי (הסרת שיוך)"
+                            >
+                              <Link2Off size={14} />
+                            </button>
+                          )}
+                          <button 
+                            onClick={(e) => deleteBook(book.id, e)} 
+                            className="p-1.5 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            title="מחיקת ספר"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

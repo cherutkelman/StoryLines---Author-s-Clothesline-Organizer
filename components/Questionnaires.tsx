@@ -245,6 +245,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [mode, setMode] = useState<'edit' | 'view'>('view');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
 
@@ -794,9 +795,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
         <div className="flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
           {selectedEntry ? (
-            <>
-                  <div className="h-screen overflow-y-scroll p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
-                  <div className="flex items-center justify-between">
+            <div 
+              className="flex-1 overflow-y-auto scroll-smooth"
+              onScroll={(e) => {
+                const scrollTop = e.currentTarget.scrollTop;
+                setIsScrolled(scrollTop > 50);
+              }}
+            >
+              <div className={`p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 transition-all duration-500 ${isScrolled ? 'py-4 opacity-0 h-0 overflow-hidden pointer-events-none' : 'opacity-100'}`}>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                      {!isCategoriesVisible && mode === 'edit' && (
                        <button 
@@ -815,9 +822,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           ) : (
                             <Icon size={24} className="text-[var(--theme-primary)]/20" />
                           )}
-                          </div>
-                          <div className="flex-1 min-h-0 overflow-y-auto p-8 bg-[var(--theme-secondary)]/10">
-
+                          
                           {mode === 'edit' && (
                             <label 
                               className="absolute inset-0 flex items-center justify-center bg-[var(--theme-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-[var(--theme-card)]"
@@ -940,8 +945,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
                   </div>
                 </div>
-                </div>
+              </div>
 
+              <div className="p-8">
                 {mode === 'edit' ? (
                   <>
                     {currentCategory === "פיתוח דמות" ? (
@@ -993,7 +999,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                       <textarea 
                                         value={stage.data[q.id] || ''}
                                         onChange={(e) => updateDevelopmentStage(stage.id, { data: { ...stage.data, [q.id]: e.target.value } })}
-                                        className="w-full bg-[var(--theme-secondary)]/30 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none transition-all resize-none"
+                                        className="w-full bg-[var(--theme-secondary)]/30 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none transition-all resize-none handwritten text-lg"
                                         placeholder="הקלד תשובה..."
                                       />
                                     </div>
@@ -1056,7 +1062,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                           const newData = { ...loc.data, [q.id]: e.target.value };
                                           updateSpecificLocation(loc.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm handwritten text-lg"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1119,7 +1125,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                           const newData = { ...power.data, [q.id]: e.target.value };
                                           updateUniquePower(power.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm handwritten text-lg"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1182,7 +1188,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                           const newData = { ...item.data, [q.id]: e.target.value };
                                           updateSpecialItem(item.id, { data: newData });
                                         }}
-                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm"
+                                        className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[80px] shadow-sm handwritten text-lg"
                                         placeholder="תשובה..."
                                       />
                                     </div>
@@ -1242,7 +1248,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                   <textarea 
                                     value={item.content}
                                     onChange={(e) => updateLoreItem(item.id, { content: e.target.value })}
-                                    className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[150px] shadow-sm"
+                                    className="w-full bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none min-h-[150px] shadow-sm handwritten text-lg"
                                     placeholder="כתוב כאן..."
                                   />
                                 </div>
@@ -1267,7 +1273,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 <textarea 
                                   value={selectedEntry.data[q.id] || ''}
                                   onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner handwritten text-lg"
                                   placeholder="כתוב כאן..."
                                 />
                               ) : (
@@ -1297,7 +1303,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                               <textarea 
                                 value={selectedEntry.data[cf.id] || ''}
                                 onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [cf.id]: e.target.value } })}
-                                className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner handwritten text-lg"
                                 placeholder="תשובה לשאלה המותאמת..."
                               />
                             </div>
@@ -1363,34 +1369,34 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             </button>
                           </div>
                         )}
-
-                        {/* Navigation Buttons at bottom */}
-                        <div className="flex items-center justify-between pt-10 border-t border-[var(--theme-border)]/50 mt-10">
-                          <button 
-                            disabled={currentCategoryIndex === 0}
-                            onClick={(e) => { 
-                              setCurrentCategoryIndex(prev => prev - 1); 
-                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] transition-all disabled:opacity-30 shadow-sm"
-                          >
-                            <ChevronLeft size={18} className="rotate-180" />
-                            <span>קטגוריה קודמת</span>
-                          </button>
-                          <button 
-                            disabled={currentCategoryIndex === categories.length - 1}
-                            onClick={(e) => { 
-                              setCurrentCategoryIndex(prev => prev + 1); 
-                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-30 shadow-md"
-                          >
-                            <span>קטגוריה הבאה</span>
-                            <ChevronLeft size={18} />
-                          </button>
-                        </div>
                       </>
                     )}
+
+                    {/* Navigation Buttons at bottom */}
+                    <div className="flex items-center justify-between pt-10 border-t border-[var(--theme-border)]/50 mt-10">
+                      <button 
+                        disabled={currentCategoryIndex === 0}
+                        onClick={(e) => { 
+                          setCurrentCategoryIndex(prev => prev - 1); 
+                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] transition-all disabled:opacity-30 shadow-sm"
+                      >
+                        <ChevronLeft size={18} className="rotate-180" />
+                        <span>קטגוריה קודמת</span>
+                      </button>
+                      <button 
+                        disabled={currentCategoryIndex === categories.length - 1}
+                        onClick={(e) => { 
+                          setCurrentCategoryIndex(prev => prev + 1); 
+                          e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-30 shadow-md"
+                      >
+                        <span>קטגוריה הבאה</span>
+                        <ChevronLeft size={18} />
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-12 py-8">
@@ -1611,8 +1617,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 )}
                 <div className="h-20" />
               </div>
-              
-            </>
+            </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text)]/20 p-12 text-center">
               <div className="bg-[var(--theme-secondary)]/50 p-10 rounded-full mb-8 shadow-inner">
