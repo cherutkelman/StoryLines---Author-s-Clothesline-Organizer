@@ -111,6 +111,12 @@ export interface Scene {
   chapterTitle?: string;
 }
 
+export interface ChapterMarker {
+  id: string;
+  position: number;
+  title: string;
+}
+
 export interface Plotline {
   id: string;
   name: string;
@@ -230,6 +236,7 @@ export interface Project {
   characterMapConnections?: CharacterMapConnection[];
   maps?: WorldMap[];
   mindMaps?: MindMap[];
+  chapterMarkers?: ChapterMarker[];
 }
 
 export interface Book extends Project {

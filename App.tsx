@@ -40,7 +40,7 @@ import {
   Link2Off,
   Link
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -68,7 +68,8 @@ const DEFAULT_PROJECT_DATA = {
   summary: '',
   characterMapConnections: [],
   maps: [],
-  mindMaps: []
+  mindMaps: [],
+  chapterMarkers: []
 };
 
 const SHARED_FIELDS = [
@@ -135,6 +136,7 @@ const App: React.FC = () => {
 
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<'none' | 'available' | 'downloaded'>('none');
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -176,6 +178,32 @@ const App: React.FC = () => {
     root.style.setProperty('--theme-text', theme.text);
     root.style.setProperty('--theme-muted', theme.muted);
   }, [activeBook?.uiState?.theme]);
+
+  useEffect(() => {
+    if ((window as any).require) {
+      const { ipcRenderer } = (window as any).require('electron');
+      
+      ipcRenderer.on('update_available', () => {
+        setUpdateStatus('available');
+      });
+
+      ipcRenderer.on('update_downloaded', () => {
+        setUpdateStatus('downloaded');
+      });
+
+      return () => {
+        ipcRenderer.removeAllListeners('update_available');
+        ipcRenderer.removeAllListeners('update_downloaded');
+      };
+    }
+  }, []);
+
+  const restartApp = () => {
+    if ((window as any).require) {
+      const { ipcRenderer } = (window as any).require('electron');
+      ipcRenderer.send('restart_app');
+    }
+  };
 
   const updateActiveBook = (updates: Partial<Book>) => {
     setBooks(prev => {
@@ -324,6 +352,32 @@ const App: React.FC = () => {
     });
   };
 
+  const updateChapterMarker = (id: string, updates: Partial<ChapterMarker>) => {
+    if (!activeBook) return;
+    updateActiveBook({
+      chapterMarkers: (activeBook.chapterMarkers || []).map(m => m.id === id ? { ...m, ...updates } : m)
+    });
+  };
+
+  const addChapterMarker = (position: number) => {
+    if (!activeBook) return;
+    const newMarker: ChapterMarker = {
+      id: `cm-${Date.now()}`,
+      position,
+      title: `פרק חדש`
+    };
+    updateActiveBook({
+      chapterMarkers: [...(activeBook.chapterMarkers || []), newMarker]
+    });
+  };
+
+  const deleteChapterMarker = (id: string) => {
+    if (!activeBook) return;
+    updateActiveBook({
+      chapterMarkers: (activeBook.chapterMarkers || []).filter(m => m.id !== id)
+    });
+  };
+
   const moveScene = (id: string, targetGlobalIndex: number, targetPlotlineId: string) => {
     if (!activeBook) return;
     const sceneToMove = activeBook.scenes.find(s => s.id === id);
@@ -353,20 +407,29 @@ const App: React.FC = () => {
 
   const exportManuscript = () => {
     if (!activeBook) return;
-    const text = activeBook.scenes
+    
+    const sortedScenes = activeBook.scenes
       .filter(s => visiblePlotlines.includes(s.plotlineId))
       .sort((a, b) => {
         if (a.position !== b.position) return a.position - b.position;
         const plotlineAIndex = activeBook.plotlines.findIndex(p => p.id === a.plotlineId);
         const plotlineBIndex = activeBook.plotlines.findIndex(p => p.id === b.plotlineId);
         return plotlineAIndex - plotlineBIndex;
-      })
-      .map(s => {
-        const plotline = activeBook.plotlines.find(p => p.id === s.plotlineId);
-        return `## ${s.title}${s.isCompleted ? ' [הושלם]' : ''} (${plotline?.name || 'ללא קו עלילה'})\n\n${s.content}`;
-      })
-      .join('\n\n---\n\n');
-    const blob = new Blob([text], { type: 'text/plain' });
+      });
+
+    let text = `# ${activeBook.title}\n\n`;
+    
+    sortedScenes.forEach((s) => {
+      const chapterMarker = activeBook.chapterMarkers?.find(m => m.position === s.position);
+      if (chapterMarker) {
+        text += `\n# ${chapterMarker.title}\n\n`;
+      }
+      
+      const plotline = activeBook.plotlines.find(p => p.id === s.plotlineId);
+      text += `## ${s.title}${s.isCompleted ? ' [הושלם]' : ''} (${plotline?.name || 'ללא קו עלילה'})\n\n${s.content}\n\n---\n\n`;
+    });
+
+    const blob = new Blob(["\ufeff", text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -377,12 +440,50 @@ const App: React.FC = () => {
   const exportDataBackup = () => {
     if (!activeBook) return;
     const dataStr = JSON.stringify(activeBook, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+    const blob = new Blob(["\ufeff", dataStr], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${activeBook.title}-backup.json`;
     a.click();
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        let content = event.target?.result as string;
+        // Remove BOM if present
+        if (content.charCodeAt(0) === 0xFEFF) {
+          content = content.slice(1);
+        }
+        const parsed = JSON.parse(content);
+        
+        if (!parsed.id || !parsed.title) {
+          alert('קובץ לא תקין');
+          return;
+        }
+
+        setBooks(prev => {
+          const exists = prev.find(b => b.id === parsed.id);
+          if (exists) {
+            if (!confirm('ספר זה כבר קיים בספריה. האם לעדכן אותו?')) {
+              return prev;
+            }
+            return prev.map(b => b.id === parsed.id ? parsed : b);
+          }
+          return [...prev, parsed];
+        });
+        setActiveBookId(parsed.id);
+      } catch (err) {
+        console.error('Failed to import backup', err);
+        alert('שגיאה בטעינת הקובץ. ייתכן שהקובץ פגום.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const addNewBookToLibrary = () => {
@@ -651,6 +752,16 @@ const App: React.FC = () => {
                     <FileJson size={16} className="text-[var(--theme-accent)]" />
                     <span>גיבוי מלא</span>
                   </button>
+                  <label className="flex items-center gap-3 px-4 py-3 bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-primary)] rounded-xl text-xs font-bold hover:bg-[var(--theme-secondary)] transition-all shadow-sm cursor-pointer">
+                    <Upload size={16} className="text-[var(--theme-accent)]" />
+                    <span>טעינת גיבוי</span>
+                    <input 
+                      type="file" 
+                      accept=".json" 
+                      className="hidden" 
+                      onChange={handleImportBackup}
+                    />
+                  </label>
                 </div>
               </div>
             </div>
@@ -679,6 +790,9 @@ const App: React.FC = () => {
                       updateBookUiState({ editorFocusedSceneId: id });
                     }}
                     onUpdateChapterTitle={updateChapterTitle}
+                    onAddChapterMarker={addChapterMarker}
+                    onUpdateChapterMarker={updateChapterMarker}
+                    onDeleteChapterMarker={deleteChapterMarker}
                   />
                 </div>
               )}
@@ -695,12 +809,15 @@ const App: React.FC = () => {
                     initialDisplayMode={activeBook.uiState?.editorDisplayMode}
                     onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
                     onExport={exportManuscript}
+                    onUpdateChapterMarker={updateChapterMarker}
                   />
                 </div>
               )}
               {activeView === 'maps' && (
                 <div className="absolute inset-0 overflow-hidden">
                    <MapsManager 
+                      allBooks={books}
+                      activeBookId={activeBookId}
                       characters={activeBook.characters || []}
                       places={activeBook.places || []}
                       connections={activeBook.characterMapConnections || []}
@@ -722,6 +839,8 @@ const App: React.FC = () => {
               {activeView === 'questionnaires' && (
                 <div className="absolute inset-0 overflow-auto">
                   <Questionnaires 
+                    allBooks={books}
+                    activeBookId={activeBookId}
                     characters={activeBook.characters || []}
                     places={activeBook.places || []}
                     periods={activeBook.periods || []}
@@ -749,6 +868,39 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Update Notification */}
+      {updateStatus !== 'none' && (
+        <div className="fixed bottom-6 left-6 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-[var(--theme-card)] border border-[var(--theme-border)] p-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[300px]">
+            <div className="w-10 h-10 rounded-xl bg-[var(--theme-accent)]/10 flex items-center justify-center text-[var(--theme-accent)]">
+              <MonitorSmartphone size={20} />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-[var(--theme-primary)]">
+                {updateStatus === 'available' ? 'עדכון זמין' : 'העדכון מוכן'}
+              </h4>
+              <p className="text-xs text-[var(--theme-muted)]">
+                {updateStatus === 'available' ? 'מוריד עדכון חדש ברקע...' : 'העדכון הורד בהצלחה. יש להפעיל מחדש.'}
+              </p>
+            </div>
+            {updateStatus === 'downloaded' && (
+              <button 
+                onClick={restartApp}
+                className="px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-xs font-bold hover:opacity-90 transition-all"
+              >
+                הפעל מחדש
+              </button>
+            )}
+            <button 
+              onClick={() => setUpdateStatus('none')}
+              className="p-2 text-[var(--theme-muted)] hover:text-[var(--theme-primary)]"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {isThemeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">

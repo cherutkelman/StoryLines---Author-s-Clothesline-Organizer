@@ -20,7 +20,8 @@ import {
   MapPin,
   Plus,
   Download,
-  Trash2
+  Trash2,
+  Flag
 } from 'lucide-react';
 
 interface EditorProps {
@@ -34,9 +35,10 @@ interface EditorProps {
   initialDisplayMode?: 'full' | 'focus';
   onDisplayModeChange?: (mode: 'full' | 'focus') => void;
   onExport?: () => void;
+  onUpdateChapterMarker?: (id: string, updates: any) => void;
 }
 
-const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport }) => {
+const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [bridgeType, setBridgeType] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | null>(null);
@@ -226,16 +228,21 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
         {activeScenes.map((scene, idx) => {
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
           const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
-          const prevScene = idx > 0 ? activeScenes[idx - 1] : null;
-          const isNewChapter = idx === 0 || (scene.chapterTitle && scene.chapterTitle !== prevScene?.chapterTitle);
+          
+          const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
 
           return (
             <React.Fragment key={scene.id}>
-              {isNewChapter && scene.chapterTitle && (
-                <div className="pt-12 pb-4 border-b-2 border-[var(--theme-primary)]/10 mb-8">
-                  <h2 className="text-4xl font-black text-[var(--theme-primary)]/20 handwritten uppercase tracking-widest">
-                    {scene.chapterTitle}
-                  </h2>
+              {chapterMarker && (
+                <div className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
+                  <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
+                    <Flag size={20} />
+                  </div>
+                  <input 
+                    className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest bg-transparent border-none focus:ring-0 p-0 w-full"
+                    value={chapterMarker.title}
+                    onChange={(e) => onUpdateChapterMarker?.(chapterMarker.id, { title: e.target.value })}
+                  />
                 </div>
               )}
               
@@ -246,7 +253,6 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                       <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
                       <div className="flex flex-col">
                         <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
-                        {scene.chapterTitle && <span className="text-[10px] text-[var(--theme-accent)] font-bold">{scene.chapterTitle}</span>}
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
                       {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
@@ -255,27 +261,6 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                   </div>
                 ) : (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="mb-6 flex items-center gap-4 group/chapter">
-                      <div className="flex-1 relative">
-                        <input 
-                          className="w-full bg-[var(--theme-secondary)]/50 border-none border-b border-transparent focus:border-[var(--theme-border)] focus:ring-0 text-sm font-bold text-[var(--theme-primary)] p-2 rounded-lg placeholder:text-[var(--theme-primary)]/20"
-                          value={scene.chapterTitle || ''} 
-                          placeholder="כותרת פרק (אופציונלי)..." 
-                          onChange={(e) => onUpdateScene(scene.id, { chapterTitle: e.target.value })} 
-                        />
-                        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover/chapter:opacity-100 transition-opacity">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handlePullChapterTitle(scene.id, scene.chapterTitle || ''); }}
-                            className="flex items-center gap-1 px-2 py-1 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded text-[10px] font-bold hover:bg-[var(--theme-border)]"
-                            title="החל כותרת פרק זו על כל הסצנות הבאות"
-                          >
-                            <Download size={10} className="rotate-180" />
-                            שלוף לכל הפרק
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
                     <header className="flex items-center justify-between mb-4">
                     <div className="flex-1 flex items-center gap-4">
                       <div className="flex flex-col flex-1">

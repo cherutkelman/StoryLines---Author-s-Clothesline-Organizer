@@ -2,6 +2,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -13,6 +14,17 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
+  });
+
+  // Auto-update check
+  autoUpdater.checkForUpdatesAndNotify();
+
+  autoUpdater.on('update-available', () => {
+    win.webContents.send('update_available');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    win.webContents.send('update_downloaded');
   });
 
   // IPC handler for file dialog
@@ -61,6 +73,10 @@ function createWindow() {
 
   // Remove the default menu bar for a cleaner look
   win.setMenuBarVisibility(false);
+
+  ipcMain.on('restart_app', () => {
+    autoUpdater.quitAndInstall();
+  });
 }
 
 app.whenReady().then(() => {
