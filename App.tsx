@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks } from "./storage";
+import { v4 as uuidv4 } from "uuid";
 import { 
   Plus, 
   Trash2, 
@@ -79,7 +80,7 @@ const SHARED_FIELDS = [
 ];
 
 const createNewBook = (title: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
-  id: `book-${Date.now()}`,
+  id: uuidv4(),
   title,
   universeId,
   lastModified: Date.now(),
