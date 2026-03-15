@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { loadBooks, saveBooks } from "./storage";
 import { 
   Plus, 
   Trash2, 
@@ -48,8 +49,6 @@ import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
 import { GoogleGenAI, Type } from "@google/genai";
 
-const STORAGE_KEY = 'storylines_library_v2';
-
 const DEFAULT_PROJECT_DATA = {
   plotlines: [
     { id: 'p1', name: 'עלילה ראשית', color: '#ef4444' },
@@ -89,35 +88,7 @@ const createNewBook = (title: string, universeId?: string, sharedData?: Partial<
 });
 
 const App: React.FC = () => {
-  const [books, setBooks] = useState<Book[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Migration logic for old data format
-        return parsed.map((b: any) => {
-          if (b.characterMapNodes) {
-             const nodes = b.characterMapNodes;
-             const newCharacters = (b.characters || []).map((char: any) => {
-                const node = nodes.find((n: any) => n.id === char.id || n.name === char.name);
-                return {
-                   ...char,
-                   x: node?.x ?? char.x,
-                   y: node?.y ?? char.y,
-                   imageUrl: node?.imageUrl ?? char.imageUrl
-                };
-             });
-             delete b.characterMapNodes;
-             b.characters = newCharacters;
-          }
-          return b;
-        });
-      } catch (e) {
-        console.error("Failed to load library", e);
-      }
-    }
-    return [createNewBook('הספר הראשון שלי')];
-  });
+  const [books, setBooks] = useState<Book[]>(loadBooks);
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
   const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>(() => {
@@ -161,7 +132,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+      saveBooks(books);
       setLastSaved(new Date());
     }, 1000); // Debounce save by 1 second
     return () => clearTimeout(timeout);

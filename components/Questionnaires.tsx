@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { QuestionnaireEntry, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation, Book } from '../types';
+import React, { useState } from 'react';
+import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import { 
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
@@ -12,10 +12,7 @@ import {
   PanelLeftOpen,
   MessageSquarePlus,
   Image as ImageIcon,
-  Camera,
-  Library,
-  CopyPlus,
-  Info
+  Camera
 } from 'lucide-react';
 
 interface QuestionnairesProps {
@@ -129,7 +126,6 @@ const MACRO_PLACE_QUESTIONS = [
   { id: "flora_fauna", category: "מיקום גיאוגרפי", question: "צמחים וחיות נפוצות באזור", type: "textarea" },
   { id: "ruler", category: "מיקום גיאוגרפי", question: "מי שולט בשטח", type: "textarea" },
   { id: "landscape", category: "מיקום גיאוגרפי", question: "נוף מצוי", type: "textarea" },
-  { id: "climate_conditions", category: "מיקום גיאוגרפי", question: "תנאי האקלים המצויים בזמנים שונים.", type: "textarea" },
   { id: "arrival_ways", category: "מיקום גיאוגרפי", question: "דרכי הגעה", type: "textarea" },
   { id: "comm_ways", category: "מיקום גיאוגרפי", question: "דרכי תקשורת", type: "textarea" },
   { id: "more_details", category: "מיקום גיאוגרפי", question: "פרטים נוספים", type: "textarea" }
@@ -150,22 +146,13 @@ const PERIOD_QUESTIONS = [
   { id: "period_name", category: "הגדרה בסיסית", question: "תקופה", type: "text" },
   { id: "history_or_present", category: "הגדרה בסיסית", question: "היסטוריה או הווה?", type: "text" },
   { id: "our_world_or_other", category: "הגדרה בסיסית", question: "העולם שלנו או עולם אחר?", type: "text" },
-  { id: "leadership_structure", category: "הגדרה בסיסית", question: "מבנה ההנהגה (דמוקרטית, דיקטטורית, מלוכנית, אמונית, שבטית וכו'.)", type: "textarea" },
-  
-  { id: "clothing_style_gender", category: "חיי היום יום", question: "סגנון לבוש לגברים ולנשים", type: "textarea" },
-  { id: "class_differences", category: "חיי היום יום", question: "הבדלי מעמדות ואיך הם מתבטאים", type: "textarea" },
-  { id: "speech_style", category: "חיי היום יום", question: "לשון הדיבור.", type: "textarea" },
-  { id: "clothing_style", category: "חיי היום יום", question: "מה סגנון הלבוש בתקופה?", type: "textarea" },
-  { id: "food_preparation", category: "חיי היום יום", question: "איך מכינים אוכל?", type: "textarea" },
-  { id: "professions", category: "חיי היום יום", question: "מקצועות נפוצים וייחודיים", type: "textarea" },
-  { id: "building_and_furniture", category: "חיי היום יום", question: "איך בונים רהיטים ובתים?", type: "textarea" },
-  { id: "transportation", category: "חיי היום יום", question: "איך נעים ממקום למקום?", type: "textarea" },
-  { id: "communication", category: "חיי היום יום", question: "איך מתקשרים עם אחרים?", type: "textarea" },
-
-  { id: "production_tech", category: "טכנולוגיה", question: "טכנולוגיות ייצור: כלים, תנועה, ביגוד, בנייה.", type: "textarea" },
-  { id: "trade_system", category: "טכנולוגיה", question: "איך מתנהלת מערכת המסחר.", type: "textarea" },
-  { id: "import_export", category: "טכנולוגיה", question: "איך מתנהלים הייבוא והייצוא.", type: "textarea" },
-  { id: "weapons", category: "טכנולוגיה", question: "כלי נשק נפוצים ונדירים.", type: "textarea" }
+  { id: "technology_capabilities", category: "טכנולוגיה ויכולת", question: "אילו יכולות טכנולוגיות יש בתקופה?", type: "textarea" },
+  { id: "human_capabilities", category: "טכנולוגיה ויכולת", question: "אילו יכולות אנושיות יש בתקופה?", type: "textarea" },
+  { id: "clothing_style", category: "חיי יום-יום", question: "מה סגנון הלבוש בתקופה?", type: "textarea" },
+  { id: "food_preparation", category: "חיי יום-יום", question: "איך מכינים אוכל?", type: "textarea" },
+  { id: "building_and_furniture", category: "חיי יום-יום", question: "איך בונים רהיטים ובתים?", type: "textarea" },
+  { id: "transportation", category: "חיי יום-יום", question: "איך נעים ממקום למקום?", type: "textarea" },
+  { id: "communication", category: "חיי יום-יום", question: "איך מתקשרים עם אחרים?", type: "textarea" }
 ];
 
 const TWIST_QUESTIONS = [
@@ -188,10 +175,6 @@ const FANTASY_WORLD_QUESTIONS = [
   { id: "magic_source", category: "יום יום", question: "מאיפה נובעת אנרגיית הקסם:", type: "textarea" },
   { id: "magic_limits", category: "יום יום", question: "מה מגביל את כוח הקסם:", type: "textarea" },
   { id: "world_laws", category: "יום יום", question: "אילו חוקים יש בעולם הזה:", type: "textarea" },
-  { id: "magic_user_diff", category: "יום יום", question: "מה יוצר את ההבדל בין המשתמשים בקסם?", type: "textarea" },
-  { id: "magic_improvement", category: "יום יום", question: "מה יגרום להם להשתפר?", type: "textarea" },
-  { id: "magic_acquisition", category: "יום יום", question: "איך ניתן לקבל את היכולת להשתמש בקסם?", type: "textarea" },
-  { id: "magic_removal", category: "יום יום", question: "איך ניתן להסיר את היכולת?", type: "textarea" },
   
   { id: "good_guys", category: "מלחמות", question: "מי הטובים:", type: "textarea" },
   { id: "bad_guys", category: "מלחמות", question: "מי הרעים:", type: "textarea" },
@@ -203,18 +186,7 @@ const FANTASY_WORLD_QUESTIONS = [
   { id: "good_ending", category: "מלחמות", question: "מהו הסוף הטוב:", type: "textarea" }
 ];
 
-const FEMALE_DEVELOPMENT_STAGE_QUESTIONS = [
-  { id: "hero_choices_impact", question: "אילו בחירות של הגיבורה השפיעו על המצב." },
-  { id: "external_events", question: "מה קורה בשלב הזה, שלא תלוי בגיבורה." },
-  { id: "current_choices", question: "אילו בחירות היא מבצעת." },
-  { id: "change_impact", question: "מה משתנה בעקבות הבחירה שלה?" },
-  { id: "emotions_impact", question: "איך משפיע השינוי על הרגשות שלה ושל אחרים?" },
-  { id: "life_consequences", question: "מהן ההשלכות של השינוי על חייה ועל חיי האחרים סביבה?" },
-  { id: "regrets", question: "האם יש לה חרטות?" },
-  { id: "future_choice", question: "האם היא תבחר אחרת פעם הבאה? למה?" },
-];
-
-const MALE_DEVELOPMENT_STAGE_QUESTIONS = [
+const DEVELOPMENT_STAGE_QUESTIONS = [
   { id: "hero_choices_impact", question: "אילו בחירות של הגיבור השפיעו על המצב." },
   { id: "external_events", question: "מה קורה בשלב הזה, שלא תלוי בגיבור." },
   { id: "current_choices", question: "אילו בחירות הוא מבצע." },
@@ -237,18 +209,11 @@ const SPECIAL_ITEM_QUESTIONS = [
   { id: "history", question: "מה ההיסטוריה שלו" },
 ];
 
-const FEMALE_UNIQUE_POWER_QUESTIONS = [
-  { id: "powers", question: "אילו כוחות יש לגיבורה:" },
-  { id: "add_power", question: "מה יכול להוסיף כוח לגיבורה:" },
+const UNIQUE_POWER_QUESTIONS = [
+  { id: "powers", question: "אילו כוחות יש לדמות:" },
+  { id: "add_power", question: "מה יכול להוסיף כוח לדמות:" },
   { id: "limits", question: "מה מגביל אותה:" },
   { id: "needs", question: "למה היא זקוקה בשביל לממש את הכוח שלה:" },
-];
-
-const MALE_UNIQUE_POWER_QUESTIONS = [
-  { id: "powers", question: "אילו כוחות יש לגיבור:" },
-  { id: "add_power", question: "מה יכול להוסיף כוח לגיבור:" },
-  { id: "limits", question: "מה מגביל אותו:" },
-  { id: "needs", question: "למה הוא זקוק בשביל לממש את הכוח שלו:" },
 ];
 
 const CHARACTER_ROLES = [
@@ -269,7 +234,6 @@ const BACKGROUND_TYPES = [
 ];
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
-  allBooks, activeBookId,
   characters, places, periods, twists, fantasyWorlds, backgrounds,
   onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
@@ -279,243 +243,11 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
-  const [mode, setMode] = useState<'edit' | 'view'>('edit');
+  const [mode, setMode] = useState<'edit' | 'view'>('view');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importSourceBookId, setImportSourceBookId] = useState<string>('');
-  const [importCategory, setImportCategory] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds'>(activeTab);
-  const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
-  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   
-  const questionnaireExplanations: Record<string, React.ReactNode> = {
-    characters: (
-      <div className="space-y-4">
-        <p>
-          <strong>בשביל לכתוב דמות מוצלחת, נצטרך להכיר אותה היטב.</strong><br />
-          לדעת מה היא אוהבת ומה היא שונאת, מה היא חוותה ואיך זה השפיע עליה.<br />
-          מה הן השאיפות שלה וממה היא הכי מפחדת.<br />
-          לא כל הפרטים חייבים להופיע בספר, אבל הם ישפיעו עליו.<br />
-          כשדמות בוחרת בחירות, אומרת דברים, ומתנהגת בצורה מסוימת,<br />
-          נהיה חייבים לשאול את עצמנו: למה? למה היא עשתה את זה.<br />
-          חייבת להיות תשובה.<br />
-          דמות שנכתבת בלי שורש, תעשה בחירות אקראיות,<br />
-          ותיקלע לסצנות שבהן לא נדע איך היא אמורה להתנהג.<br />
-          כשאנחנו מכירים את מאחורי הקלעים, אנחנו יכולים להעלות את ההצגה.
-        </p>
-        <p>
-          <strong>השאלונים על הדמויות,</strong><br />
-          נועדו להביא את רמת ההיכרות שלנו עם הדמות לגבוהה ביותר.<br />
-          כך שכשנכתוב את הסיפור, יהיה ברור לנו מה תעשה הדמות,<br />
-          בדיוק כמו שברור לנו מה החברה הכי טובה הייתה עושה במצב כזה.<br />
-          דמות אנושית היא לא רובוט. אבל היא כמעט תמיד תפעל על פי אותם מניעים.<br />
-          כל אדם והמניעים שלו. הסופר צריך להכיר את המניעים של הדמויות שלו.
-        </p>
-        <p>
-          <strong>איך נבנה שדמות שיתחברו אליה?</strong><br />
-          כאנשים, אנחנו מורכבים מחולשות ומחוזקות.<br />
-          לפעמים אנחנו בוחרים נכון, ולפעמים עושים טעויות.<br />
-          לפעמים גאים בעצמנו, ולפעמים מתביישים ומתחרטים.<br />
-          ניתן לדמות חולשה, מאבק פנימי כלשהו.<br />
-          ניתן לה צד נדיב וצד אנוכי.<br />
-          ניתן לה פחד, ורצון להסתיר אותו או לברוח ממנו.<br />
-          ניתן לה תקווה, ורצון לשינוי, ונצעיד אותה בדרך לשם.
-        </p>
-        <p>
-          <strong>הטעויות הנפוצות ביותר</strong><br />
-          נובעות מחוסר היכרות, או מנסיון לבנות דמות שהיא הכל מהכל.<br />
-          דמות מושלמת, ללא קשיים או חסרונות.<br />
-          דמות חסרת רצון עצמי, פסיבית.<br />
-          דמות שמשתנה פעמים רבות מדי, או ללא הסבר הגיוני.<br />
-          דמות שלא מתפתחת.<br />
-          דמות שהיא כולה טוב, או כולה רע.
-        </p>
-      </div>
-    ),
-    places: (
-      <div className="space-y-4">
-        <p>
-          <strong>לפני הכתיבה, עלינו להכיר היטב את המקום שעליו אנחנו כותבים.</strong><br />
-          אסור לנו לכתוב על מקום אמיתי שאנחנו לא מכירים.<br />
-          בשביל תיאור חיצוני למקום, יספיק טיול בגוגל מפות,<br />
-          אבל בשביל לתאר חוויית מגורים, נצטרך לבקר במקום,<br />
-          או לתחקר היטב אנשים שגרים בו.<br />
-          בשביל לתאר מיקום ספציפי, כמו בית. אולם קולנוע, בסיס צבאי וכן הלאה,<br />
-          נשתמש במפות כדי לשרטט את המבנה, כך נוכל לתאר נכון פניות,<br />
-          מישהו שרואה מישהי והיא לא רואה אותו. וכן הלאה.
-        </p>
-        <p>
-          <strong>כאשר אנחנו ממציאים מקום חדש,</strong><br />
-          חובה לוודא שמתקיימים בו תנאים שמתקיימים במקומות אחרים.<br />
-          אקלים, אוכלוסיה, תרבות.<br />
-          נמלא את השאלות בשאלונים כדי להכיר מקרוב את המקום שהמצאנו.<br />
-          אם לא יודעים את התשובה, נמציא אותה.<br />
-          ונישאר מחוייבים אליה לאורך הכתיבה.
-        </p>
-        <p>
-          <strong>הטעויות הנפוצות</strong><br />
-          גורמות לדרכים ארוכות לעבור מהר מדי.<br />
-          אקלים לא סדיר, שנכתב רק ליצירת אווירה בסצנה.<br />
-          אין הגיון במציאת אוכל או בהתרוקנות.<br />
-          ריגול, הצצה, התגנבות וכו' שלא תואמים את המבנה.
-        </p>
-      </div>
-    ),
-    periods: (
-      <div className="space-y-4">
-        <p>
-          <strong>כל עלילה מתרחשת בזמן כלשהו.</strong><br />
-          בין אם זה עבר, הווה או עתיד, לכל תקופה יש את המאפיינים שלה.<br />
-          במידה והסיפור מתרחש בתקופה היסטורית, ונועד לייצג את המציאות, ולא מציאות חליפית,<br />
-          נבצע מחקר.<br />
-          נמצא ספרים, תמונות, מחקרים, מה שאפשר, כדי לדעת כמה שיותר פרטים על התקופה.<br />
-          כדי ליצור ספר שירגיש אמיתי, חובה לדייק בפרטים הקטנים.
-        </p>
-        <p>
-          <strong>תשומת לב למקום ההתרחשות!</strong><br />
-          במקומות שונים, התקיימה מציאות שונה, גם אם באותה תקופה.<br />
-          נבדוק היטב מה היה נכון לתקופה במקום בו מתרחשת העלילה.
-        </p>
-        <p>
-          <strong>במידה ובחרנו במציאות חליפית,</strong><br />
-          נוודא שאנחנו מכירים היטב את הניואנסים הקטנים המאפיינים כל תקופה.<br />
-          נענה על השאלות בשאלונים, ונרחיב ככל יכולתנו.<br />
-          ככל שנכיר ונדע על התקופה, הקוראים ירגישו ויחוו אותה טוב יותר.
-        </p>
-        <p>
-          <strong>טעויות נפוצות</strong><br />
-          שימוש בביטויים לא מותאמים לתקופה.<br />
-          טכנולוגיות מתקופות אחרות.<br />
-          התנהגויות חברתיות לא מותאמות.<br />
-          בגדים, חפצים ומאכלים שאינם מתאימים.
-        </p>
-      </div>
-    ),
-    twists: (
-      <div className="space-y-4">
-        <p>
-          <strong>תפניות טובות בסיפור, יכולות להפוך אותו ממשעמם וגנרי למרתק וסוחף.</strong><br />
-          תפנית טובה, היא תפנית שמצד אחד, הקורא מופתע ממנה,<br />
-          ומצד שני, במבט לאחור הוא יכול לזהות את הסימנים המקדימים.
-        </p>
-        <p>
-          <strong>בשביל ליצור תפנית, נכוון את הסיפור לכיוון מסוים.</strong><br />
-          ניתן לכל הדמויות לחשוב שהן יודעות מה הולך לקרות,<br />
-          ניתן להן לתכנן את הצעדים הבאים בהתאם לזה,<br />
-          ואז המציאות תשתנה ותהפוך את הקערה על פיה.
-        </p>
-        <p>
-          <strong>ישנם כמה סוגי תפניות.</strong><br />
-          טבע שמשתנה, ומשנה איתו את הסיפור.<br />
-          תאונות.<br />
-          מפגש מקרי.<br />
-          דמות שעושה מעשה לא צפוי.<br />
-          עובדה שמתגלה ומשנה הכל.
-        </p>
-        <p>
-          <strong>ככל שנצניע את הסימנים המקדימים לטוויסט, כך ההפתעה תהיה גדולה יותר.</strong><br />
-          אבל חובה להזהר מ'להכריח' את הטוויסט לבוא.<br />
-          למשל: מישהו חייב להציל את הדמות הראשית אחרת היא תמות באמצע הספר.
-        </p>
-        <p>
-          <strong>טעויות נפוצות.</strong><br />
-          רמזים מטרימים ברורים מאד.<br />
-          תפניות שלא נרמז לגביהן שום דבר מראש.<br />
-          הבאת העלילה למקום שמחייב טוויסט מאד מסוים. אחרת הסיפור יסתיים.<br />
-          תפנית שמשנה באופן משמעותי את העלילה,<br />
-          בלי הסבר מספק למה היא כל כך משמעותית.<br />
-          יותר מדי תפניות.<br />
-          פחות מדי תפניות.<br />
-          תפניות שבהן דמויות עושות משהו בלתי אפשרי, או משהו שמאד לא מתאים להן.
-        </p>
-      </div>
-    ),
-    fantasyWorlds: (
-      <div className="space-y-4">
-        <p>
-          <strong>כדי לבנות עולם פנטזיה טוב, נהיה חייבים לוודא שאנחנו מכירים אותו היטב.</strong><br />
-          העולם יכול להסתמך על העולם שלנו, ועל האנושיות שלנו,<br />
-          ויכול להיות גם שונה במאה אחוז.<br />
-          אבל חייבים להיות לו כללים משלו.<br />
-          בשביל ליצור כללים, נצטרך להתייחס לכל מה שכתבנו בשאלונים הקודמים.<br />
-          לדמויות, למקומות, לתקופה.<br />
-          בעולם הזה יהיה מוסר שמתאים לו.<br />
-          אף קורא לא אוהב להרגיש שהכל מסתחרר סביבו.<br />
-          הוא רוצה לדעת שיש סדר והגיון לדברים.<br />
-          גם אם הם כולם מומצאים.
-        </p>
-        <p>
-          <strong>הקסם</strong><br />
-          בעולם שבו משתמשים בקסם, חייבים להיות כללים שנוגעים לו.<br />
-          חייב להיות משהו שיגרום לדמויות להיות חזקות או חלשות יותר.<br />
-          אחרת הספר יהיה משעמם וצפוי.<br />
-          חייבים להיות כישורים שקשורים לקסם.<br />
-          חייב להיות מקור אנרגיה.<br />
-          בכל חברה, יכולים להיות כללים משלה בנוגע לקסם.<br />
-          קסם הוא אנרגיה. אנרגיה חייבת להגיע ממקור כלשהו.<br />
-          חייבים להיות כללים שמגבילים אותה,<br />
-          וכללים שמגבירים אותה.
-        </p>
-        <p>
-          <strong>טעויות נפוצות</strong><br />
-          חוסר שוויון לא מוסבר.<br />
-          כשלאחד יש יכולת חזקה יותר מהשני, בלי הסבר שעומד מאחורי זה.<br />
-          עולם ללא כללי טבע, חברה, תחבורה וכו'.<br />
-          אנרגיה בלתי מוגבלת ליצירת קסם.<br />
-          סיפור בלי מטרה מעבר להצגת היכולות.<br />
-          דמויות ללא מניע אמיתי למעשים שלהן.
-        </p>
-      </div>
-    ),
-    backgrounds: (
-      <div className="space-y-4">
-        <p>
-          <strong>כדי לכתוב סיפור עם עומק, צריך הסטוריה, עבר. ידע קודם.</strong><br />
-          זהות אמיתית של קבוצה, מבוססת על העבר שלה.<br />
-          הידע לא חייב להיכתב בספר, אבל הוא צריך להיות קיים.<br />
-          מסורות מכל הסוגים. הם אלה שנותנים כוח והצדקה לפעולות מסוימות.<br />
-          גם אם נבחר לצטט בספר באופן חלקי, נוכל להביא את רוח הסיפור לספר.<br />
-          חשוב שנכיר את העולם שמאחורי הספר.<br />
-          בסיפורי מסגרת, צריכה להיות משמעות.<br />
-          דרכו אפשר ליצור חיבור כלשהו אל הקורא.<br />
-          רמיזה של סוף שיתגלה רק בסיפור המסגרת.<br />
-          פתיחה מסקרנת, שתובן רק עם הסיפור הפנימי.<br />
-          נקודת זמן לשאוף אליה במהלך הספר.
-        </p>
-        <p>
-          <strong>טעויות נפוצות</strong><br />
-          להביא למלחמה ללא מניע אמיתי.<br />
-          כתיבת דמויות שמסתמכות על מסורת, בלי להכיר את המסורת.<br />
-          לשים סיפור מסגרת שלא משפיע בשום צורה על הסיפור הפנימי.<br />
-          לרמוז לאגדות, נבואות או סיפורים ש'כולם אמורים להכיר' -<br />
-          בלי לתת לקורא שום ידע בנושא.
-        </p>
-      </div>
-    )
-  };
-  
-  // Sync import category with active tab when modal opens
-  useEffect(() => {
-    if (isImportModalOpen) {
-      setImportCategory(activeTab);
-      setSelectedImportIds([]);
-    }
-  }, [isImportModalOpen, activeTab]);
-
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
-
-  const getQuestionsConfig = (role: string | undefined) => {
-    if (activeTab === 'characters') {
-      if (role === 'male') return MALE_QUESTIONS_CONFIG;
-      return FEMALE_QUESTIONS_CONFIG;
-    }
-    if (activeTab === 'places') return MACRO_PLACE_QUESTIONS;
-    if (activeTab === 'periods') return PERIOD_QUESTIONS;
-    if (activeTab === 'twists') return TWIST_QUESTIONS;
-    if (activeTab === 'fantasyWorlds') return FANTASY_WORLD_QUESTIONS;
-    if (activeTab === 'backgrounds') return [];
-    return [];
-  };
 
   const handleTabChange = (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds') => {
     setActiveTab(tab);
@@ -803,48 +535,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateEntry({ loreItems: updatedLore });
   };
 
-  const handleImport = () => {
-    if (!importSourceBookId) return;
-    const sourceBook = allBooks.find(b => b.id === importSourceBookId);
-    if (!sourceBook) return;
-
-    const sourceItems = (sourceBook as any)[importCategory] || [];
-    const itemsToImport = selectedImportIds.length === 0 
-      ? sourceItems 
-      : sourceItems.filter((item: any) => selectedImportIds.includes(item.id));
-
-    if (itemsToImport.length === 0) return;
-
-    // Deep clone and generate new IDs to avoid conflicts
-    const clonedItems = itemsToImport.map((item: any) => ({
-      ...item,
-      id: `${item.id}-imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      // Also regenerate IDs for nested items if they exist
-      developmentStages: item.developmentStages?.map((s: any) => ({ ...s, id: `stage-${Date.now()}-${Math.random()}` })),
-      specialItems: item.specialItems?.map((s: any) => ({ ...s, id: `item-${Date.now()}-${Math.random()}` })),
-      uniquePowers: item.uniquePowers?.map((s: any) => ({ ...s, id: `power-${Date.now()}-${Math.random()}` })),
-      specificLocations: item.specificLocations?.map((s: any) => ({ ...s, id: `loc-${Date.now()}-${Math.random()}` })),
-      loreItems: item.loreItems?.map((s: any) => ({ ...s, id: `lore-${Date.now()}-${Math.random()}` })),
-    }));
-
-    const currentItems = (activeTab === 'characters' ? characters : 
-                        activeTab === 'places' ? places : 
-                        activeTab === 'periods' ? periods : 
-                        activeTab === 'twists' ? twists : 
-                        activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds);
-
-    const updateFn = (activeTab === 'characters' ? onUpdateCharacters : 
-                     activeTab === 'places' ? onUpdatePlaces : 
-                     activeTab === 'periods' ? onUpdatePeriods : 
-                     activeTab === 'twists' ? onUpdateTwists : 
-                     activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds);
-
-    updateFn([...currentItems, ...clonedItems]);
-    setIsImportModalOpen(false);
-    setSelectedImportIds([]);
-    alert(`יובאו ${clonedItems.length} פריטים בהצלחה`);
-  };
-
   const exportCurrentEntry = () => {
     if (!selectedEntry) return;
     let text = `שאלון: ${selectedEntry.name}\n`;
@@ -868,7 +558,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         text += `\nפיתוח דמות:\n-----------------------------------\n`;
         selectedEntry.developmentStages.forEach((stage, idx) => {
             text += `${idx + 1}. ${stage.title}\n`;
-            (currentGender === 'male' ? MALE_DEVELOPMENT_STAGE_QUESTIONS : FEMALE_DEVELOPMENT_STAGE_QUESTIONS).forEach(q => {
+            DEVELOPMENT_STAGE_QUESTIONS.forEach(q => {
                 text += `   - ${q.question}: ${stage.data[q.id] || '---'}\n`;
             });
             text += `\n`;
@@ -890,7 +580,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         text += `\nכוחות ייחודיים:\n-----------------------------------\n`;
         selectedEntry.uniquePowers.forEach((power, idx) => {
             text += `${idx + 1}. ${power.name}\n`;
-            (currentGender === 'male' ? MALE_UNIQUE_POWER_QUESTIONS : FEMALE_UNIQUE_POWER_QUESTIONS).forEach(q => {
+            UNIQUE_POWER_QUESTIONS.forEach(q => {
                 text += `   - ${q.question}: ${power.data[q.id] || '---'}\n`;
             });
             text += `\n`;
@@ -908,109 +598,11 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         });
     }
 
-    if (selectedEntry.loreItems && selectedEntry.loreItems.length > 0) {
-        text += `\nתוכן:\n-----------------------------------\n`;
-        selectedEntry.loreItems.forEach((item, idx) => {
-            text += `${idx + 1}. ${item.title}\n`;
-            text += `${item.content}\n\n`;
-        });
-    }
-
     const blob = new Blob(["\ufeff", text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${selectedEntry.name}-${activeTab}-export.txt`;
-    a.click();
-  };
-
-  const exportAllEntries = () => {
-    if (entries.length === 0) return;
-    
-    let text = `ייצוא כל ה${activeTab === 'characters' ? 'דמויות' : activeTab === 'places' ? 'מקומות' : activeTab === 'periods' ? 'תקופות' : activeTab === 'twists' ? 'תפניות' : activeTab === 'fantasyWorlds' ? 'עולמות פנטזיה' : 'רקעים'}\n`;
-    text += `תאריך: ${new Date().toLocaleDateString('he-IL')}\n`;
-    text += `===================================\n\n`;
-
-    entries.forEach(entry => {
-        const config = getQuestionsConfig(entry.role);
-        const entryGender = entry.data.gender || 'female';
-        text += `שם: ${entry.name}\n`;
-        text += `סוג/תפקיד: ${entry.role}\n`;
-        text += `-----------------------------------\n\n`;
-
-        config.forEach((q: any) => {
-            text += `[${q.category || 'כללי'}] ${q.question}\n`;
-            text += `${entry.data[q.id] || '---'}\n\n`;
-        });
-
-        if (entry.customFields && entry.customFields.length > 0) {
-            text += `\nשאלות נוספות:\n-----------------------------------\n`;
-            entry.customFields.forEach(cf => {
-                text += `${cf.label}\n`;
-                text += `${entry.data[cf.id] || '---'}\n\n`;
-            });
-        }
-
-        if (entry.developmentStages && entry.developmentStages.length > 0) {
-            text += `\nפיתוח דמות:\n-----------------------------------\n`;
-            entry.developmentStages.forEach((stage, idx) => {
-                text += `${idx + 1}. ${stage.title}\n`;
-                (entryGender === 'male' ? MALE_DEVELOPMENT_STAGE_QUESTIONS : FEMALE_DEVELOPMENT_STAGE_QUESTIONS).forEach(q => {
-                    text += `   - ${q.question}: ${stage.data[q.id] || '---'}\n`;
-                });
-                text += `\n`;
-            });
-        }
-
-        if (entry.specialItems && entry.specialItems.length > 0) {
-            text += `\nחפצים מיוחדים:\n-----------------------------------\n`;
-            entry.specialItems.forEach((item, idx) => {
-                text += `${idx + 1}. ${item.name}\n`;
-                SPECIAL_ITEM_QUESTIONS.forEach(q => {
-                    text += `   - ${q.question}: ${item.data[q.id] || '---'}\n`;
-                });
-                text += `\n`;
-            });
-        }
-
-        if (entry.uniquePowers && entry.uniquePowers.length > 0) {
-            text += `\nכוחות ייחודיים:\n-----------------------------------\n`;
-            entry.uniquePowers.forEach((power, idx) => {
-                text += `${idx + 1}. ${power.name}\n`;
-                (entryGender === 'male' ? MALE_UNIQUE_POWER_QUESTIONS : FEMALE_UNIQUE_POWER_QUESTIONS).forEach(q => {
-                    text += `   - ${q.question}: ${power.data[q.id] || '---'}\n`;
-                });
-                text += `\n`;
-            });
-        }
-
-        if (entry.specificLocations && entry.specificLocations.length > 0) {
-            text += `\nמיקומים ספציפיים:\n-----------------------------------\n`;
-            entry.specificLocations.forEach((loc, idx) => {
-                text += `${idx + 1}. ${loc.name}\n`;
-                SPECIFIC_LOCATION_QUESTIONS.forEach(q => {
-                    text += `   - ${q.question}: ${loc.data[q.id] || '---'}\n`;
-                });
-                text += `\n`;
-            });
-        }
-
-        if (entry.loreItems && entry.loreItems.length > 0) {
-            text += `\nתוכן:\n-----------------------------------\n`;
-            entry.loreItems.forEach((item, idx) => {
-                text += `${idx + 1}. ${item.title}\n`;
-                text += `${item.content}\n\n`;
-            });
-        }
-
-        text += `\n===================================\n\n`;
-    });
-
-    const blob = new Blob(["\ufeff", text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `all-${activeTab}-export.txt`;
     a.click();
   };
 
@@ -1262,66 +854,29 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      <div className="flex-1">
                         {mode === 'edit' ? (
                           <>
-                            <div className="flex items-center gap-3">
-                              <input 
-                                value={selectedEntry.name}
-                                onChange={(e) => updateEntry({ name: e.target.value })}
-                                className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
-                                placeholder="שם..."
-                              />
-                              <button 
-                                onClick={() => setIsInfoModalOpen(true)}
-                                className="p-1.5 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
-                                title="מידע על השאלון"
-                              >
-                                <Info size={20} />
-                              </button>
-                            </div>
+                            <input 
+                              value={selectedEntry.name}
+                              onChange={(e) => updateEntry({ name: e.target.value })}
+                              className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
+                              placeholder="שם..."
+                            />
                             {activeTab === 'characters' && (
-                              <div className="mt-3 flex flex-col gap-3">
-                                <div className="flex flex-wrap gap-2">
-                                  {CHARACTER_ROLES.map(role => (
-                                    <button
-                                      key={role.id}
-                                      onClick={() => updateEntry({ role: role.id })}
-                                      className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
-                                    >
-                                      {role.label}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase tracking-widest">מגדר:</span>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'female' } })}
-                                      className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${currentGender === 'female' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
-                                    >
-                                      נקבה
-                                    </button>
-                                    <button
-                                      onClick={() => updateEntry({ data: { ...selectedEntry.data, gender: 'male' } })}
-                                      className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${currentGender === 'male' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg(--theme-secondary)]'}`}
-                                    >
-                                      זכר
-                                    </button>
-                                  </div>
-                                </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {CHARACTER_ROLES.map(role => (
+                                  <button
+                                    key={role.id}
+                                    onClick={() => updateEntry({ role: role.id })}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                                  >
+                                    {role.label}
+                                  </button>
+                                ))}
                               </div>
                             )}
                           </>
                         ) : (
                           <>
-                            <div className="flex items-center gap-3">
-                              <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
-                              <button 
-                                onClick={() => setIsInfoModalOpen(true)}
-                                className="p-1.5 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
-                                title="מידע על השאלון"
-                              >
-                                <Info size={24} />
-                              </button>
-                            </div>
+                            <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
                             {activeTab === 'characters' && selectedEntry.role && (
                               <div className="mt-2">
                                 <span className="px-3 py-1 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-full text-[10px] font-bold">
@@ -1343,21 +898,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     <span>{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
                   </button>
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => setIsImportModalOpen(true)}
-                      className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-accent)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
-                      title="ייבוא פריטים מספר אחר"
-                    >
-                      <CopyPlus size={18} />
-                    </button>
-
-                    <button 
-                      onClick={exportAllEntries}
-                      className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
-                      title="ייצוא כל הפריטים בטאב זה"
-                    >
-                      <Library size={18} />
-                    </button>
 
                     <button 
                       onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
@@ -1448,7 +988,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                  {(currentGender === 'male' ? MALE_DEVELOPMENT_STAGE_QUESTIONS : FEMALE_DEVELOPMENT_STAGE_QUESTIONS).map(q => (
+                                  {DEVELOPMENT_STAGE_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
                                       <label className="text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest px-1">{q.question}</label>
                                       <textarea 
@@ -1571,7 +1111,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                 </div>
 
                                 <div className="grid gap-6">
-                                  {(currentGender === 'male' ? MALE_UNIQUE_POWER_QUESTIONS : FEMALE_UNIQUE_POWER_QUESTIONS).map(q => (
+                                  {UNIQUE_POWER_QUESTIONS.map(q => (
                                     <div key={q.id} className="space-y-2">
                                       <label className="text-xs font-bold text-[var(--theme-accent)]/60">{q.question}</label>
                                       <textarea 
@@ -1671,12 +1211,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
                         {(selectedEntry.loreItems || []).length === 0 ? (
                           <div className="p-12 border-2 border-dashed border-[var(--theme-border)]/50 rounded-[2rem] text-center text-[var(--theme-text)]/30">
-                            {(() => {
-                              const bgType = BACKGROUND_TYPES.find(t => t.id === selectedEntry.role);
-                              const EmptyIcon = bgType?.icon || Sparkles;
-                              return <EmptyIcon size={40} className="mx-auto mb-4 opacity-20" />;
-                            })()}
-                            <p className="text-sm font-bold">טרם נוספו פריטים. לחץ על הכפתור למעלה כדי להתחיל.</p>
+                            <Users size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-sm font-bold" >טרם נוספו פריטים. לחץ על הכפתור למעלה כדי להתחיל.</p>
                           </div>
                         ) : (
                           <div className="space-y-12">
@@ -1723,9 +1259,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <span className="text-[10px] font-black text-[var(--theme-accent)]/30 uppercase tracking-[0.2em]">{q.category}</span>
-                                  <div className="h-px w-8 bg-[var(--theme-secondary)]" />
-                                  <label className="text-sm font-bold text-[var(--theme-accent)]">{q.question}</label>
+                                  <span className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-[0.2em]">{q.category}</span>
+                                  <div className="h-px w-8 bg-[var(--color-secondary)]" />
+                                  <label className="text-sm font-bold text-[var(--text-accent)]">{q.question}</label>
                                 </div>
                               </div>
                               {q.type === 'textarea' ? (
@@ -1753,16 +1289,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <div key={cf.id} className="group space-y-3 animate-in fade-in duration-500 relative">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <span className="text-[10px] font-black text-[var(--theme-accent)]/30 uppercase tracking-[0.2em]">שאלות נוספות</span>
-                                  <div className="h-px w-8 bg-[var(--theme-secondary)]" />
-                                  <label className="text-sm font-bold text-[var(--theme-accent)]">{cf.label}</label>
+                                  <span className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-[0.2em]">שאלות נוספות</span>
+                                  <div className="h-px w-8 bg-[var(--color-secondary)]" />
+                                  <label className="text-sm font-bold text-[var(--text-accent)]">{cf.label}</label>
                                 </div>
                                 <button onClick={() => removeCustomQuestion(cf.id)} className="text-red-200 hover:text-red-500 transition-colors p-1" title="הסר שאלה"><X size={14}/></button>
                               </div>
                               <textarea 
                                 value={selectedEntry.data[cf.id] || ''}
                                 onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [cf.id]: e.target.value } })}
-                                className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
+                                className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
                                 placeholder="תשובה לשאלה המותאמת..."
                               />
                             </div>
@@ -1909,7 +1445,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                           <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{stage.title}</h4>
                                        </div>
                                        <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
-                                          {(currentGender === 'male' ? MALE_DEVELOPMENT_STAGE_QUESTIONS : FEMALE_DEVELOPMENT_STAGE_QUESTIONS).map(q => {
+                                          {DEVELOPMENT_STAGE_QUESTIONS.map(q => {
                                             const val = stage.data[q.id];
                                             if (!val) return null;
                                             return (
@@ -1982,7 +1518,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                                           <h4 className="text-xl font-bold text-[var(--theme-accent)] handwritten text-3xl">{power.name}</h4>
                                        </div>
                                        <div className="grid gap-6 border-r-2 border-[var(--theme-border)]/30 pr-6">
-                                          {(currentGender === 'male' ? MALE_UNIQUE_POWER_QUESTIONS : FEMALE_UNIQUE_POWER_QUESTIONS).map(q => {
+                                          {UNIQUE_POWER_QUESTIONS.map(q => {
                                             const val = power.data[q.id];
                                             if (!val) return null;
                                             return (
@@ -2093,163 +1629,9 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           )}
         </div>
       </div>
-
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-[var(--theme-border)]/30 flex items-center justify-between bg-[var(--theme-secondary)]/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-2xl shadow-lg">
-                  <CopyPlus size={24} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-3xl">ייבוא פריטים מספר אחר</h3>
-                  <p className="text-xs text-[var(--theme-primary)]/40 font-bold uppercase tracking-widest mt-1">בחר את המקור והפריטים שברצונך להוסיף</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsImportModalOpen(false)}
-                className="p-2 hover:bg-[var(--theme-secondary)] rounded-xl transition-colors text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-8 overflow-y-auto space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest px-1">ספר מקור</label>
-                  <select 
-                    value={importSourceBookId}
-                    onChange={(e) => {
-                      setImportSourceBookId(e.target.value);
-                      setSelectedImportIds([]);
-                    }}
-                    className="w-full bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm font-bold focus:ring-4 focus:ring-[var(--theme-primary)]/10 outline-none transition-all"
-                  >
-                    <option value="">בחר ספר...</option>
-                    {allBooks.filter(b => b.id !== activeBookId).map(book => (
-                      <option key={book.id} value={book.id}>{book.title}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest px-1">קטגוריה</label>
-                  <select 
-                    value={importCategory}
-                    onChange={(e) => {
-                      setImportCategory(e.target.value as any);
-                      setSelectedImportIds([]);
-                    }}
-                    className="w-full bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm font-bold focus:ring-4 focus:ring-[var(--theme-primary)]/10 outline-none transition-all"
-                  >
-                    <option value="characters">דמויות</option>
-                    <option value="places">מקומות</option>
-                    <option value="periods">תקופות</option>
-                    <option value="twists">תפניות</option>
-                    <option value="fantasyWorlds">עולמות פנטזיה</option>
-                    <option value="backgrounds">רקעים</option>
-                  </select>
-                </div>
-              </div>
-
-              {importSourceBookId && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between px-1">
-                    <label className="text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">בחר פריטים (השאר ריק לייבוא הכל)</label>
-                    <button 
-                      onClick={() => setSelectedImportIds([])}
-                      className="text-[10px] font-bold text-[var(--theme-accent)] hover:underline"
-                    >
-                      נקה בחירה
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1 scrollbar-hide">
-                    {(allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory]?.map((item: any) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setSelectedImportIds(prev => 
-                            prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
-                          );
-                        }}
-                        className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-right ${selectedImportIds.includes(item.id) ? 'bg-[var(--theme-primary)]/5 border-[var(--theme-primary)] text-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] border-[var(--theme-border)]/30 text-[var(--theme-primary)]/60 hover:border-[var(--theme-border)]'}`}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedImportIds.includes(item.id) ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)]' : 'border-[var(--theme-border)]'}`}>
-                          {selectedImportIds.includes(item.id) && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                        <span className="text-sm font-bold truncate">{item.name || item.title || 'ללא שם'}</span>
-                      </button>
-                    ))}
-                    {((allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory] || []).length === 0 && (
-                      <div className="col-span-2 py-8 text-center text-[var(--theme-text)]/30 text-sm font-bold bg-[var(--theme-secondary)]/20 rounded-3xl border-2 border-dashed border-[var(--theme-border)]/30">
-                        אין פריטים בקטגוריה זו בספר הנבחר
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-8 border-t border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/30 flex gap-4">
-              <button 
-                onClick={handleImport}
-                disabled={!importSourceBookId || ((allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory] || []).length === 0}
-                className="flex-1 bg-[var(--theme-primary)] text-[var(--theme-card)] py-4 rounded-2xl font-bold text-sm shadow-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <CopyPlus size={18} />
-                <span>ייבא {selectedImportIds.length > 0 ? `${selectedImportIds.length} פריטים` : 'את כל הפריטים'}</span>
-              </button>
-              <button 
-                onClick={() => setIsImportModalOpen(false)}
-                className="px-8 bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)]/50 rounded-2xl font-bold text-sm hover:bg-[var(--theme-secondary)] transition-all"
-              >
-                ביטול
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isInfoModalOpen && (
-        <div 
-          className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 cursor-pointer"
-          onClick={() => setIsInfoModalOpen(false)}
-        >
-          <div 
-            className="bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-8 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-secondary)]/20">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-xl">
-                  <Info size={20} />
-                </div>
-                <h2 className="text-xl font-bold text-[var(--theme-primary)] handwritten text-3xl">מידע על השאלון</h2>
-              </div>
-              <button onClick={() => setIsInfoModalOpen(false)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] transition-colors p-1"><X size={28} /></button>
-            </div>
-            
-            <div className="p-8 text-right overflow-y-auto max-h-[60vh]">
-              <div className="text-[var(--theme-text)] leading-relaxed font-medium">
-                {questionnaireExplanations[activeTab]}
-              </div>
-            </div>
-
-            <div className="p-8 border-t border-[var(--theme-border)] bg-[var(--theme-secondary)]/10 flex justify-center">
-              <button 
-                onClick={() => setIsInfoModalOpen(false)}
-                className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-10 py-3 rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg"
-              >
-                הבנתי
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-};
+};   
+
 
 export default Questionnaires;
