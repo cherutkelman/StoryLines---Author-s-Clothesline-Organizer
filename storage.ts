@@ -1,5 +1,19 @@
+import { v4 as uuidv4 } from "uuid";
 import type { Book } from "./types";
 const STORAGE_KEY = 'storylines_library_v2';
+const USER_ID_KEY = "storylines_user_id";
+
+export const getOrCreateUserId = (): string => {
+  const existing = localStorage.getItem(USER_ID_KEY);
+
+  if (existing) {
+    return existing;
+  }
+
+  const newUserId = uuidv4();
+  localStorage.setItem(USER_ID_KEY, newUserId);
+  return newUserId;
+};
 
 export const loadBooks = (): Book[] => {
   const saved = localStorage.getItem(STORAGE_KEY);

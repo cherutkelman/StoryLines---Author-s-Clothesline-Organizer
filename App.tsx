@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { loadBooks, saveBooks } from "./storage";
+import { loadBooks, saveBooks, getOrCreateUserId } from "./storage";
 import { v4 as uuidv4 } from "uuid";
 import { 
   Plus, 
@@ -79,8 +79,10 @@ const SHARED_FIELDS = [
   'characterMapConnections', 'maps', 'mindMaps'
 ];
 
-const createNewBook = (title: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
+const createNewBook = (title: string, userId: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
   id: uuidv4(),
+  ownerId: userId,
+  
   title,
   universeId,
   lastModified: Date.now(),
@@ -89,6 +91,8 @@ const createNewBook = (title: string, universeId?: string, sharedData?: Partial<
 });
 
 const App: React.FC = () => {
+  const userId = useMemo(() => getOrCreateUserId(), []);
+  console.log("Current userId:", userId);
   const [books, setBooks] = useState<Book[]>(loadBooks);
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
@@ -490,12 +494,12 @@ const App: React.FC = () => {
             (sharedData as any)[field] = (sourceBook as any)[field];
           });
           
-          newBook = createNewBook(newBookTitle, universeId, sharedData);
+          newBook = createNewBook(newBookTitle, userId, universeId, sharedData);
         } else {
-          newBook = createNewBook(newBookTitle);
+          newBook = createNewBook(newBookTitle, userId);
         }
       } else {
-        newBook = createNewBook(newBookTitle);
+        newBook = createNewBook(newBookTitle, userId);
       }
       
       const nextBooks = [...updatedPrev, newBook];
@@ -515,7 +519,7 @@ const App: React.FC = () => {
     if (confirm('אתה בטוח שאתה רוצה למחוק את הספר?')) {
       const remainingBooks = books.filter(b => b.id !== id);
       if (remainingBooks.length === 0) {
-        const freshBook = createNewBook('ספר חדש');
+        const freshBook = createNewBook('ספר חדש', userId);
         setBooks([freshBook]);
         setActiveBookId(freshBook.id);
       } else {

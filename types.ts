@@ -264,6 +264,7 @@ export interface Project {
 
 export interface Book extends Project {
   id: string;
+  ownerId: string;
   title: string;
   universeId?: string;
   lastModified: number;
