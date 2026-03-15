@@ -153,6 +153,20 @@ export interface LoreItem {
   content: string;
 }
 
+export interface RelationshipStep {
+  id: string;
+  track1Text: string;
+  track2Text: string;
+  isMerged: boolean;
+}
+
+export interface Relationship {
+  id: string;
+  char1Id: string;
+  char2Id: string;
+  steps: RelationshipStep[];
+}
+
 export interface QuestionnaireEntry {
   id: string;
   name: string;
@@ -237,6 +251,15 @@ export interface Project {
   maps?: WorldMap[];
   mindMaps?: MindMap[];
   chapterMarkers?: ChapterMarker[];
+  plotStructure?: string;
+  plotStructurePoints?: Record<string, { sceneId?: string; description?: string }>;
+  customPlotPoints?: { id: string; label: string; x: number; y: number }[];
+  characterArcs?: {
+    id: string;
+    characterName: string;
+    steps: { id: string; text: string }[];
+  }[];
+  relationships?: Relationship[];
 }
 
 export interface Book extends Project {
@@ -245,7 +268,7 @@ export interface Book extends Project {
   universeId?: string;
   lastModified: number;
   uiState?: {
-    lastView?: 'board' | 'editor' | 'questionnaires' | 'maps';
+    lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
     editorFocusedSceneId?: string | null;
     editorDisplayMode?: 'full' | 'focus';
     questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';

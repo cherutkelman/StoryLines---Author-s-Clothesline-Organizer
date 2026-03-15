@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Scene, Project, ChapterMarker } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows } from 'lucide-react';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin } from 'lucide-react';
 
 interface BoardProps {
   project: Project;
@@ -345,6 +345,7 @@ const Board: React.FC<BoardProps> = ({
                     <div className="flex items-center gap-12 px-8 w-full">
                       {Array.from({ length: columnCount }).map((_, colIdx) => {
                         const sceneInThisSlot = project.scenes.find(s => s.position === colIdx && s.plotlineId === plotline.id);
+                        const isLinkedToPlotStructure = sceneInThisSlot && Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
                         
                         return (
                           <div 
@@ -369,6 +370,12 @@ const Board: React.FC<BoardProps> = ({
                                 {sceneInThisSlot.isCompleted && (
                                   <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
                                     <CheckCircle2 size={18} />
+                                  </div>
+                                )}
+
+                                {isLinkedToPlotStructure && (
+                                  <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
+                                    <Pin size={14} className="rotate-45" />
                                   </div>
                                 )}
 
@@ -441,6 +448,7 @@ const Board: React.FC<BoardProps> = ({
                     <div className="flex flex-wrap gap-12 px-8">
                       {chapter.scenes.map((scene) => {
                         const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
+                        const isLinkedToPlotStructure = Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id);
                         return (
                           <div
                             key={scene.id}
@@ -456,6 +464,12 @@ const Board: React.FC<BoardProps> = ({
                             {scene.isCompleted && (
                               <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
                                 <CheckCircle2 size={18} />
+                              </div>
+                            )}
+
+                            {isLinkedToPlotStructure && (
+                              <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
+                                <Pin size={14} className="rotate-45" />
                               </div>
                             )}
 

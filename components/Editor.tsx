@@ -21,7 +21,9 @@ import {
   Plus,
   Download,
   Trash2,
-  Flag
+  Flag,
+  Info,
+  Pin
 } from 'lucide-react';
 
 interface EditorProps {
@@ -45,6 +47,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
     setDisplayMode(mode);
@@ -220,6 +223,14 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
               <Download size={14} />
               <span>ייצוא</span>
             </button>
+            <button 
+              onClick={() => setIsInfoModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              title="מידע על כתיבה"
+            >
+              <Info size={14} />
+              <span>טיפים</span>
+            </button>
           </div>
         </div>
       </div>
@@ -256,6 +267,11 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
                       {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
+                      {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
+                        <span title="מקושר למבנה העלילה">
+                          <Pin size={14} className="text-[var(--theme-accent)] rotate-45" />
+                        </span>
+                      )}
                     </div>
                     <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
                   </div>
@@ -268,7 +284,14 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                           <div className="h-2 w-2 rounded-full" style={{ backgroundColor: plotline?.color }} />
                           <span className="text-[10px] font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">{plotline?.name}</span>
                         </div>
-                        <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten w-full" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                        <div className="flex items-center gap-2 w-full">
+                          <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten flex-1" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                          {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
+                            <span title="מקושר למבנה העלילה">
+                              <Pin size={20} className="text-[var(--theme-accent)] rotate-45" />
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
@@ -399,6 +422,50 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                     </div>
                   )}
                </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isInfoModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-8 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-secondary)]/20">
+              <h2 className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-3xl">טיפים לכתיבה</h2>
+              <button onClick={() => setIsInfoModalOpen(false)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] transition-colors p-1"><X size={28} /></button>
+            </div>
+            
+            <div className="flex-1 p-8 overflow-y-auto space-y-8 text-right" dir="rtl">
+              <section>
+                <h3 className="text-xl font-bold text-[var(--theme-primary)] mb-4 border-b border-[var(--theme-border)] pb-2">זמנים</h3>
+                <div className="space-y-3 text-[var(--theme-primary)]/80 leading-relaxed">
+                  <p>ישנם שני סוגי כתיבת זמנים עיקריים.</p>
+                  <p><span className="font-bold">כתיבה בזמן הווה</span> - אני הולכת, הוא רואה.</p>
+                  <p><span className="font-bold">וכתיבה בזמן עבר</span> - הלכתי, והוא ראה.</p>
+                  <p>לכתיבה בזמן עבר, יש סגנון שכולל כתיבה על עבר מיידית, מה שנשמע כמו יומן שנכתב ממש עכשיו, לעומת כתיבה על עבר רחוק, שקרה מזמן. ואז נוכל להוסיף תובנות, או הכנה להמשך: <span className="italic">"בשלב הזה, רוני לא ידעה עדיין מה עומד להתרחש."</span></p>
+                  <p className="font-bold text-[var(--theme-accent)]">לא משנה באיזה זמן נבחר להשתמש בכתיבה, העיקר שנקפיד להשתמש בו באופן עקבי.</p>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-xl font-bold text-[var(--theme-primary)] mb-4 border-b border-[var(--theme-border)] pb-2">גופים</h3>
+                <div className="space-y-4 text-[var(--theme-primary)]/80 leading-relaxed">
+                  <p>ישנם שני סוגי כתיבת גופים מקובלים.</p>
+                  
+                  <div>
+                    <h4 className="font-bold text-[var(--theme-primary)] mb-1">כתיבה בגוף ראשון</h4>
+                    <p>אני הלכתי, או אני הולך. הכתיבה יכולה להיות מגוף ראשון של דמויות שונות. אם נכתוב כך, נקפיד לכתוב בראש כל סצנה מי הדמות שמספרת.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-[var(--theme-primary)] mb-1">כתיבה בגוף שלישי</h4>
+                    <p>הוא עזב, או הוא עוזב.</p>
+                    <p>בגוף שלישי, יש אפשרות של כתיבה בגוף שלישי ספציפי (צמוד) מעין מספר 'היושב על כתפה' של הדמות ויודע כל מה שהיא יודעת, ורק מה שהיא יודעת.</p>
+                    <p>לעומת מספר יודע כל, שיכול לספר לנו על דברים שקורים במקביל, במקומות שונים. לרוב- הוא לא יתאר מחשבות של דמויות, אלא רק את המתרחש סביבן.</p>
+                  </div>
+
+                  <p>אפשר לכתוב בשתי הצורות במקביל, למשל- דמות א נכתבת בגוף שלישי, ודמות ב' נכתבת מגוף ראשון. <span className="font-bold text-[var(--theme-accent)]">אבל נקפיד להשאר עקביים.</span></p>
+                </div>
+              </section>
             </div>
           </div>
         </div>

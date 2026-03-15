@@ -45,6 +45,7 @@ import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
+import PlotStructure from './components/PlotStructure';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const STORAGE_KEY = 'storylines_library_v2';
@@ -69,7 +70,8 @@ const DEFAULT_PROJECT_DATA = {
   characterMapConnections: [],
   maps: [],
   mindMaps: [],
-  chapterMarkers: []
+  chapterMarkers: [],
+  plotStructure: undefined
 };
 
 const SHARED_FIELDS = [
@@ -118,10 +120,10 @@ const App: React.FC = () => {
   });
   
   const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps'>(() => {
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>(() => {
     const firstBook = books[0];
     const lastView = firstBook?.uiState?.lastView;
-    return (lastView === 'characterMap' as any ? 'maps' : lastView) || 'board';
+    return (lastView === 'characterMap' as any ? 'maps' : (lastView === 'plotStructure' as any ? 'planning' : lastView)) || 'board';
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
@@ -131,6 +133,7 @@ const App: React.FC = () => {
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [isNewBookModalOpen, setIsNewBookModalOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [newBookTitle, setNewBookTitle] = useState('');
   const [linkToBookId, setLinkToBookId] = useState<string>('');
 
@@ -244,7 +247,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'maps') => {
+  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning') => {
     setActiveView(view);
     updateBookUiState({ lastView: view });
   };
@@ -576,7 +579,7 @@ const App: React.FC = () => {
             <div className="bg-[var(--theme-primary)] p-2 rounded-lg text-[var(--theme-card)] transition-transform hover:scale-110">
               <BookOpen size={20} />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setIsAboutModalOpen(true)}>
               <h1 className="text-xl font-bold text-[var(--theme-primary)] handwritten text-3xl select-none leading-none">StoryLines</h1>
               <span className="text-[10px] font-bold text-[var(--theme-primary)]/60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
             </div>
@@ -584,6 +587,13 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1 bg-[var(--theme-secondary)] p-1.5 rounded-2xl border border-[var(--theme-border)]/50 shadow-inner">
+          <button 
+            onClick={() => handleViewChange('planning')} 
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'planning' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
+          >
+            <Layout size={18} />
+            <span className="hidden sm:inline">תכנון עלילה</span>
+          </button>
           <button 
             onClick={() => handleViewChange('board')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
@@ -771,6 +781,32 @@ const App: React.FC = () => {
         <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)]">
           {activeBook ? (
             <>
+              {activeView === 'planning' && (
+                <div className="absolute inset-0">
+                  <PlotStructure 
+                    selectedStructure={activeBook.plotStructure}
+                    onSelect={(id) => updateActiveBook({ plotStructure: id })}
+                    scenes={activeBook.scenes}
+                    pointsData={activeBook.plotStructurePoints || {}}
+                    onUpdatePoint={(pointId, data) => {
+                      const currentPoints = activeBook.plotStructurePoints || {};
+                      updateActiveBook({
+                        plotStructurePoints: {
+                          ...currentPoints,
+                          [pointId]: data
+                        }
+                      });
+                    }}
+                    customPlotPoints={activeBook.customPlotPoints || []}
+                    onUpdateCustomPoints={(points) => updateActiveBook({ customPlotPoints: points })}
+                    characterArcs={activeBook.characterArcs || []}
+                    onUpdateArcs={(arcs) => updateActiveBook({ characterArcs: arcs })}
+                    characters={activeBook.characters || []}
+                    relationships={activeBook.relationships || []}
+                    onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
+                  />
+                </div>
+              )}
               {activeView === 'board' && (
                 <div className="absolute inset-0">
                   <Board 
@@ -1028,6 +1064,46 @@ const App: React.FC = () => {
                       <span>צור ספר</span>
                    </button>
                 </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isAboutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--theme-card)] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] p-10 animate-in zoom-in-95 duration-200 text-center relative">
+             <button 
+               onClick={() => setIsAboutModalOpen(false)} 
+               className="absolute top-6 left-6 text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] p-1 transition-colors"
+             >
+               <X size={24} />
+             </button>
+             
+             <div className="bg-[var(--theme-primary)] w-20 h-20 rounded-3xl text-[var(--theme-card)] flex items-center justify-center mx-auto mb-8 shadow-xl transform -rotate-3">
+                <BookOpen size={40} />
+             </div>
+             
+             <h2 className="text-2xl font-bold text-[var(--theme-primary)] mb-6 leading-tight">
+               סיימתם לכתוב? <br />
+               <span className="text-[var(--theme-accent)] handwritten text-4xl">זה הזמן לעריכה ספרותית.</span>
+             </h2>
+             
+             <div className="space-y-4 mb-8">
+               <p className="text-[var(--theme-primary)]/60 font-bold uppercase tracking-widest text-xs">פנו אלי:</p>
+               <a 
+                 href="https://linktr.ee/cherutkelman" 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-xl font-bold hover:bg-[var(--theme-border)] transition-colors border border-[var(--theme-border)]/50"
+               >
+                 <Link size={18} />
+                 linktr.ee/cherutkelman
+               </a>
+             </div>
+             
+             <div className="pt-6 border-t border-[var(--theme-border)]/30">
+               <p className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-4xl">חרות קלמן</p>
+               <p className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase tracking-[0.2em] mt-1">Literary Editor & Story Consultant</p>
              </div>
           </div>
         </div>

@@ -14,7 +14,8 @@ import {
   Image as ImageIcon,
   Camera,
   Library,
-  CopyPlus
+  CopyPlus,
+  Info
 } from 'lucide-react';
 
 interface QuestionnairesProps {
@@ -149,13 +150,22 @@ const PERIOD_QUESTIONS = [
   { id: "period_name", category: "הגדרה בסיסית", question: "תקופה", type: "text" },
   { id: "history_or_present", category: "הגדרה בסיסית", question: "היסטוריה או הווה?", type: "text" },
   { id: "our_world_or_other", category: "הגדרה בסיסית", question: "העולם שלנו או עולם אחר?", type: "text" },
-  { id: "technology_capabilities", category: "טכנולוגיה ויכולת", question: "אילו יכולות טכנולוגיות יש בתקופה?", type: "textarea" },
-  { id: "human_capabilities", category: "טכנולוגיה ויכולת", question: "אילו יכולות אנושיות יש בתקופה?", type: "textarea" },
-  { id: "clothing_style", category: "חיי יום-יום", question: "מה סגנון הלבוש בתקופה?", type: "textarea" },
-  { id: "food_preparation", category: "חיי יום-יום", question: "איך מכינים אוכל?", type: "textarea" },
-  { id: "building_and_furniture", category: "חיי יום-יום", question: "איך בונים רהיטים ובתים?", type: "textarea" },
-  { id: "transportation", category: "חיי יום-יום", question: "איך נעים ממקום למקום?", type: "textarea" },
-  { id: "communication", category: "חיי יום-יום", question: "איך מתקשרים עם אחרים?", type: "textarea" }
+  { id: "leadership_structure", category: "הגדרה בסיסית", question: "מבנה ההנהגה (דמוקרטית, דיקטטורית, מלוכנית, אמונית, שבטית וכו'.)", type: "textarea" },
+  
+  { id: "clothing_style_gender", category: "חיי היום יום", question: "סגנון לבוש לגברים ולנשים", type: "textarea" },
+  { id: "class_differences", category: "חיי היום יום", question: "הבדלי מעמדות ואיך הם מתבטאים", type: "textarea" },
+  { id: "speech_style", category: "חיי היום יום", question: "לשון הדיבור.", type: "textarea" },
+  { id: "clothing_style", category: "חיי היום יום", question: "מה סגנון הלבוש בתקופה?", type: "textarea" },
+  { id: "food_preparation", category: "חיי היום יום", question: "איך מכינים אוכל?", type: "textarea" },
+  { id: "professions", category: "חיי היום יום", question: "מקצועות נפוצים וייחודיים", type: "textarea" },
+  { id: "building_and_furniture", category: "חיי היום יום", question: "איך בונים רהיטים ובתים?", type: "textarea" },
+  { id: "transportation", category: "חיי היום יום", question: "איך נעים ממקום למקום?", type: "textarea" },
+  { id: "communication", category: "חיי היום יום", question: "איך מתקשרים עם אחרים?", type: "textarea" },
+
+  { id: "production_tech", category: "טכנולוגיה", question: "טכנולוגיות ייצור: כלים, תנועה, ביגוד, בנייה.", type: "textarea" },
+  { id: "trade_system", category: "טכנולוגיה", question: "איך מתנהלת מערכת המסחר.", type: "textarea" },
+  { id: "import_export", category: "טכנולוגיה", question: "איך מתנהלים הייבוא והייצוא.", type: "textarea" },
+  { id: "weapons", category: "טכנולוגיה", question: "כלי נשק נפוצים ונדירים.", type: "textarea" }
 ];
 
 const TWIST_QUESTIONS = [
@@ -178,6 +188,10 @@ const FANTASY_WORLD_QUESTIONS = [
   { id: "magic_source", category: "יום יום", question: "מאיפה נובעת אנרגיית הקסם:", type: "textarea" },
   { id: "magic_limits", category: "יום יום", question: "מה מגביל את כוח הקסם:", type: "textarea" },
   { id: "world_laws", category: "יום יום", question: "אילו חוקים יש בעולם הזה:", type: "textarea" },
+  { id: "magic_user_diff", category: "יום יום", question: "מה יוצר את ההבדל בין המשתמשים בקסם?", type: "textarea" },
+  { id: "magic_improvement", category: "יום יום", question: "מה יגרום להם להשתפר?", type: "textarea" },
+  { id: "magic_acquisition", category: "יום יום", question: "איך ניתן לקבל את היכולת להשתמש בקסם?", type: "textarea" },
+  { id: "magic_removal", category: "יום יום", question: "איך ניתן להסיר את היכולת?", type: "textarea" },
   
   { id: "good_guys", category: "מלחמות", question: "מי הטובים:", type: "textarea" },
   { id: "bad_guys", category: "מלחמות", question: "מי הרעים:", type: "textarea" },
@@ -272,6 +286,213 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [importSourceBookId, setImportSourceBookId] = useState<string>('');
   const [importCategory, setImportCategory] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds'>(activeTab);
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  
+  const questionnaireExplanations: Record<string, React.ReactNode> = {
+    characters: (
+      <div className="space-y-4">
+        <p>
+          <strong>בשביל לכתוב דמות מוצלחת, נצטרך להכיר אותה היטב.</strong><br />
+          לדעת מה היא אוהבת ומה היא שונאת, מה היא חוותה ואיך זה השפיע עליה.<br />
+          מה הן השאיפות שלה וממה היא הכי מפחדת.<br />
+          לא כל הפרטים חייבים להופיע בספר, אבל הם ישפיעו עליו.<br />
+          כשדמות בוחרת בחירות, אומרת דברים, ומתנהגת בצורה מסוימת,<br />
+          נהיה חייבים לשאול את עצמנו: למה? למה היא עשתה את זה.<br />
+          חייבת להיות תשובה.<br />
+          דמות שנכתבת בלי שורש, תעשה בחירות אקראיות,<br />
+          ותיקלע לסצנות שבהן לא נדע איך היא אמורה להתנהג.<br />
+          כשאנחנו מכירים את מאחורי הקלעים, אנחנו יכולים להעלות את ההצגה.
+        </p>
+        <p>
+          <strong>השאלונים על הדמויות,</strong><br />
+          נועדו להביא את רמת ההיכרות שלנו עם הדמות לגבוהה ביותר.<br />
+          כך שכשנכתוב את הסיפור, יהיה ברור לנו מה תעשה הדמות,<br />
+          בדיוק כמו שברור לנו מה החברה הכי טובה הייתה עושה במצב כזה.<br />
+          דמות אנושית היא לא רובוט. אבל היא כמעט תמיד תפעל על פי אותם מניעים.<br />
+          כל אדם והמניעים שלו. הסופר צריך להכיר את המניעים של הדמויות שלו.
+        </p>
+        <p>
+          <strong>איך נבנה שדמות שיתחברו אליה?</strong><br />
+          כאנשים, אנחנו מורכבים מחולשות ומחוזקות.<br />
+          לפעמים אנחנו בוחרים נכון, ולפעמים עושים טעויות.<br />
+          לפעמים גאים בעצמנו, ולפעמים מתביישים ומתחרטים.<br />
+          ניתן לדמות חולשה, מאבק פנימי כלשהו.<br />
+          ניתן לה צד נדיב וצד אנוכי.<br />
+          ניתן לה פחד, ורצון להסתיר אותו או לברוח ממנו.<br />
+          ניתן לה תקווה, ורצון לשינוי, ונצעיד אותה בדרך לשם.
+        </p>
+        <p>
+          <strong>הטעויות הנפוצות ביותר</strong><br />
+          נובעות מחוסר היכרות, או מנסיון לבנות דמות שהיא הכל מהכל.<br />
+          דמות מושלמת, ללא קשיים או חסרונות.<br />
+          דמות חסרת רצון עצמי, פסיבית.<br />
+          דמות שמשתנה פעמים רבות מדי, או ללא הסבר הגיוני.<br />
+          דמות שלא מתפתחת.<br />
+          דמות שהיא כולה טוב, או כולה רע.
+        </p>
+      </div>
+    ),
+    places: (
+      <div className="space-y-4">
+        <p>
+          <strong>לפני הכתיבה, עלינו להכיר היטב את המקום שעליו אנחנו כותבים.</strong><br />
+          אסור לנו לכתוב על מקום אמיתי שאנחנו לא מכירים.<br />
+          בשביל תיאור חיצוני למקום, יספיק טיול בגוגל מפות,<br />
+          אבל בשביל לתאר חוויית מגורים, נצטרך לבקר במקום,<br />
+          או לתחקר היטב אנשים שגרים בו.<br />
+          בשביל לתאר מיקום ספציפי, כמו בית. אולם קולנוע, בסיס צבאי וכן הלאה,<br />
+          נשתמש במפות כדי לשרטט את המבנה, כך נוכל לתאר נכון פניות,<br />
+          מישהו שרואה מישהי והיא לא רואה אותו. וכן הלאה.
+        </p>
+        <p>
+          <strong>כאשר אנחנו ממציאים מקום חדש,</strong><br />
+          חובה לוודא שמתקיימים בו תנאים שמתקיימים במקומות אחרים.<br />
+          אקלים, אוכלוסיה, תרבות.<br />
+          נמלא את השאלות בשאלונים כדי להכיר מקרוב את המקום שהמצאנו.<br />
+          אם לא יודעים את התשובה, נמציא אותה.<br />
+          ונישאר מחוייבים אליה לאורך הכתיבה.
+        </p>
+        <p>
+          <strong>הטעויות הנפוצות</strong><br />
+          גורמות לדרכים ארוכות לעבור מהר מדי.<br />
+          אקלים לא סדיר, שנכתב רק ליצירת אווירה בסצנה.<br />
+          אין הגיון במציאת אוכל או בהתרוקנות.<br />
+          ריגול, הצצה, התגנבות וכו' שלא תואמים את המבנה.
+        </p>
+      </div>
+    ),
+    periods: (
+      <div className="space-y-4">
+        <p>
+          <strong>כל עלילה מתרחשת בזמן כלשהו.</strong><br />
+          בין אם זה עבר, הווה או עתיד, לכל תקופה יש את המאפיינים שלה.<br />
+          במידה והסיפור מתרחש בתקופה היסטורית, ונועד לייצג את המציאות, ולא מציאות חליפית,<br />
+          נבצע מחקר.<br />
+          נמצא ספרים, תמונות, מחקרים, מה שאפשר, כדי לדעת כמה שיותר פרטים על התקופה.<br />
+          כדי ליצור ספר שירגיש אמיתי, חובה לדייק בפרטים הקטנים.
+        </p>
+        <p>
+          <strong>תשומת לב למקום ההתרחשות!</strong><br />
+          במקומות שונים, התקיימה מציאות שונה, גם אם באותה תקופה.<br />
+          נבדוק היטב מה היה נכון לתקופה במקום בו מתרחשת העלילה.
+        </p>
+        <p>
+          <strong>במידה ובחרנו במציאות חליפית,</strong><br />
+          נוודא שאנחנו מכירים היטב את הניואנסים הקטנים המאפיינים כל תקופה.<br />
+          נענה על השאלות בשאלונים, ונרחיב ככל יכולתנו.<br />
+          ככל שנכיר ונדע על התקופה, הקוראים ירגישו ויחוו אותה טוב יותר.
+        </p>
+        <p>
+          <strong>טעויות נפוצות</strong><br />
+          שימוש בביטויים לא מותאמים לתקופה.<br />
+          טכנולוגיות מתקופות אחרות.<br />
+          התנהגויות חברתיות לא מותאמות.<br />
+          בגדים, חפצים ומאכלים שאינם מתאימים.
+        </p>
+      </div>
+    ),
+    twists: (
+      <div className="space-y-4">
+        <p>
+          <strong>תפניות טובות בסיפור, יכולות להפוך אותו ממשעמם וגנרי למרתק וסוחף.</strong><br />
+          תפנית טובה, היא תפנית שמצד אחד, הקורא מופתע ממנה,<br />
+          ומצד שני, במבט לאחור הוא יכול לזהות את הסימנים המקדימים.
+        </p>
+        <p>
+          <strong>בשביל ליצור תפנית, נכוון את הסיפור לכיוון מסוים.</strong><br />
+          ניתן לכל הדמויות לחשוב שהן יודעות מה הולך לקרות,<br />
+          ניתן להן לתכנן את הצעדים הבאים בהתאם לזה,<br />
+          ואז המציאות תשתנה ותהפוך את הקערה על פיה.
+        </p>
+        <p>
+          <strong>ישנם כמה סוגי תפניות.</strong><br />
+          טבע שמשתנה, ומשנה איתו את הסיפור.<br />
+          תאונות.<br />
+          מפגש מקרי.<br />
+          דמות שעושה מעשה לא צפוי.<br />
+          עובדה שמתגלה ומשנה הכל.
+        </p>
+        <p>
+          <strong>ככל שנצניע את הסימנים המקדימים לטוויסט, כך ההפתעה תהיה גדולה יותר.</strong><br />
+          אבל חובה להזהר מ'להכריח' את הטוויסט לבוא.<br />
+          למשל: מישהו חייב להציל את הדמות הראשית אחרת היא תמות באמצע הספר.
+        </p>
+        <p>
+          <strong>טעויות נפוצות.</strong><br />
+          רמזים מטרימים ברורים מאד.<br />
+          תפניות שלא נרמז לגביהן שום דבר מראש.<br />
+          הבאת העלילה למקום שמחייב טוויסט מאד מסוים. אחרת הסיפור יסתיים.<br />
+          תפנית שמשנה באופן משמעותי את העלילה,<br />
+          בלי הסבר מספק למה היא כל כך משמעותית.<br />
+          יותר מדי תפניות.<br />
+          פחות מדי תפניות.<br />
+          תפניות שבהן דמויות עושות משהו בלתי אפשרי, או משהו שמאד לא מתאים להן.
+        </p>
+      </div>
+    ),
+    fantasyWorlds: (
+      <div className="space-y-4">
+        <p>
+          <strong>כדי לבנות עולם פנטזיה טוב, נהיה חייבים לוודא שאנחנו מכירים אותו היטב.</strong><br />
+          העולם יכול להסתמך על העולם שלנו, ועל האנושיות שלנו,<br />
+          ויכול להיות גם שונה במאה אחוז.<br />
+          אבל חייבים להיות לו כללים משלו.<br />
+          בשביל ליצור כללים, נצטרך להתייחס לכל מה שכתבנו בשאלונים הקודמים.<br />
+          לדמויות, למקומות, לתקופה.<br />
+          בעולם הזה יהיה מוסר שמתאים לו.<br />
+          אף קורא לא אוהב להרגיש שהכל מסתחרר סביבו.<br />
+          הוא רוצה לדעת שיש סדר והגיון לדברים.<br />
+          גם אם הם כולם מומצאים.
+        </p>
+        <p>
+          <strong>הקסם</strong><br />
+          בעולם שבו משתמשים בקסם, חייבים להיות כללים שנוגעים לו.<br />
+          חייב להיות משהו שיגרום לדמויות להיות חזקות או חלשות יותר.<br />
+          אחרת הספר יהיה משעמם וצפוי.<br />
+          חייבים להיות כישורים שקשורים לקסם.<br />
+          חייב להיות מקור אנרגיה.<br />
+          בכל חברה, יכולים להיות כללים משלה בנוגע לקסם.<br />
+          קסם הוא אנרגיה. אנרגיה חייבת להגיע ממקור כלשהו.<br />
+          חייבים להיות כללים שמגבילים אותה,<br />
+          וכללים שמגבירים אותה.
+        </p>
+        <p>
+          <strong>טעויות נפוצות</strong><br />
+          חוסר שוויון לא מוסבר.<br />
+          כשלאחד יש יכולת חזקה יותר מהשני, בלי הסבר שעומד מאחורי זה.<br />
+          עולם ללא כללי טבע, חברה, תחבורה וכו'.<br />
+          אנרגיה בלתי מוגבלת ליצירת קסם.<br />
+          סיפור בלי מטרה מעבר להצגת היכולות.<br />
+          דמויות ללא מניע אמיתי למעשים שלהן.
+        </p>
+      </div>
+    ),
+    backgrounds: (
+      <div className="space-y-4">
+        <p>
+          <strong>כדי לכתוב סיפור עם עומק, צריך הסטוריה, עבר. ידע קודם.</strong><br />
+          זהות אמיתית של קבוצה, מבוססת על העבר שלה.<br />
+          הידע לא חייב להיכתב בספר, אבל הוא צריך להיות קיים.<br />
+          מסורות מכל הסוגים. הם אלה שנותנים כוח והצדקה לפעולות מסוימות.<br />
+          גם אם נבחר לצטט בספר באופן חלקי, נוכל להביא את רוח הסיפור לספר.<br />
+          חשוב שנכיר את העולם שמאחורי הספר.<br />
+          בסיפורי מסגרת, צריכה להיות משמעות.<br />
+          דרכו אפשר ליצור חיבור כלשהו אל הקורא.<br />
+          רמיזה של סוף שיתגלה רק בסיפור המסגרת.<br />
+          פתיחה מסקרנת, שתובן רק עם הסיפור הפנימי.<br />
+          נקודת זמן לשאוף אליה במהלך הספר.
+        </p>
+        <p>
+          <strong>טעויות נפוצות</strong><br />
+          להביא למלחמה ללא מניע אמיתי.<br />
+          כתיבת דמויות שמסתמכות על מסורת, בלי להכיר את המסורת.<br />
+          לשים סיפור מסגרת שלא משפיע בשום צורה על הסיפור הפנימי.<br />
+          לרמוז לאגדות, נבואות או סיפורים ש'כולם אמורים להכיר' -<br />
+          בלי לתת לקורא שום ידע בנושא.
+        </p>
+      </div>
+    )
+  };
   
   // Sync import category with active tab when modal opens
   useEffect(() => {
@@ -1041,12 +1262,21 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      <div className="flex-1">
                         {mode === 'edit' ? (
                           <>
-                            <input 
-                              value={selectedEntry.name}
-                              onChange={(e) => updateEntry({ name: e.target.value })}
-                              className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
-                              placeholder="שם..."
-                            />
+                            <div className="flex items-center gap-3">
+                              <input 
+                                value={selectedEntry.name}
+                                onChange={(e) => updateEntry({ name: e.target.value })}
+                                className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
+                                placeholder="שם..."
+                              />
+                              <button 
+                                onClick={() => setIsInfoModalOpen(true)}
+                                className="p-1.5 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
+                                title="מידע על השאלון"
+                              >
+                                <Info size={20} />
+                              </button>
+                            </div>
                             {activeTab === 'characters' && (
                               <div className="mt-3 flex flex-col gap-3">
                                 <div className="flex flex-wrap gap-2">
@@ -1082,7 +1312,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </>
                         ) : (
                           <>
-                            <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
+                            <div className="flex items-center gap-3">
+                              <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">{selectedEntry.name}</h2>
+                              <button 
+                                onClick={() => setIsInfoModalOpen(true)}
+                                className="p-1.5 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
+                                title="מידע על השאלון"
+                              >
+                                <Info size={24} />
+                              </button>
+                            </div>
                             {activeTab === 'characters' && selectedEntry.role && (
                               <div className="mt-2">
                                 <span className="px-3 py-1 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-full text-[10px] font-bold">
@@ -1967,6 +2206,43 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 className="px-8 bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)]/50 rounded-2xl font-bold text-sm hover:bg-[var(--theme-secondary)] transition-all"
               >
                 ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isInfoModalOpen && (
+        <div 
+          className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 cursor-pointer"
+          onClick={() => setIsInfoModalOpen(false)}
+        >
+          <div 
+            className="bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-8 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-secondary)]/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-xl">
+                  <Info size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-[var(--theme-primary)] handwritten text-3xl">מידע על השאלון</h2>
+              </div>
+              <button onClick={() => setIsInfoModalOpen(false)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] transition-colors p-1"><X size={28} /></button>
+            </div>
+            
+            <div className="p-8 text-right overflow-y-auto max-h-[60vh]">
+              <div className="text-[var(--theme-text)] leading-relaxed font-medium">
+                {questionnaireExplanations[activeTab]}
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-[var(--theme-border)] bg-[var(--theme-secondary)]/10 flex justify-center">
+              <button 
+                onClick={() => setIsInfoModalOpen(false)}
+                className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-10 py-3 rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg"
+              >
+                הבנתי
               </button>
             </div>
           </div>
