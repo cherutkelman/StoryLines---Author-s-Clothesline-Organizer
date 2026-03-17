@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Scene, Project, QuestionnaireEntry } from '../types';
+import { Scene, Project, QuestionnaireEntry, Comment } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -23,7 +24,10 @@ import {
   Trash2,
   Flag,
   Info,
-  Pin
+  Pin,
+  MessageSquare,
+  Send,
+  Check
 } from 'lucide-react';
 
 interface EditorProps {
@@ -34,22 +38,24 @@ interface EditorProps {
   onOpenBulkAdd: () => void;
   initialFocusedSceneId?: string | null;
   onFocusScene?: (id: string | null) => void;
-  initialDisplayMode?: 'full' | 'focus';
-  onDisplayModeChange?: (mode: 'full' | 'focus') => void;
+  initialDisplayMode?: 'full' | 'focus' | 'reading';
+  onDisplayModeChange?: (mode: 'full' | 'focus' | 'reading') => void;
   onExport?: () => void;
   onUpdateChapterMarker?: (id: string, updates: any) => void;
 }
 
 const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
-  const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
+  const [displayMode, setDisplayMode] = useState<'full' | 'focus' | 'reading'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [bridgeType, setBridgeType] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [activeCommentSceneId, setActiveCommentSceneId] = useState<string | null>(null);
+  const [newCommentText, setNewCommentText] = useState('');
 
-  const handleDisplayModeChange = (mode: 'full' | 'focus') => {
+  const handleDisplayModeChange = (mode: 'full' | 'focus' | 'reading') => {
     setDisplayMode(mode);
     onDisplayModeChange?.(mode);
   };
@@ -111,6 +117,42 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
     }
   };
 
+  const handleAddComment = (sceneId: string) => {
+    if (!newCommentText.trim()) return;
+    const scene = project.scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+    
+    const newComment: Comment = {
+      id: uuidv4(),
+      text: newCommentText.trim(),
+      createdAt: Date.now(),
+      resolved: false
+    };
+    
+    onUpdateScene(sceneId, { 
+      comments: [...(scene.comments || []), newComment] 
+    });
+    setNewCommentText('');
+  };
+
+  const handleResolveComment = (sceneId: string, commentId: string) => {
+    const scene = project.scenes.find(s => s.id === sceneId);
+    if (!scene || !scene.comments) return;
+    
+    onUpdateScene(sceneId, {
+      comments: scene.comments.map(c => c.id === commentId ? { ...c, resolved: !c.resolved } : c)
+    });
+  };
+
+  const handleDeleteComment = (sceneId: string, commentId: string) => {
+    const scene = project.scenes.find(s => s.id === sceneId);
+    if (!scene || !scene.comments) return;
+    
+    onUpdateScene(sceneId, {
+      comments: scene.comments.filter(c => c.id !== commentId)
+    });
+  };
+
   if (activeScenes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-[var(--theme-primary)]/20 p-10">
@@ -170,6 +212,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
           <div className="flex items-center gap-1 bg-black/10 p-1 rounded-lg">
             <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
             <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
+            <button onClick={() => handleDisplayModeChange('reading')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'reading' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><BookOpen size={14} /><span>מצב קריאה</span></button>
           </div>
 
           <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
@@ -238,86 +281,195 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
       </div>
 
       <div className="space-y-4">
-        {activeScenes.map((scene, idx) => {
-          const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
-          const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
-          
-          const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
-
-          return (
-            <React.Fragment key={scene.id}>
-              {chapterMarker && (
-                <div className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
-                  <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
-                    <Flag size={20} />
-                  </div>
-                  <input 
-                    className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest bg-transparent border-none focus:ring-0 p-0 w-full"
-                    value={chapterMarker.title}
-                    onChange={(e) => onUpdateChapterMarker?.(chapterMarker.id, { title: e.target.value })}
-                  />
-                </div>
-              )}
-              
-              <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
-                {!isExpanded ? (
-                  <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
-                    <div className="flex items-center gap-4">
-                      <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
-                      <div className="flex flex-col">
-                        <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
+        {displayMode === 'reading' ? (
+          <div className="bg-[var(--theme-card)] rounded-[2.5rem] border border-[var(--theme-border)] p-12 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[60vh]">
+            <div className="max-w-2xl mx-auto space-y-12 text-right" dir="rtl">
+              {activeScenes.map((scene, idx) => {
+                const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
+                return (
+                  <React.Fragment key={scene.id}>
+                    {chapterMarker && (
+                      <div className="pt-12 pb-4 border-b-2 border-[var(--theme-primary)]/10 mb-8">
+                        <h2 className="text-3xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest">
+                          {chapterMarker.title}
+                        </h2>
                       </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
-                      {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
-                      {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
-                        <span title="מקושר למבנה העלילה">
-                          <Pin size={14} className="text-[var(--theme-accent)] rotate-45" />
-                        </span>
+                    )}
+                    <div className="space-y-4">
+                      {scene.title && (
+                        <h3 className="text-xl font-bold text-[var(--theme-primary)]/40 handwritten mb-2">
+                          {scene.title}
+                        </h3>
                       )}
+                      <div className="text-xl leading-relaxed text-[var(--theme-primary)] whitespace-pre-wrap font-serif">
+                        {scene.content || <span className="opacity-20 italic">סצנה ריקה...</span>}
+                      </div>
                     </div>
-                    <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          activeScenes.map((scene, idx) => {
+            const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
+            const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
+            
+            const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
+
+            return (
+              <React.Fragment key={scene.id}>
+                {chapterMarker && (
+                  <div className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
+                    <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
+                      <Flag size={20} />
+                    </div>
+                    <input 
+                      className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest bg-transparent border-none focus:ring-0 p-0 w-full"
+                      value={chapterMarker.title}
+                      onChange={(e) => onUpdateChapterMarker?.(chapterMarker.id, { title: e.target.value })}
+                    />
                   </div>
-                ) : (
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <header className="flex items-center justify-between mb-4">
-                    <div className="flex-1 flex items-center gap-4">
-                      <div className="flex flex-col flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: plotline?.color }} />
-                          <span className="text-[10px] font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">{plotline?.name}</span>
+                )}
+                
+                <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
+                  {!isExpanded ? (
+                    <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
+                      <div className="flex items-center gap-4">
+                        <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
+                        <div className="flex flex-col">
+                          <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
                         </div>
-                        <div className="flex items-center gap-2 w-full">
-                          <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten flex-1" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
-                          {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
-                            <span title="מקושר למבנה העלילה">
-                              <Pin size={20} className="text-[var(--theme-accent)] rotate-45" />
-                            </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
+                        {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
+                        {scene.comments && scene.comments.filter(c => !c.resolved).length > 0 && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">
+                            <MessageSquare size={10} />
+                            {scene.comments.filter(c => !c.resolved).length}
+                          </span>
+                        )}
+                        {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
+                          <span title="מקושר למבנה העלילה">
+                            <Pin size={14} className="text-[var(--theme-accent)] rotate-45" />
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
+                    </div>
+                  ) : (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <header className="flex items-center justify-between mb-4">
+                      <div className="flex-1 flex items-center gap-4">
+                        <div className="flex flex-col flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: plotline?.color }} />
+                            <span className="text-[10px] font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">{plotline?.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 w-full">
+                            <input className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten flex-1" value={scene.title} placeholder="כותרת הסצנה..." onChange={(e) => onUpdateScene(scene.id, { title: e.target.value })} />
+                            {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
+                              <span title="מקושר למבנה העלילה">
+                                <Pin size={20} className="text-[var(--theme-accent)] rotate-45" />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
+                        </button>
+                        <button 
+                          onClick={() => setActiveCommentSceneId(activeCommentSceneId === scene.id ? null : scene.id)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${activeCommentSceneId === scene.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
+                          title="הערות"
+                        >
+                          <MessageSquare size={16} />
+                          {scene.comments && scene.comments.filter(c => !c.resolved).length > 0 && (
+                            <span className="bg-red-500 text-white text-[8px] px-1 rounded-full">{scene.comments.filter(c => !c.resolved).length}</span>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => onDeleteScene(scene.id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          title="מחק סצנה"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </header>
+                    <textarea className={`w-full min-h-[400px] rounded-[2rem] border border-[var(--theme-border)] p-10 text-xl leading-relaxed focus:ring-4 focus:ring-[var(--theme-primary)]/10 focus:border-[var(--theme-border)] resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[var(--theme-card)]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
+                    
+                    {activeCommentSceneId === scene.id && (
+                      <div className="mt-4 bg-[var(--theme-secondary)]/30 rounded-2xl p-6 border border-[var(--theme-border)] animate-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-bold text-[var(--theme-primary)] flex items-center gap-2">
+                            <MessageSquare size={14} />
+                            הערות לסצנה
+                          </h4>
+                          <button onClick={() => setActiveCommentSceneId(null)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]"><X size={16} /></button>
+                        </div>
+
+                        <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
+                          {scene.comments && scene.comments.length > 0 ? (
+                            scene.comments.map(comment => (
+                              <div key={comment.id} className={`p-3 rounded-xl border transition-all ${comment.resolved ? 'bg-gray-100/50 border-gray-200 opacity-60' : 'bg-[var(--theme-card)] border-[var(--theme-border)] shadow-sm'}`}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className={`text-sm flex-1 ${comment.resolved ? 'line-through' : ''}`}>{comment.text}</p>
+                                  <div className="flex items-center gap-1">
+                                    <button 
+                                      onClick={() => handleResolveComment(scene.id, comment.id)}
+                                      className={`p-1 rounded-lg transition-all ${comment.resolved ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                                      title={comment.resolved ? "בטל סימון כטופל" : "סמן כטופל"}
+                                    >
+                                      <Check size={14} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteComment(scene.id, comment.id)}
+                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                      title="מחק הערה"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-[var(--theme-primary)]/30 mt-1">
+                                  {new Date(comment.createdAt).toLocaleString('he-IL')}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-6 text-[var(--theme-primary)]/20 italic text-xs">אין הערות עדיין</div>
                           )}
                         </div>
+
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            value={newCommentText}
+                            onChange={(e) => setNewCommentText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment(scene.id)}
+                            placeholder="הוסף הערה חדשה..."
+                            className="flex-1 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)] transition-all"
+                          />
+                          <button 
+                            onClick={() => handleAddComment(scene.id)}
+                            className="bg-[var(--theme-primary)] text-[var(--theme-card)] p-2 rounded-xl hover:opacity-90 transition-all shadow-md"
+                          >
+                            <Send size={18} />
+                          </button>
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
-                      </button>
-                      <button 
-                        onClick={() => onDeleteScene(scene.id)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                        title="מחק סצנה"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </header>
-                  <textarea className={`w-full min-h-[400px] rounded-[2rem] border border-[var(--theme-border)] p-10 text-xl leading-relaxed focus:ring-4 focus:ring-[var(--theme-primary)]/10 focus:border-[var(--theme-border)] resize-none transition-all shadow-inner ${scene.isCompleted ? 'bg-green-50/10' : 'bg-[var(--theme-card)]'}`} value={scene.content} placeholder="התחל לכתוב..." onChange={(e) => onUpdateScene(scene.id, { content: e.target.value })} />
-                </div>
-              )}
-            </article>
-          </React.Fragment>
-          );
-        })}
+                    )}
+                  </div>
+                )}
+              </article>
+            </React.Fragment>
+            );
+          })
+        )}
       </div>
 
       {bridgeType && (
