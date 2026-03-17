@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Scene, Project, ChapterMarker } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin } from 'lucide-react';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface BoardProps {
   project: Project;
@@ -43,6 +43,7 @@ const Board: React.FC<BoardProps> = ({
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<'plotlines' | 'chapters'>('plotlines');
+  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const handleZoomChange = (newZoom: number) => {
@@ -515,19 +516,28 @@ const Board: React.FC<BoardProps> = ({
 
       {/* Plot Summary Box - Sticky at bottom */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-30">
-        <div className="bg-[var(--theme-card)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl shadow-2xl p-4 flex flex-col gap-2">
+        <div className={`bg-[var(--theme-card)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl shadow-2xl p-4 flex flex-col gap-2 transition-all duration-300 ${isSummaryCollapsed ? 'h-14 overflow-hidden' : ''}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest flex items-center gap-2">
               <MessageSquareQuote size={14} />
               תקציר העלילה
             </h3>
+            <button 
+              onClick={() => setIsSummaryCollapsed(!isSummaryCollapsed)}
+              className="p-1 hover:bg-[var(--theme-secondary)] rounded-lg transition-colors text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"
+              title={isSummaryCollapsed ? "הגדל תקציר" : "מזער תקציר"}
+            >
+              {isSummaryCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
           </div>
-          <textarea 
-            value={project.summary || ''}
-            onChange={(e) => onUpdateSummary(e.target.value)}
-            placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
-            className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none text-lg leading-relaxed"
-          />
+          {!isSummaryCollapsed && (
+            <textarea 
+              value={project.summary || ''}
+              onChange={(e) => onUpdateSummary(e.target.value)}
+              placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
+              className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none text-lg leading-relaxed animate-in fade-in slide-in-from-bottom-2"
+            />
+          )}
         </div>
       </div>
     </div>

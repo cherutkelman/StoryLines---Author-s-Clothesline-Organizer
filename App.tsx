@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { loadBooks, saveBooks, getOrCreateUserId } from "./storage";
+import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
+import { auth, signInWithGoogle, logout } from './src/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { v4 as uuidv4 } from "uuid";
 import { 
   Plus, 
@@ -40,9 +42,12 @@ import {
   ChevronDown,
   Palette,
   Link2Off,
-  Link
+  Link,
+  RefreshCw,
+  Cloud,
+  AlertCircle
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -50,57 +55,86 @@ import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
 import { GoogleGenAI, Type } from "@google/genai";
 
-const DEFAULT_PROJECT_DATA = {
-  plotlines: [
-    { id: 'p1', name: 'עלילה ראשית', color: '#ef4444' },
-    { id: 'p2', name: 'עלילת משנה', color: '#3b82f6' }
-  ],
-  scenes: [
-    { id: 's1', plotlineId: 'p1', title: 'התחלה', content: 'הגיבור יוצא לדרך...', position: 0, isCompleted: true },
-    { id: 's2', plotlineId: 'p2', title: 'מזימה', content: 'הנבל מתכנן משהו...', position: 1, isCompleted: false },
-    { id: 's3', plotlineId: 'p1', title: 'מכשול ראשון', content: 'הדרך נחסמת...', position: 2, isCompleted: false }
-  ],
-  characters: [],
-  places: [],
-  periods: [],
-  twists: [],
-  fantasyWorlds: [],
-  backgrounds: [],
-  summary: '',
-  characterMapConnections: [],
-  maps: [],
-  mindMaps: [],
-  chapterMarkers: [],
-  plotStructure: undefined
-};
-
 const SHARED_FIELDS = [
   'characters', 'places', 'periods', 'twists', 'fantasyWorlds', 'backgrounds',
   'characterMapConnections', 'maps', 'mindMaps'
 ];
 
-const createNewBook = (title: string, userId: string, universeId?: string, sharedData?: Partial<Project>): Book => ({
-  id: uuidv4(),
-  ownerId: userId,
-  
-  title,
-  universeId,
-  lastModified: Date.now(),
-  ...DEFAULT_PROJECT_DATA,
-  ...(sharedData || {})
-});
-
 const App: React.FC = () => {
-  const userId = useMemo(() => getOrCreateUserId(), []);
-  console.log("Current userId:", userId);
-  const [books, setBooks] = useState<Book[]>(loadBooks);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   
-  const [activeBookId, setActiveBookId] = useState<string>(books[0]?.id || '');
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>(() => {
-    const firstBook = books[0];
-    const lastView = firstBook?.uiState?.lastView;
-    return (lastView === 'characterMap' as any ? 'maps' : (lastView === 'plotStructure' as any ? 'planning' : lastView)) || 'board';
-  });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoading(true);
+      setUser(firebaseUser);
+      
+      if (firebaseUser) {
+        // Logged in
+        console.log("App: User logged in, initializing cloud storage");
+        setUserId(firebaseUser.uid);
+        setCurrentUserId(firebaseUser.uid);
+        
+        // 1. Migrate legacy books in local storage to the new UID
+        await migrateLegacyBooks(firebaseUser.uid);
+        
+        // 2. Switch to cloud mode
+        setStorageMode('cloud');
+        
+        // 3. Perform initial sync to merge local and remote
+        console.log("App: Performing initial sync...");
+        const { updatedBooks } = await syncService.sync();
+        console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
+        
+        setBooks(deduplicateBooks(updatedBooks));
+      } else {
+        // Logged out
+        console.log("App: User logged out, switching to local storage");
+        setUserId(null);
+        setCurrentUserId(getOrCreateUserId());
+        setStorageMode('local');
+        
+        const loadedBooks = await loadBooks();
+        setBooks(deduplicateBooks(loadedBooks));
+      }
+
+      const loadedUI = loadUIStates();
+      const globalUI = loadGlobalUIState();
+      
+      setUiStates(loadedUI);
+      setIsAuthReady(true);
+      setIsLoading(false);
+
+      // Select active book after books are loaded/synced
+      setBooks(prev => {
+        if (prev.length > 0) {
+          const lastActiveId = globalUI.lastActiveBookId;
+          const bookToSelect = prev.find(b => b.id === lastActiveId) || prev[0];
+          setActiveBookId(bookToSelect.id);
+        }
+        return prev;
+      });
+    });
+
+    syncService.subscribe(setSyncStatus);
+    return () => unsubscribe();
+  }, []);
+
+  const [books, setBooks] = useState<Book[]>([]);
+  const displayBooks = useMemo(() => deduplicateBooks(books), [books]);
+  const [user, setUser] = useState<User | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>(getOrCreateUserId());
+  const [uiStates, setUiStates] = useState<Record<string, BookUIState>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncState>('idle');
+
+  useEffect(() => {
+    console.log(`[App] syncStatus changed to: ${syncStatus}`);
+  }, [syncStatus]);
+
+  const [showDebug, setShowDebug] = useState(false);
+  
+  const [activeBookId, setActiveBookId] = useState<string>('');
+  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>('board');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
@@ -113,6 +147,12 @@ const App: React.FC = () => {
   const [newBookTitle, setNewBookTitle] = useState('');
   const [linkToBookId, setLinkToBookId] = useState<string>('');
 
+  const [resolvingBookId, setResolvingBookId] = useState<string | null>(null);
+  const [remoteBookData, setRemoteBookData] = useState<Book | null>(null);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [isMergingManually, setIsMergingManually] = useState(false);
+  const [mergeTitle, setMergeTitle] = useState('');
+
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
   const [updateStatus, setUpdateStatus] = useState<'none' | 'available' | 'downloaded'>('none');
@@ -122,9 +162,14 @@ const App: React.FC = () => {
     [books, activeBookId]
   );
 
+  const activeUI = useMemo(() => 
+    uiStates[activeBookId] || (activeBook ? uiStates[activeBook.id] : {}) || {},
+    [uiStates, activeBookId, activeBook]
+  );
+
   useEffect(() => {
-    if (activeBook?.uiState?.lastView) {
-      setActiveView(activeBook.uiState.lastView);
+    if (activeUI.lastView) {
+      setActiveView(activeUI.lastView);
     }
   }, [activeBookId]);
 
@@ -136,15 +181,23 @@ const App: React.FC = () => {
   }, [activeBook?.id]);
 
   useEffect(() => {
+    if (books.length > 0 && activeBookId && !books.find(b => b.id === activeBookId)) {
+      setActiveBookId(books[0].id);
+    }
+  }, [books, activeBookId]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       saveBooks(books);
+      saveUIStates(uiStates);
+      saveGlobalUIState({ lastActiveBookId: activeBookId });
       setLastSaved(new Date());
     }, 1000); // Debounce save by 1 second
     return () => clearTimeout(timeout);
-  }, [books]);
+  }, [books, uiStates, activeBookId]);
 
   useEffect(() => {
-    const themeKey = activeBook?.uiState?.theme || 'classic';
+    const themeKey = activeBook?.theme || 'classic';
     const theme = THEMES[themeKey as keyof typeof THEMES] || THEMES.classic;
     
     const root = document.documentElement;
@@ -156,7 +209,7 @@ const App: React.FC = () => {
     root.style.setProperty('--theme-border', theme.border);
     root.style.setProperty('--theme-text', theme.text);
     root.style.setProperty('--theme-muted', theme.muted);
-  }, [activeBook?.uiState?.theme]);
+  }, [activeBook?.theme]);
 
   useEffect(() => {
     if ((window as any).require) {
@@ -185,42 +238,18 @@ const App: React.FC = () => {
   };
 
   const updateActiveBook = (updates: Partial<Book>) => {
-    setBooks(prev => {
-      const updatedBooks = prev.map(b => b.id === activeBookId ? { ...b, ...updates, lastModified: Date.now() } : b);
-      
-      const currentBook = updatedBooks.find(b => b.id === activeBookId);
-      if (currentBook?.universeId) {
-        const sharedUpdates: any = {};
-        let hasSharedUpdates = false;
-        
-        SHARED_FIELDS.forEach(field => {
-          if (field in updates) {
-            sharedUpdates[field] = (updates as any)[field];
-            hasSharedUpdates = true;
-          }
-        });
-
-        if (hasSharedUpdates) {
-          return updatedBooks.map(b => 
-            b.universeId === currentBook.universeId && b.id !== activeBookId 
-              ? { ...b, ...sharedUpdates, lastModified: Date.now() } 
-              : b
-          );
-        }
-      }
-      
-      return updatedBooks;
-    });
+    setBooks(prev => updateBookAndSharedFields(prev, activeBookId, updates, SHARED_FIELDS));
   };
 
-  const updateBookUiState = (updates: Partial<NonNullable<Book['uiState']>>) => {
-    if (!activeBook) return;
-    updateActiveBook({
-      uiState: {
-        ...(activeBook.uiState || {}),
+  const updateBookUiState = (updates: Partial<BookUIState>) => {
+    if (!activeBookId) return;
+    setUiStates(prev => ({
+      ...prev,
+      [activeBookId]: {
+        ...(prev[activeBookId] || {}),
         ...updates
       }
-    });
+    }));
   };
 
   const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning') => {
@@ -285,9 +314,25 @@ const App: React.FC = () => {
   const deletePlotline = (id: string) => {
     if (!activeBook || activeBook.plotlines.length <= 1) return;
     if (confirm('מחיקת קו עלילה תשאיר את הסצנות שלו יתומות. להמשיך?')) {
+      const deletedPositions = activeBook.scenes
+        .filter(s => s.plotlineId === id)
+        .map(s => s.position)
+        .sort((a, b) => a - b);
+
+      const remainingScenes = activeBook.scenes
+        .filter(s => s.plotlineId !== id)
+        .sort((a, b) => a.position - b.position)
+        .map((s, idx) => ({ ...s, position: idx }));
+      
+      const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
+        const shift = deletedPositions.filter(pos => pos < m.position).length;
+        return { ...m, position: m.position - shift };
+      });
+
       updateActiveBook({
         plotlines: activeBook.plotlines.filter(p => p.id !== id),
-        scenes: activeBook.scenes.filter(s => s.plotlineId !== id)
+        scenes: remainingScenes,
+        chapterMarkers: updatedMarkers
       });
     }
   };
@@ -312,8 +357,18 @@ const App: React.FC = () => {
     
     const newScenes = [...activeBook.scenes];
     newScenes.splice(newPos, 0, newScene);
+
+    // Shift chapter markers that are at or after the insertion point
+    const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
+      if (m.position >= newPos) {
+        return { ...m, position: m.position + 1 };
+      }
+      return m;
+    });
+
     updateActiveBook({
-      scenes: newScenes.map((s, idx) => ({ ...s, position: idx }))
+      scenes: newScenes.map((s, idx) => ({ ...s, position: idx })),
+      chapterMarkers: updatedMarkers
     });
   };
 
@@ -362,26 +417,64 @@ const App: React.FC = () => {
     const sceneToMove = activeBook.scenes.find(s => s.id === id);
     if (!sceneToMove) return;
 
+    const oldPos = sceneToMove.position;
     const otherScenes = activeBook.scenes.filter(s => s.id !== id);
     const updatedScene = { ...sceneToMove, plotlineId: targetPlotlineId };
     
     const newScenes = [...otherScenes];
     newScenes.splice(targetGlobalIndex, 0, updatedScene);
 
+    // Update chapter markers based on the move
+    const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
+      let newMarkerPos = m.position;
+      
+      if (m.position === oldPos) {
+        newMarkerPos = targetGlobalIndex;
+      } else if (oldPos < targetGlobalIndex) {
+        // Moving forward: scenes between oldPos + 1 and targetGlobalIndex shift back
+        if (m.position > oldPos && m.position <= targetGlobalIndex) {
+          newMarkerPos = m.position - 1;
+        }
+      } else if (oldPos > targetGlobalIndex) {
+        // Moving backward: scenes between targetGlobalIndex and oldPos - 1 shift forward
+        if (m.position >= targetGlobalIndex && m.position < oldPos) {
+          newMarkerPos = m.position + 1;
+        }
+      }
+      
+      return { ...m, position: newMarkerPos };
+    });
+
     updateActiveBook({
-      scenes: newScenes.map((s, idx) => ({ ...s, position: idx }))
+      scenes: newScenes.map((s, idx) => ({ ...s, position: idx })),
+      chapterMarkers: updatedMarkers
     });
   };
 
   const deleteScene = (id: string) => {
     if (!activeBook) return;
-    // Removed confirm as it might be blocked in iframe
+    
+    const sceneToDelete = activeBook.scenes.find(s => s.id === id);
+    if (!sceneToDelete) return;
+    const deletedPos = sceneToDelete.position;
+
     const newScenes = activeBook.scenes
       .filter(s => s.id !== id)
       .sort((a, b) => a.position - b.position)
       .map((s, idx) => ({ ...s, position: idx }));
     
-    updateActiveBook({ scenes: newScenes });
+    // Shift chapter markers that are after the deleted point
+    const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
+      if (m.position > deletedPos) {
+        return { ...m, position: m.position - 1 };
+      }
+      return m;
+    });
+
+    updateActiveBook({ 
+      scenes: newScenes,
+      chapterMarkers: updatedMarkers
+    });
   };
 
   const exportManuscript = () => {
@@ -474,59 +567,47 @@ const App: React.FC = () => {
   const handleCreateNewBook = () => {
     if (!newBookTitle.trim()) return;
     
-    setBooks(prev => {
-      let newBook: Book;
-      let updatedPrev = [...prev];
-      
-      if (linkToBookId) {
-        const sourceBookIndex = updatedPrev.findIndex(b => b.id === linkToBookId);
-        if (sourceBookIndex !== -1) {
-          const sourceBook = updatedPrev[sourceBookIndex];
-          let universeId = sourceBook.universeId;
-          
-          if (!universeId) {
-            universeId = `universe-${Date.now()}`;
-            updatedPrev[sourceBookIndex] = { ...sourceBook, universeId };
-          }
-          
-          const sharedData: Partial<Project> = {};
-          SHARED_FIELDS.forEach(field => {
-            (sharedData as any)[field] = (sourceBook as any)[field];
-          });
-          
-          newBook = createNewBook(newBookTitle, userId, universeId, sharedData);
-        } else {
-          newBook = createNewBook(newBookTitle, userId);
+    let universeId = linkToBookId ? (books.find(b => b.id === linkToBookId)?.universeId || uuidv4()) : undefined;
+    let sharedData: Partial<Project> = {};
+    
+    if (linkToBookId) {
+      const sourceBook = books.find(b => b.id === linkToBookId);
+      if (sourceBook) {
+        SHARED_FIELDS.forEach(field => {
+          (sharedData as any)[field] = (sourceBook as any)[field];
+        });
+        
+        // If source book didn't have universeId, update it
+        if (!sourceBook.universeId) {
+          setBooks(prev => updateBookInList(prev, linkToBookId, { universeId }));
         }
-      } else {
-        newBook = createNewBook(newBookTitle, userId);
       }
-      
-      const nextBooks = [...updatedPrev, newBook];
-      setActiveBookId(newBook.id);
-      return nextBooks;
-    });
+    }
+
+    const newBook = createNewBook(newBookTitle, currentUserId, universeId, sharedData);
+    setBooks(prev => [...prev, newBook]);
+    setActiveBookId(newBook.id);
     
     setIsNewBookModalOpen(false);
   };
 
   const renameBook = (id: string, title: string) => {
-    setBooks(prev => prev.map(b => b.id === id ? { ...b, title } : b));
+    setBooks(prev => updateBookInList(prev, id, { title }));
   };
 
   const deleteBook = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('אתה בטוח שאתה רוצה למחוק את הספר?')) {
-      const remainingBooks = books.filter(b => b.id !== id);
-      if (remainingBooks.length === 0) {
-        const freshBook = createNewBook('ספר חדש', userId);
-        setBooks([freshBook]);
-        setActiveBookId(freshBook.id);
-      } else {
-        setBooks(remainingBooks);
-        if (activeBookId === id) {
-          setActiveBookId(remainingBooks[0].id);
-        }
+    // In a real app we'd show a custom modal here. 
+    // For now, we'll just proceed to comply with "no confirm" rule.
+    const remainingBooks = books.filter(b => b.id !== id && !b.deletedAt);
+    if (remainingBooks.length === 0) {
+      const freshBook = createNewBook('ספר חדש', currentUserId);
+      setBooks([freshBook]);
+      setActiveBookId(freshBook.id);
+    } else {
+      setBooks(prev => softDeleteBookInList(prev, id));
+      if (activeBookId === id) {
+        setActiveBookId(remainingBooks[0].id);
       }
     }
   };
@@ -539,6 +620,137 @@ const App: React.FC = () => {
   const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
+
+  const handleSync = async () => {
+    console.log("[App] Sync button clicked");
+    try {
+      // Ensure latest state is saved before sync
+      console.log("[App] Saving books before sync...");
+      await saveBooks(books);
+      
+      console.log("[App] Calling syncService.sync()...");
+      const { updatedBooks } = await syncService.sync();
+      
+      if (updatedBooks.length > 0) {
+        console.log(`[App] Sync complete. Updating state with ${updatedBooks.length} books.`);
+        setBooks(updatedBooks);
+      } else {
+        console.log("[App] Sync complete. No updates to local state.");
+      }
+    } catch (error) {
+      console.error("[App] Sync error:", error);
+    }
+  };
+
+  const openConflictResolver = async (bookId: string) => {
+    const remote = await syncService.getRemoteBook(bookId);
+    if (!remote) {
+      alert("לא ניתן היה לטעון את הגרסה מהענן");
+      return;
+    }
+    setResolvingBookId(bookId);
+    setRemoteBookData(remote);
+    setIsConflictModalOpen(true);
+    setIsMergingManually(false);
+  };
+
+  const resolveConflict = async (resolution: 'local' | 'remote' | 'merge') => {
+    if (!resolvingBookId || !remoteBookData) return;
+
+    const localBookBefore = books.find(b => b.id === resolvingBookId);
+    console.log(`[App] resolveConflict starting for book ${resolvingBookId}:`, {
+      resolution,
+      local: localBookBefore ? {
+        updatedAt: new Date(localBookBefore.updatedAt).toISOString(),
+        lastSyncedAt: localBookBefore.lastSyncedAt ? new Date(localBookBefore.lastSyncedAt).toISOString() : 'Never',
+        pendingSync: localBookBefore.pendingSync,
+        syncStatus: localBookBefore.syncStatus
+      } : 'N/A',
+      remote: {
+        updatedAt: new Date(remoteBookData.updatedAt).toISOString(),
+        lastSyncedAt: remoteBookData.lastSyncedAt ? new Date(remoteBookData.lastSyncedAt).toISOString() : 'Never',
+        pendingSync: remoteBookData.pendingSync,
+        syncStatus: remoteBookData.syncStatus
+      }
+    });
+
+    if (resolution === 'local') {
+      setBooks(prev => {
+        const updated = prev.map(b => b.id === resolvingBookId ? { 
+          ...b, 
+          syncStatus: 'synced' as SyncStatus, 
+          pendingSync: true, 
+          forceOverwriteRemote: true,
+          updatedAt: Date.now() 
+        } : b);
+        
+        const resolvedBook = updated.find(b => b.id === resolvingBookId);
+        console.log(`[App] resolveConflict: Resolution 'local' applied in state:`, {
+          id: resolvedBook?.id,
+          updatedAt: resolvedBook ? new Date(resolvedBook.updatedAt).toISOString() : 'N/A',
+          pendingSync: resolvedBook?.pendingSync,
+          forceOverwriteRemote: resolvedBook?.forceOverwriteRemote
+        });
+        
+        return updated;
+      });
+    } else if (resolution === 'remote') {
+      setBooks(prev => {
+        const updated = prev.map(b => b.id === resolvingBookId ? { 
+          ...remoteBookData, 
+          syncStatus: 'synced' as SyncStatus, 
+          pendingSync: false 
+        } : b);
+
+        const resolvedBook = updated.find(b => b.id === resolvingBookId);
+        console.log(`[App] resolveConflict: Resolution 'remote' applied in state:`, {
+          id: resolvedBook?.id,
+          updatedAt: resolvedBook ? new Date(resolvedBook.updatedAt).toISOString() : 'N/A',
+          pendingSync: resolvedBook?.pendingSync
+        });
+
+        return updated;
+      });
+    } else if (resolution === 'merge') {
+      const localBook = books.find(b => b.id === resolvingBookId);
+      if (!localBook) return;
+      setBooks(prev => {
+        const updated = prev.map(b => b.id === resolvingBookId ? { 
+          ...localBook, 
+          title: mergeTitle,
+          syncStatus: 'synced' as SyncStatus, 
+          pendingSync: true, 
+          forceOverwriteRemote: true, // MUST set this to resolve the conflict
+          updatedAt: Date.now() 
+        } : b);
+
+        const resolvedBook = updated.find(b => b.id === resolvingBookId);
+        console.log(`[App] resolveConflict: Resolution 'merge' applied in state:`, {
+          id: resolvedBook?.id,
+          updatedAt: resolvedBook ? new Date(resolvedBook.updatedAt).toISOString() : 'N/A',
+          pendingSync: resolvedBook?.pendingSync,
+          forceOverwriteRemote: resolvedBook?.forceOverwriteRemote
+        });
+
+        return updated;
+      });
+    }
+
+    setIsConflictModalOpen(false);
+    setResolvingBookId(null);
+    setRemoteBookData(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-primary)]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--theme-primary)]"></div>
+          <p className="handwritten text-2xl">טוען את הסיפורים שלך...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
@@ -602,11 +814,38 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button 
+            onClick={handleSync}
+            disabled={syncStatus === 'syncing'}
+            className={`flex items-center gap-2 p-2.5 rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)] ${
+              syncStatus === 'syncing' ? 'animate-pulse' : ''
+            } ${
+              syncStatus === 'error' ? 'text-red-500' : 
+              syncStatus === 'success' ? 'text-green-500' : 'text-[var(--theme-primary)]'
+            }`}
+            title={
+              syncStatus === 'syncing' ? "מסנכרן..." : 
+              syncStatus === 'error' ? "שגיאה בסנכרון" : 
+              syncStatus === 'success' ? "סונכרן בהצלחה" : "סנכרן עכשיו"
+            }
+          >
+            {syncStatus === 'syncing' ? <RefreshCw size={20} className="animate-spin" /> : 
+             syncStatus === 'error' ? <AlertCircle size={20} /> :
+             syncStatus === 'success' ? <CheckCircle2 size={20} /> : <Cloud size={20} />}
+            <span className="hidden xl:inline text-xs font-bold">סנכרון</span>
+          </button>
+          <button 
             onClick={() => setIsThemeModalOpen(true)}
             className="p-2.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)]"
             title="בחר פלטת צבעים"
           >
             <Palette size={20} />
+          </button>
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="p-2.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)]"
+            title="דיאגנוסטיקה"
+          >
+            <Settings2 size={20} />
           </button>
         </div>
       </header>
@@ -619,7 +858,7 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center py-8 gap-4">
               <button onClick={addNewBookToLibrary} className="p-3 text-[var(--theme-accent)] hover:bg-[var(--theme-secondary)] rounded-xl"><Plus size={20} /></button>
               <div className="h-px w-8 bg-[var(--theme-secondary)]" />
-              {books.map(book => (
+              {displayBooks.map(book => (
                 <button 
                   key={book.id} 
                   onClick={() => setActiveBookId(book.id)}
@@ -638,13 +877,16 @@ const App: React.FC = () => {
                   <button onClick={addNewBookToLibrary} className="text-[var(--theme-accent)] hover:text-[var(--theme-primary)] p-2 rounded-xl hover:bg-[var(--theme-secondary)] transition-all"><Plus size={20} /></button>
                 </div>
                 <div className="space-y-2">
-                  {books.map(book => (
+                  {displayBooks.map(book => (
                     <div key={book.id} className={`group relative flex flex-col p-4 rounded-2xl transition-all cursor-pointer border-2 ${activeBookId === book.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-border)]' : 'hover:bg-[var(--theme-secondary)]/50 border-transparent'}`} onClick={() => setActiveBookId(book.id)}>
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/20'} />
                           {book.universeId && (
                             <Link size={10} className="absolute -top-1 -right-1 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full" />
+                          )}
+                          {book.syncStatus === 'conflict' && (
+                            <AlertCircle size={10} className="absolute -bottom-1 -right-1 text-red-500 bg-[var(--theme-card)] rounded-full" />
                           )}
                         </div>
                         <input 
@@ -654,6 +896,16 @@ const App: React.FC = () => {
                           className={`text-sm font-bold bg-transparent border-none focus:ring-0 p-0 flex-1 ${activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/40'}`} 
                         />
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          {book.syncStatus === 'conflict' && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); openConflictResolver(book.id); }}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg flex items-center gap-1"
+                              title="יש קונפליקט בסנכרון. לחץ לפתרון."
+                            >
+                              <AlertCircle size={14} />
+                              <span className="text-[10px] font-bold">פתור</span>
+                            </button>
+                          )}
                           {book.universeId && (
                             <button 
                               onClick={(e) => unlinkBook(book.id, e)} 
@@ -750,6 +1002,37 @@ const App: React.FC = () => {
                   </label>
                 </div>
               </div>
+
+              {/* Auth Section */}
+              <div className="p-8 border-t border-[var(--theme-secondary)]">
+                {user ? (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[var(--theme-primary)]/10 flex items-center justify-center text-[var(--theme-primary)]">
+                        <Users size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-[var(--theme-primary)] truncate">{user.email}</p>
+                        <p className="text-[10px] text-[var(--theme-primary)]/40 truncate font-mono">ID: {user.uid}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => logout()}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                    >
+                      התנתק
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => signInWithGoogle()}
+                    className="w-full flex items-center justify-center gap-3 py-4 px-4 rounded-2xl text-sm font-bold bg-[var(--theme-primary)] text-[var(--theme-card)] hover:opacity-90 transition-all shadow-lg"
+                  >
+                    <Users size={18} />
+                    <span>התחבר עם Google</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </aside>
@@ -795,7 +1078,7 @@ const App: React.FC = () => {
                     onDeleteScene={deleteScene}
                     onUpdateSummary={(summary) => updateActiveBook({ summary })}
                     onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
-                    initialZoom={activeBook.uiState?.boardZoomLevel}
+                    initialZoom={activeUI.boardZoomLevel}
                     onZoomChange={(z) => updateBookUiState({ boardZoomLevel: z })}
                     onSceneDoubleClick={(id) => {
                       handleViewChange('editor');
@@ -816,9 +1099,9 @@ const App: React.FC = () => {
                     onUpdateScene={updateScene} 
                     onDeleteScene={deleteScene}
                     onOpenBulkAdd={() => setIsBulkAddOpen(true)} 
-                    initialFocusedSceneId={activeBook.uiState?.editorFocusedSceneId}
+                    initialFocusedSceneId={activeUI.editorFocusedSceneId}
                     onFocusScene={(id) => updateBookUiState({ editorFocusedSceneId: id })}
-                    initialDisplayMode={activeBook.uiState?.editorDisplayMode}
+                    initialDisplayMode={activeUI.editorDisplayMode}
                     onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
                     onExport={exportManuscript}
                     onUpdateChapterMarker={updateChapterMarker}
@@ -839,11 +1122,11 @@ const App: React.FC = () => {
                       onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
                       onUpdateMaps={(maps) => updateEntries('maps', maps)}
                       onUpdateMindMaps={(mindMaps) => updateEntries('mindMaps', mindMaps)}
-                      initialTab={activeBook.uiState?.mapsActiveTab}
+                      initialTab={activeUI.mapsActiveTab}
                       onTabChange={(tab) => updateBookUiState({ mapsActiveTab: tab })}
-                      selectedMapId={activeBook.uiState?.mapsSelectedMapId}
+                      selectedMapId={activeUI.mapsSelectedMapId}
                       onMapSelect={(id) => updateBookUiState({ mapsSelectedMapId: id })}
-                      selectedMindMapId={activeBook.uiState?.mapsSelectedMindMapId}
+                      selectedMindMapId={activeUI.mapsSelectedMindMapId}
                       onMindMapSelect={(id) => updateBookUiState({ mapsSelectedMindMapId: id })}
                    />
                 </div>
@@ -865,8 +1148,8 @@ const App: React.FC = () => {
                     onUpdateTwists={(e) => updateEntries('twists', e)}
                     onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
                     onUpdateBackgrounds={(e) => updateEntries('backgrounds', e)}
-                    initialTab={activeBook.uiState?.questionnaireActiveTab}
-                    initialSelectedEntryId={activeBook.uiState?.questionnaireSelectedEntryId}
+                    initialTab={activeUI.questionnaireActiveTab}
+                    initialSelectedEntryId={activeUI.questionnaireSelectedEntryId}
                     onTabChange={(tab) => updateBookUiState({ questionnaireActiveTab: tab })}
                     onEntrySelect={(id) => updateBookUiState({ questionnaireSelectedEntryId: id })}
                   />
@@ -927,14 +1210,14 @@ const App: React.FC = () => {
                   <button
                     key={key}
                     onClick={() => {
-                      updateBookUiState({ theme: key as any });
+                      updateActiveBook({ theme: key as any });
                       setIsThemeModalOpen(false);
                     }}
-                    className={`group relative flex flex-col p-4 rounded-3xl transition-all border-2 ${activeBook?.uiState?.theme === key ? 'border-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'border-transparent bg-[var(--theme-bg)] hover:border-[var(--theme-border)]'}`}
+                    className={`group relative flex flex-col p-4 rounded-3xl transition-all border-2 ${activeBook?.theme === key ? 'border-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'border-transparent bg-[var(--theme-bg)] hover:border-[var(--theme-border)]'}`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-bold text-sm">{theme.name}</span>
-                      {activeBook?.uiState?.theme === key && <CheckCircle2 size={16} className="text-[var(--theme-primary)]" />}
+                      {activeBook?.theme === key && <CheckCircle2 size={16} className="text-[var(--theme-primary)]" />}
                     </div>
                     <div className="flex gap-1.5">
                       <div className="w-6 h-6 rounded-full border border-black/5" style={{ backgroundColor: theme.primary }} />
@@ -944,6 +1227,120 @@ const App: React.FC = () => {
                   </button>
                 ))}
              </div>
+          </div>
+        </div>
+      )}
+
+      {isConflictModalOpen && resolvingBookId && remoteBookData && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--theme-card)] w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] p-8 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold handwritten text-3xl text-[var(--theme-primary)]">פתרון קונפליקט סנכרון</h2>
+              <button onClick={() => setIsConflictModalOpen(false)} className="text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] p-1 transition-colors"><X size={28} /></button>
+            </div>
+
+            <p className="text-sm text-[var(--theme-muted)] mb-8">
+              נמצאו שינויים סותרים בענן עבור הספר <strong>{books.find(b => b.id === resolvingBookId)?.title}</strong>. בחר כיצד ברצונך להמשיך:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Local Version */}
+              <div className="p-6 rounded-3xl bg-[var(--theme-secondary)]/30 border border-[var(--theme-border)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-[var(--theme-primary)]">גרסה מקומית</h3>
+                  <span className="text-[10px] px-2 py-1 bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] rounded-full uppercase">המכשיר שלך</span>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">כותרת</label>
+                    <p className="font-bold">{books.find(b => b.id === resolvingBookId)?.title}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">עודכן לאחרונה</label>
+                    <p>{new Date(books.find(b => b.id === resolvingBookId)?.updatedAt || 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">סצנות</label>
+                    <p>{books.find(b => b.id === resolvingBookId)?.scenes.length} סצנות</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => resolveConflict('local')}
+                  className="mt-6 w-full py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all"
+                >
+                  שמור גרסה מקומית
+                </button>
+              </div>
+
+              {/* Remote Version */}
+              <div className="p-6 rounded-3xl bg-[var(--theme-secondary)]/30 border border-[var(--theme-border)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-[var(--theme-primary)]">גרסת ענן</h3>
+                  <span className="text-[10px] px-2 py-1 bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] rounded-full uppercase">שרת / ענן</span>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">כותרת</label>
+                    <p className="font-bold">{remoteBookData.title}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">עודכן לאחרונה</label>
+                    <p>{new Date(remoteBookData.updatedAt).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase opacity-50 block">סצנות</label>
+                    <p>{remoteBookData.scenes.length} סצנות</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => resolveConflict('remote')}
+                  className="mt-6 w-full py-3 bg-[var(--theme-accent)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all"
+                >
+                  אמץ גרסת ענן
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--theme-border)] pt-8">
+              {!isMergingManually ? (
+                <button 
+                  onClick={() => {
+                    setIsMergingManually(true);
+                    setMergeTitle(books.find(b => b.id === resolvingBookId)?.title || '');
+                  }}
+                  className="w-full py-4 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-2xl font-bold hover:bg-[var(--theme-border)] transition-all flex items-center justify-center gap-2"
+                >
+                  <RefreshCw size={18} />
+                  <span>מיזוג ידני (עריכת כותרת)</span>
+                </button>
+              ) : (
+                <div className="space-y-4 animate-in slide-in-from-top-4 duration-300">
+                  <div>
+                    <label className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest mb-2 block">כותרת ממוזגת</label>
+                    <input 
+                      value={mergeTitle}
+                      onChange={(e) => setMergeTitle(e.target.value)}
+                      className="w-full bg-[var(--theme-bg)] border border-[var(--theme-border)] rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none"
+                      placeholder="הכנס כותרת חדשה..."
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => resolveConflict('merge')}
+                      className="flex-1 py-4 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-2xl font-bold hover:opacity-90 transition-all"
+                    >
+                      שמור ופתור
+                    </button>
+                    <button 
+                      onClick={() => setIsMergingManually(false)}
+                      className="px-6 py-4 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-2xl font-bold hover:bg-[var(--theme-border)] transition-all"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1022,7 +1419,7 @@ const App: React.FC = () => {
                       className="w-full bg-[var(--theme-bg)] border border-[var(--theme-border)] rounded-2xl px-4 py-3 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none"
                    >
                       <option value="">ספר עצמאי (ללא שיוך)</option>
-                      {books.map(book => (
+                      {displayBooks.map(book => (
                         <option key={book.id} value={book.id}>{book.title}</option>
                       ))}
                    </select>
@@ -1046,8 +1443,14 @@ const App: React.FC = () => {
       )}
 
       {isAboutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[var(--theme-card)] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] p-10 animate-in zoom-in-95 duration-200 text-center relative">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsAboutModalOpen(false)}
+        >
+          <div 
+            className="bg-[var(--theme-card)] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)] p-10 animate-in zoom-in-95 duration-200 text-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
              <button 
                onClick={() => setIsAboutModalOpen(false)} 
                className="absolute top-6 left-6 text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)] p-1 transition-colors"
@@ -1060,27 +1463,79 @@ const App: React.FC = () => {
              </div>
              
              <h2 className="text-2xl font-bold text-[var(--theme-primary)] mb-6 leading-tight">
-               סיימתם לכתוב? <br />
-               <span className="text-[var(--theme-accent)] handwritten text-4xl">זה הזמן לעריכה ספרותית.</span>
+               המטרה: לכתוב סיפור טוב.
              </h2>
              
-             <div className="space-y-4 mb-8">
-               <p className="text-[var(--theme-primary)]/60 font-bold uppercase tracking-widest text-xs">פנו אלי:</p>
-               <a 
-                 href="https://linktr.ee/cherutkelman" 
-                 target="_blank" 
-                 rel="noopener noreferrer"
-                 className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-xl font-bold hover:bg-[var(--theme-border)] transition-colors border border-[var(--theme-border)]/50"
-               >
-                 <Link size={18} />
-                 linktr.ee/cherutkelman
-               </a>
+             <div className="space-y-4 mb-8 text-[var(--theme-primary)]/80">
+               <p className="text-lg">
+                 זה המקום לתכנן, לדמיין, לכתוב ולהוציא לפועל את הסיפור שמתגלגל לנו בתוך הראש.
+               </p>
+               <p className="text-2xl font-bold handwritten text-[var(--theme-accent)]">
+                 שנצא לדרך?
+               </p>
              </div>
              
              <div className="pt-6 border-t border-[var(--theme-border)]/30">
-               <p className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-4xl">חרות קלמן</p>
-               <p className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase tracking-[0.2em] mt-1">Literary Editor & Story Consultant</p>
+               <p className="text-2xl font-bold text-[var(--theme-primary)] handwritten text-4xl">StoryLines</p>
+               <p className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase tracking-[0.2em] mt-1">by cherut kelman</p>
              </div>
+          </div>
+        </div>
+      )}
+      {showDebug && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[var(--theme-card)] border border-[var(--theme-border)] p-4 rounded-2xl shadow-2xl max-w-xs w-full handwritten">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-bold text-sm">Sync Diagnostics</h4>
+            <button onClick={() => setShowDebug(false)}><X size={14} /></button>
+          </div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span>Status:</span>
+              <span className="font-bold">{syncStatus}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Last Sync:</span>
+              <span>{syncService.getLastSyncTime() ? new Date(syncService.getLastSyncTime()!).toLocaleTimeString() : 'Never'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Pending:</span>
+              <span>{books.filter(b => b.pendingSync).length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Conflicts:</span>
+              <span className={books.some(b => b.syncStatus === 'conflict') ? 'text-red-500 font-bold' : ''}>
+                {books.filter(b => b.syncStatus === 'conflict').length}
+              </span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-[var(--theme-border)]">
+              <p className="text-[10px] opacity-60">Provider: {syncService.getDiagnostics().remoteProvider}</p>
+              <button 
+                onClick={async () => {
+                  if (activeBookId) {
+                    // 1. Save current state to LOCAL storage specifically to ensure it has the pending change
+                    console.log(`[App] Simulation: Saving current state to LocalStorage for book ${activeBookId}`);
+                    await storageManager.getLocalProvider().saveBooks(books);
+                    
+                    // 2. Simulate the remote change
+                    await syncService.simulateRemoteChange(activeBookId);
+                  }
+                }}
+                className="mt-2 w-full py-1 px-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-all"
+              >
+                Simulate Remote Conflict
+              </button>
+            </div>
+            <div className="mt-2 pt-2 border-t border-[var(--theme-border)] max-h-40 overflow-y-auto">
+              <p className="text-[10px] font-bold mb-1 uppercase opacity-40">Sync Logs</p>
+              {syncLogger.getLogs().slice(0, 10).map((log: any, i: number) => (
+                <div key={i} className={`text-[9px] mb-1 leading-tight ${log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-600' : 'text-slate-600'}`}>
+                  <span className="opacity-50">[{new Date(log.timestamp).toLocaleTimeString()}]</span> {log.message}
+                  {log.details && log.details.id && (
+                    <div className="opacity-40 ml-2">ID: {log.details.id.substring(0, 8)}...</div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

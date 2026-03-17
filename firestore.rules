@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: books
+    // Document ID: bookId (string)
+    // Fields:
+    //   - id: string (required) - The unique ID of the book
+    //   - ownerId: string (required) - The UID of the user who owns the book
+    //   - title: string (required) - The title of the book
+    //   - updatedAt: number (required) - Last update timestamp
+    //   - deletedAt: number (optional) - Deletion timestamp
+    //   - [other fields]: various types - scenes, plotlines, etc.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "cherut13@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidBook(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.ownerId is string && data.ownerId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.updatedAt is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /books/{bookId} {
+      // Users can only read their own books
+      allow read: if isOwner(resource.data.ownerId) || isAdmin();
+      
+      // Users can only create books they own
+      allow create: if isAuthenticated() && 
+                      isValidBook(request.resource.data) && 
+                      request.resource.data.ownerId == request.auth.uid;
+      
+      // Users can only update their own books and must maintain ownership
+      allow update: if isOwner(resource.data.ownerId) && 
+                      isValidBook(request.resource.data) &&
+                      request.resource.data.ownerId == resource.data.ownerId;
+      
+      // Users can only delete their own books
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

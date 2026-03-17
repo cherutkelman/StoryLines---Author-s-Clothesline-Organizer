@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Book": {
+      "title": "Book",
+      "description": "A book project containing scenes, plotlines, and other story data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "updatedAt": { "type": "number" },
+        "deletedAt": { "type": "number" }
+      },
+      "required": ["id", "ownerId", "title", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/books/{bookId}": {
+      "schema": "Book",
+      "description": "Collection of books owned by users."
+    }
+  }
+}

@@ -262,22 +262,31 @@ export interface Project {
   relationships?: Relationship[];
 }
 
+export type SyncStatus = 'synced' | 'pending' | 'error' | 'local_only' | 'conflict';
+
+export interface BookUIState {
+  lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
+  editorFocusedSceneId?: string | null;
+  editorDisplayMode?: 'full' | 'focus';
+  questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
+  questionnaireSelectedEntryId?: string | null;
+  boardZoomLevel?: number;
+  mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
+  mapsSelectedMapId?: string | null;
+  mapsSelectedMindMapId?: string | null;
+}
+
 export interface Book extends Project {
   id: string;
   ownerId: string;
   title: string;
   universeId?: string;
-  lastModified: number;
-  uiState?: {
-    lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
-    editorFocusedSceneId?: string | null;
-    editorDisplayMode?: 'full' | 'focus';
-    questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
-    questionnaireSelectedEntryId?: string | null;
-    boardZoomLevel?: number;
-    mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
-    mapsSelectedMapId?: string | null;
-    mapsSelectedMindMapId?: string | null;
-    theme?: keyof typeof THEMES;
-  };
+  theme?: keyof typeof THEMES;
+  createdAt: number;
+  updatedAt: number;
+  lastSyncedAt?: number;
+  syncStatus: SyncStatus;
+  pendingSync: boolean;
+  deletedAt?: number;
+  forceOverwriteRemote?: boolean;
 }

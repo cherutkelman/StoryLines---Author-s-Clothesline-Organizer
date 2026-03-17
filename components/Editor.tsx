@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Scene, Project, QuestionnaireEntry } from '../types';
 import { 
   BookOpen, 
@@ -72,12 +72,14 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
       );
     }
 
-    if (filtered.length > 0 && !focusedSceneId && displayMode === 'focus') {
-      handleFocusScene(filtered[0].id);
-    }
-    
     return filtered;
-  }, [project.scenes, visiblePlotlines, displayMode, searchQuery]);
+  }, [project.scenes, visiblePlotlines, searchQuery]);
+
+  useEffect(() => {
+    if (activeScenes.length > 0 && !focusedSceneId && displayMode === 'focus') {
+      handleFocusScene(activeScenes[0].id);
+    }
+  }, [activeScenes, focusedSceneId, displayMode]);
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
@@ -441,7 +443,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                   <p>ישנם שני סוגי כתיבת זמנים עיקריים.</p>
                   <p><span className="font-bold">כתיבה בזמן הווה</span> - אני הולכת, הוא רואה.</p>
                   <p><span className="font-bold">וכתיבה בזמן עבר</span> - הלכתי, והוא ראה.</p>
-                  <p>לכתיבה בזמן עבר, יש סגנון שכולל כתיבה על עבר מיידית, מה שנשמע כמו יומן שנכתב ממש עכשיו, לעומת כתיבה על עבר רחוק, שקרה מזמן. ואז נוכל להוסיף תובנות, או הכנה להמשך: <span className="italic">"בשלב הזה, רוני לא ידעה עדיין מה עומד להתרחש."</span></p>
+                  <p>לכתיבה בזמן עבר, יש סגנון שכולל כתיבה על עבר מיידי, מה שנשמע כמו יומן שנכתב ממש עכשיו, לעומת כתיבה על עבר רחוק, שקרה מזמן. ואז נוכל להוסיף תובנות, או הכנה להמשך: <span className="italic">"בשלב הזה, רוני לא ידעה עדיין מה עומד להתרחש."</span></p>
                   <p className="font-bold text-[var(--theme-accent)]">לא משנה באיזה זמן נבחר להשתמש בכתיבה, העיקר שנקפיד להשתמש בו באופן עקבי.</p>
                 </div>
               </section>
@@ -463,7 +465,7 @@ const Editor: React.FC<EditorProps> = ({ project, visiblePlotlines, onUpdateScen
                     <p>לעומת מספר יודע כל, שיכול לספר לנו על דברים שקורים במקביל, במקומות שונים. לרוב- הוא לא יתאר מחשבות של דמויות, אלא רק את המתרחש סביבן.</p>
                   </div>
 
-                  <p>אפשר לכתוב בשתי הצורות במקביל, למשל- דמות א נכתבת בגוף שלישי, ודמות ב' נכתבת מגוף ראשון. <span className="font-bold text-[var(--theme-accent)]">אבל נקפיד להשאר עקביים.</span></p>
+                  <p>אפשר לכתוב בשתי הצורות במקביל, למשל- דמות א' נכתבת בגוף שלישי, ודמות ב' נכתבת מגוף ראשון. <span className="font-bold text-[var(--theme-accent)]">אבל נקפיד להשאר עקביים.</span></p>
                 </div>
               </section>
             </div>
