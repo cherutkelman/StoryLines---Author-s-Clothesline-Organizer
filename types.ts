@@ -101,13 +101,6 @@ export const THEMES = {
   }
 };
 
-export interface Comment {
-  id: string;
-  text: string;
-  createdAt: number;
-  resolved?: boolean;
-}
-
 export interface Scene {
   id: string;
   plotlineId: string;
@@ -116,7 +109,6 @@ export interface Scene {
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
   chapterTitle?: string;
-  comments?: Comment[];
 }
 
 export interface ChapterMarker {
@@ -275,7 +267,7 @@ export type SyncStatus = 'synced' | 'pending' | 'error' | 'local_only' | 'confli
 export interface BookUIState {
   lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
   editorFocusedSceneId?: string | null;
-  editorDisplayMode?: 'full' | 'focus' | 'reading';
+  editorDisplayMode?: 'full' | 'focus';
   questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
-import { auth, signInWithGoogle, logout } from './src/firebase';
+import { auth, signIn as signInWithGoogle, logOut as logout } from './src/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { v4 as uuidv4 } from "uuid";
 import { 
@@ -1095,6 +1095,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
                    <Editor 
                     project={activeBook} 
+                    user={user}
                     visiblePlotlines={visiblePlotlines} 
                     onUpdateScene={updateScene} 
                     onDeleteScene={deleteScene}

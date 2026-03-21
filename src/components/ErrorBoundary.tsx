@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -20,45 +20,27 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    console.error('Uncaught error:', error, errorInfo);
   }
 
   public render() {
     if (this.state.hasError) {
-      let displayMessage = "משהו השתבש. אנא נסה לרענן את הדף.";
-      
-      try {
-        // Check if it's a Firestore error JSON
-        if (this.state.error?.message) {
-          const parsed = JSON.parse(this.state.error.message);
-          if (parsed.error && parsed.operationType) {
-            if (parsed.error.includes("insufficient permissions")) {
-              displayMessage = "אין לך הרשאות מתאימות לביצוע פעולה זו. וודא שאתה מחובר לחשבון הנכון.";
-            } else if (parsed.error.includes("offline")) {
-              displayMessage = "נראה שאתה לא מחובר לאינטרנט. בדוק את החיבור שלך.";
-            }
-          }
-        }
-      } catch (e) {
-        // Not a JSON error, use default
-      }
-
       return (
-        <div className="min-h-screen flex items-center justify-center bg-red-50 p-4 text-right" dir="rtl">
-          <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-red-100">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">אופס! שגיאה</h2>
-            <p className="text-slate-600 mb-6">{displayMessage}</p>
+        <div className="min-h-screen bg-red-50 flex items-center justify-center p-6 text-center">
+          <div className="max-w-md bg-white p-8 rounded-2xl shadow-xl border border-red-100">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">אופס, משהו השתבש</h1>
+            <p className="text-gray-600 mb-6">
+              התרחשה שגיאה בלתי צפויה באפליקציה.
+            </p>
+            <pre className="text-left bg-gray-50 p-4 rounded-lg text-xs overflow-auto max-h-40 mb-6">
+              {this.state.error?.message}
+            </pre>
             <button
               onClick={() => window.location.reload()}
-              className="w-full py-3 px-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+              className="px-6 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
             >
-              רענן דף
+              טען מחדש
             </button>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <pre className="mt-6 p-4 bg-slate-100 rounded-lg text-[10px] overflow-auto text-left" dir="ltr">
-                {this.state.error.stack}
-              </pre>
-            )}
           </div>
         </div>
       );

@@ -1,23 +1,93 @@
 {
   "entities": {
+    "Document": {
+      "title": "Document",
+      "description": "A collaborative document with track changes support.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The title of the document."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "The UID of the document creator."
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "Segment"
+          },
+          "description": "The list of text segments that make up the document."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The last time the document was modified."
+        }
+      },
+      "required": ["title", "authorId", "segments"]
+    },
+    "Segment": {
+      "title": "Segment",
+      "description": "A piece of text within a document, potentially a suggestion.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID for the segment."
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content of the segment."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["accepted", "suggested_addition", "suggested_deletion"],
+          "description": "The status of this segment in the track changes workflow."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who created this segment/suggestion."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the user who created this segment/suggestion."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the segment/suggestion was created."
+        }
+      },
+      "required": ["id", "text", "status", "userId", "userName", "timestamp"]
+    },
     "Book": {
       "title": "Book",
-      "description": "A book project containing scenes, plotlines, and other story data.",
+      "description": "A project containing plotlines, scenes, and other story elements.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "ownerId": { "type": "string" },
         "title": { "type": "string" },
+        "plotlines": { "type": "array", "items": { "type": "object" } },
+        "scenes": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "number" },
         "updatedAt": { "type": "number" },
-        "deletedAt": { "type": "number" }
+        "pendingSync": { "type": "boolean" },
+        "syncStatus": { "type": "string" }
       },
-      "required": ["id", "ownerId", "title", "updatedAt"]
+      "required": ["id", "ownerId", "title", "plotlines", "scenes", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
+    "/documents/{docId}": {
+      "schema": "Document",
+      "description": "Collection of collaborative documents."
+    },
     "/books/{bookId}": {
       "schema": "Book",
-      "description": "Collection of books owned by users."
+      "description": "Collection of user books/projects."
     }
   }
 }
