@@ -131,6 +131,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const [editorWorkflow, setEditorWorkflow] = useState<'author' | 'externalReview'>('author');
   const suggestionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
     // ===== Suggestion Navigation =====
@@ -145,7 +146,18 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             sceneId: scene.id
           }))
       )
-      .sort((a, b) => a.start - b.start);
+      .sort((a, b) => {
+      const sceneA = activeScenes.find(scene => scene.id === a.sceneId);
+      const sceneB = activeScenes.find(scene => scene.id === b.sceneId);
+
+      if (!sceneA || !sceneB) return 0;
+
+      if (sceneA.position !== sceneB.position) {
+        return sceneA.position - sceneB.position;
+      }
+
+      return a.start - b.start;
+    });
   };
 
   const activateSuggestion = (suggestionId: string) => {
@@ -273,21 +285,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
           <CopyPlus size={18} />
           <span>הוספה מהירה של סצנות</span>
         </button>
-        <button
-          onClick={goToPreviousSuggestion}
-          className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-          title="ההצעה הקודמת"
-        >
-          <span>הקודמת</span>
-        </button>
-
-        <button
-          onClick={goToNextSuggestion}
-          className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-          title="ההצעה הבאה"
-        >
-          <span>הבאה</span>
-        </button>
       </div>
     );
   }
@@ -337,6 +334,30 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
           </div>
 
+          <div className="flex items-center gap-1 bg-black/10 p-1 rounded-lg">
+            <button
+              onClick={() => setEditorWorkflow('author')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                editorWorkflow === 'author'
+                  ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm'
+                  : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'
+              }`}
+            >
+              <span>כתיבה</span>
+            </button>
+
+            <button
+              onClick={() => setEditorWorkflow('externalReview')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                editorWorkflow === 'externalReview'
+                  ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm'
+                  : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'
+              }`}
+            >
+              <span>עורך חיצוני</span>
+            </button>
+          </div>
+
           <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
 
           <div className="flex items-center gap-2">
@@ -364,7 +385,21 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 <span>חיפוש</span>
               </button>
             )}
-            
+            <button
+              onClick={goToPreviousSuggestion}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              title="ההצעה הקודמת"
+            >
+              <span>הקודמת</span>
+            </button>
+
+            <button
+              onClick={goToNextSuggestion}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              title="ההצעה הבאה"
+            >
+              <span>הבאה</span>
+            </button>
             <button 
               onClick={onOpenBulkAdd}
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -532,60 +567,100 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       onChange={(val) => onUpdateScene(scene.id, { content: val })}
                       minRows={5}
                     />
-
-                    {scene.suggestions && scene.suggestions.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                          {scene.suggestions
+                  
+                     {scene.suggestions && scene.suggestions.length > 0 && (
+                      <div className="mt-3 p-3 rounded-lg bg-[var(--theme-secondary)]/30 text-sm leading-relaxed whitespace-pre-wrap">
+                        {(() => {
+                          const suggestions = (scene.suggestions || [])
                             .filter(s => s.status === 'pending')
-                            .map((s) => (
-                              <div
-                                key={s.id}
-                                ref={(el) => {
-                                  suggestionRefs.current[s.id] = el;
-                                }}
-                                onClick={() => activateSuggestion(s.id)}
-                                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 cursor-pointer ${
-                                    activeSuggestionId === s.id
-                                      ? 'border-2 border-[var(--theme-primary)] bg-amber-50'
-                                      : 'border border-red-200 bg-red-50'
-                                  }`}
-                                >
-                                <div className="text-sm text-red-700 line-through whitespace-pre-wrap">
-                                  {s.text}
-                                </div>
+                            .sort((a, b) => a.start - b.start);
 
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const newContent =
-                                        scene.content.slice(0, s.start) +
-                                        scene.content.slice(s.end);
+                          let result: React.ReactNode[] = [];
+                          let lastIndex = 0;
 
-                                      onUpdateScene(scene.id, {
-                                        content: newContent,
-                                        suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
-                                      });
-                                    }}
-                                    className="px-3 py-1 rounded-lg bg-green-100 text-green-800 text-xs font-bold hover:bg-green-200"
-                                  >
-                                    קבל
-                                  </button>
+                          suggestions.forEach((s, i) => {
+                            // טקסט רגיל
+                            if (s.start > lastIndex) {
+                              result.push(
+                                <span key={`text-${i}`}>
+                                  {scene.content.slice(lastIndex, s.start)}
+                                </span>
+                              );
+                            }
 
-                                  <button
-                                    onClick={() => {
-                                      onUpdateScene(scene.id, {
-                                        suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
-                                      });
-                                    }}
-                                    className="px-3 py-1 rounded-lg bg-gray-100 text-gray-800 text-xs font-bold hover:bg-gray-200"
-                                  >
-                                    דחה
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                            // מחיקה
+                            result.push(
+                              <span
+                                key={`del-${s.id}`}
+                                onClick={() => setActiveSuggestionId(s.id)}
+                                className={
+                                  s.id === activeSuggestionId
+                                    ? "line-through text-red-700 bg-red-200 px-1 rounded cursor-pointer"
+                                    : "line-through text-red-400 cursor-pointer"
+                                }
+                              >
+                                {scene.content.slice(s.start, s.end)}
+                              </span>
+                            );
+
+                            lastIndex = s.end;
+                          });
+
+                          // שאר הטקסט
+                          if (lastIndex < scene.content.length) {
+                            result.push(
+                              <span key="tail">
+                                {scene.content.slice(lastIndex)}
+                              </span>
+                            );
+                          }
+
+                          return result;
+                        })()}
+                      </div>
+                    )}
+                    {(() => {
+                      const activeSuggestion = (scene.suggestions || []).find(
+                        s => s.id === activeSuggestionId && s.status === 'pending'
+                      );
+
+                      if (!activeSuggestion) return null;
+
+                      return (
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const newContent =
+                                scene.content.slice(0, activeSuggestion.start) +
+                                scene.content.slice(activeSuggestion.end);
+
+                              onUpdateScene(scene.id, {
+                                content: newContent,
+                                suggestions: (scene.suggestions || []).filter(item => item.id !== activeSuggestion.id)
+                              });
+
+                              setActiveSuggestionId(null);
+                            }}
+                            className="px-3 py-1 rounded-lg bg-green-100 text-green-800 text-xs font-bold hover:bg-green-200"
+                          >
+                            קבל
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              onUpdateScene(scene.id, {
+                                suggestions: (scene.suggestions || []).filter(item => item.id !== activeSuggestion.id)
+                              });
+
+                              setActiveSuggestionId(null);
+                            }}
+                            className="px-3 py-1 rounded-lg bg-gray-100 text-gray-800 text-xs font-bold hover:bg-gray-200"
+                          >
+                            דחה
+                          </button>
                         </div>
-                      )}
+                      );
+                    })()}
                   </>
                 </div>
               )}

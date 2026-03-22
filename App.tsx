@@ -50,6 +50,7 @@ import {
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
+import ExternalReview from './components/ExternalReview';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
@@ -905,6 +906,7 @@ const App: React.FC = () => {
             <LucideType size={18} />
             <span className="hidden sm:inline">עורך טקסט</span>
           </button>
+          
           <button 
             onClick={() => handleViewChange('maps')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
