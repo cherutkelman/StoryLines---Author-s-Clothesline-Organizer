@@ -40,7 +40,7 @@ export const loadBooks = async (includeDeleted = false): Promise<Book[]> => {
   return deduplicateBooks(books);
 };
 
-export const saveBooks = async (books: Book[]): Promise<void> => {
+export const saveBooks = async (books: Book[], skipCloud = false): Promise<Book[]> => {
   const cleanBooks = deduplicateBooks(books);
   
   // Always save to LocalStorage as our local cache/source for sync
@@ -48,12 +48,30 @@ export const saveBooks = async (books: Book[]): Promise<void> => {
   console.log(`Storage: Saving books to LocalStorage provider`);
   await localProvider.saveBooks(cleanBooks);
   
-  // If in cloud mode, also save to remote provider
-  if (storageManager.getMode() === 'cloud') {
+  let finalBooks = [...cleanBooks];
+
+  // If in cloud mode and not skipping cloud, also save to remote provider
+  if (!skipCloud && storageManager.getMode() === 'cloud') {
     const remoteProvider = storageManager.getRemoteProvider();
-    console.log(`Storage: Also saving books to ${remoteProvider.name} provider`);
-    await remoteProvider.saveBooks(cleanBooks);
+    const pendingIds = cleanBooks.filter(b => b.pendingSync).map(b => b.id);
+    
+    if (pendingIds.length > 0) {
+      console.log(`Storage: Also saving ${pendingIds.length} pending books to ${remoteProvider.name} provider`);
+      await remoteProvider.saveBooks(cleanBooks, pendingIds);
+      
+      // Update pendingSync flag locally after successful cloud save
+      finalBooks = cleanBooks.map(b => 
+        pendingIds.includes(b.id) ? { ...b, pendingSync: false, syncStatus: 'synced' as SyncStatus } : b
+      );
+      
+      // Save the updated list back to local storage so it's consistent
+      await localProvider.saveBooks(finalBooks);
+    } else {
+      console.log(`Storage: No pending books to sync to ${remoteProvider.name}`);
+    }
   }
+
+  return finalBooks;
 };
 
 const UI_STATE_KEY = 'storylines_ui_state_v1';

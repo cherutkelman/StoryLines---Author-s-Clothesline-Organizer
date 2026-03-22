@@ -32,7 +32,7 @@ import {
   ChevronLast,
   ChevronFirst,
   Users,
-  Map,
+  Map as MapIcon,
   Eye,
   EyeOff,
   MessageSquareQuote,
@@ -79,19 +79,31 @@ const App: React.FC = () => {
         
         // 2. Switch to cloud mode
         setStorageMode('cloud');
+        setStorageModeState('cloud');
         
         // 3. Perform initial sync to merge local and remote
         console.log("App: Performing initial sync...");
-        const { updatedBooks } = await syncService.sync();
-        console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
-        
-        setBooks(deduplicateBooks(updatedBooks));
+        try {
+          setIsSyncing(true);
+          const { updatedBooks } = await syncService.sync();
+          console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
+          setBooks(deduplicateBooks(updatedBooks));
+          setCloudError(null);
+        } catch (error: any) {
+          console.error("App: Initial sync failed", error);
+          if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+            setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+          }
+        } finally {
+          setIsSyncing(false);
+        }
       } else {
         // Logged out
         console.log("App: User logged out, switching to local storage");
         setUserId(null);
         setCurrentUserId(getOrCreateUserId());
         setStorageMode('local');
+        setStorageModeState('local');
         
         const loadedBooks = await loadBooks();
         setBooks(deduplicateBooks(loadedBooks));
@@ -134,10 +146,14 @@ const App: React.FC = () => {
   const [showDebug, setShowDebug] = useState(false);
   
   const [activeBookId, setActiveBookId] = useState<string>('');
+  const [storageMode, setStorageModeState] = useState<'local' | 'cloud'>(storageManager.getMode());
   const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>('board');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
+  const [lastCloudSaved, setLastCloudSaved] = useState<Date | null>(null);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
@@ -186,15 +202,65 @@ const App: React.FC = () => {
     }
   }, [books, activeBookId]);
 
+  // Local save effect (1s)
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      saveBooks(books);
+    const timeout = setTimeout(async () => {
+      const updatedBooks = await saveBooks(books, true); // Skip cloud
+      // We don't necessarily need to setBooks here because it's just local save
+      // but if we want to be safe and keep state in sync with storage:
+      // setBooks(updatedBooks); 
       saveUIStates(uiStates);
       saveGlobalUIState({ lastActiveBookId: activeBookId });
       setLastSaved(new Date());
-    }, 1000); // Debounce save by 1 second
+    }, 1000); // Debounce local save by 1 second
     return () => clearTimeout(timeout);
   }, [books, uiStates, activeBookId]);
+
+  // Cloud save effect (5 minutes)
+  useEffect(() => {
+    if (storageMode !== 'cloud' || !user || isSyncing) return;
+    
+    // Only trigger cloud save if there are pending changes
+    const hasPendingChanges = books.some(b => b.pendingSync);
+    if (!hasPendingChanges) return;
+
+    // If we recently had a quota error, wait longer before retrying
+    const debounceTime = cloudError?.includes('quota') ? 600000 : 300000; // 10m if quota error, else 5m
+
+    const timeout = setTimeout(async () => {
+      try {
+        console.log("[App] Debounced cloud save triggered...");
+        setIsSyncing(true);
+        const currentBooks = books; // Capture current state
+        const updatedBooks = await saveBooks(currentBooks, false); // Don't skip cloud
+        
+        setBooks(prev => {
+          // Merge updatedBooks into prev, but only if prev hasn't been updated since we started saving
+          return prev.map(p => {
+            const updated = updatedBooks.find(u => u.id === p.id);
+            if (updated && updated.updatedAt === p.updatedAt) {
+              // This book hasn't changed since we started the save, so it's safe to clear its pendingSync flag
+              return updated;
+            }
+            return p;
+          });
+        });
+        
+        setLastCloudSaved(new Date());
+        setCloudError(null);
+      } catch (e: any) {
+        console.error("Cloud save failed", e);
+        if (e.message?.includes('resource-exhausted') || e.message?.includes('quota')) {
+          setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+        } else {
+          setCloudError('סנכרון לענן נכשל. ננסה שוב בקרוב.');
+        }
+      } finally {
+        setIsSyncing(false);
+      }
+    }, debounceTime); 
+    return () => clearTimeout(timeout);
+  }, [books, storageMode, user, cloudError, isSyncing]);
 
   useEffect(() => {
     const themeKey = activeBook?.theme || 'classic';
@@ -373,11 +439,11 @@ const App: React.FC = () => {
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
-    if (!activeBook) return;
-    updateActiveBook({
-      scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
-    });
-  };
+  if (!activeBook) return;
+  updateActiveBook({
+    scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
+  });
+};
 
   const updateChapterTitle = (position: number, title: string) => {
     if (!activeBook) return;
@@ -623,22 +689,54 @@ const App: React.FC = () => {
 
   const handleSync = async () => {
     console.log("[App] Sync button clicked");
+    if (isSyncing) return;
+    
     try {
+      setIsSyncing(true);
       // Ensure latest state is saved before sync
       console.log("[App] Saving books before sync...");
-      await saveBooks(books);
+      const currentBooks = books;
+      const savedBooks = await saveBooks(currentBooks);
+      
+      setBooks(prev => {
+        return prev.map(p => {
+          const saved = savedBooks.find(s => s.id === p.id);
+          if (saved && saved.updatedAt === p.updatedAt) {
+            return saved;
+          }
+          return p;
+        });
+      });
       
       console.log("[App] Calling syncService.sync()...");
       const { updatedBooks } = await syncService.sync();
+      setLastCloudSaved(new Date());
+      setCloudError(null);
       
       if (updatedBooks.length > 0) {
         console.log(`[App] Sync complete. Updating state with ${updatedBooks.length} books.`);
-        setBooks(updatedBooks);
+        setBooks(prev => {
+          // For sync, we might need to be more careful, but usually sync is a full replace
+          // However, to be safe against concurrent edits:
+          const map = new Map(prev.map(b => [b.id, b]));
+          updatedBooks.forEach(u => {
+            const existing = map.get(u.id);
+            if (!existing || u.updatedAt >= existing.updatedAt) {
+              map.set(u.id, u);
+            }
+          });
+          return Array.from(map.values());
+        });
       } else {
         console.log("[App] Sync complete. No updates to local state.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[App] Sync error:", error);
+      if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+        setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+      }
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -754,6 +852,17 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
+      {cloudError && (
+        <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between text-sm font-bold z-[100] sticky top-0 shadow-lg animate-in slide-in-from-top duration-500">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} />
+            <span>{cloudError}</span>
+          </div>
+          <button onClick={() => setCloudError(null)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+      )}
       <header className="flex-shrink-0 sticky top-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-6 py-3 flex items-center justify-between shadow-sm z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
@@ -800,7 +909,7 @@ const App: React.FC = () => {
             onClick={() => handleViewChange('maps')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
           >
-            <Map size={18} />
+            <MapIcon size={18} />
             <span className="hidden sm:inline">מפות</span>
           </button>
           <button 
@@ -815,22 +924,30 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2">
           <button 
             onClick={handleSync}
-            disabled={syncStatus === 'syncing'}
+            disabled={syncStatus === 'syncing' || isSyncing}
             className={`flex items-center gap-2 p-2.5 rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)] ${
-              syncStatus === 'syncing' ? 'animate-pulse' : ''
+              (syncStatus === 'syncing' || isSyncing) ? 'animate-pulse' : ''
             } ${
-              syncStatus === 'error' ? 'text-red-500' : 
+              (syncStatus === 'error' || cloudError) ? 'text-red-500' : 
               syncStatus === 'success' ? 'text-green-500' : 'text-[var(--theme-primary)]'
             }`}
             title={
-              syncStatus === 'syncing' ? "מסנכרן..." : 
-              syncStatus === 'error' ? "שגיאה בסנכרון" : 
-              syncStatus === 'success' ? "סונכרן בהצלחה" : "סנכרן עכשיו"
+              (syncStatus === 'syncing' || isSyncing) ? "מסנכרן..." : 
+              (syncStatus === 'error' || cloudError) ? (cloudError || "שגיאה בסנכרון") : 
+              syncStatus === 'success' ? "סונכרן בהצלחה" : 
+              `סנכרן עכשיו${lastCloudSaved ? ` (סונכרן לאחרונה: ${lastCloudSaved.toLocaleTimeString()})` : ''}`
             }
           >
-            {syncStatus === 'syncing' ? <RefreshCw size={20} className="animate-spin" /> : 
-             syncStatus === 'error' ? <AlertCircle size={20} /> :
-             syncStatus === 'success' ? <CheckCircle2 size={20} /> : <Cloud size={20} />}
+            {(syncStatus === 'syncing' || isSyncing) ? <RefreshCw size={20} className="animate-spin" /> : 
+             (syncStatus === 'error' || cloudError) ? <AlertCircle size={20} /> :
+             syncStatus === 'success' ? <CheckCircle2 size={20} /> : 
+             <div className="relative">
+               <Cloud size={20} />
+               {books.some(b => b.pendingSync) && (
+                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[var(--theme-card)]" title="יש שינויים הממתינים לסנכרון" />
+               )}
+             </div>
+            }
             <span className="hidden xl:inline text-xs font-bold">סנכרון</span>
           </button>
           <button 
@@ -1495,8 +1612,21 @@ const App: React.FC = () => {
               <span className="font-bold">{syncStatus}</span>
             </div>
             <div className="flex justify-between">
+              <span>Syncing:</span>
+              <span className={isSyncing ? 'text-amber-500 font-bold' : ''}>{isSyncing ? 'Yes' : 'No'}</span>
+            </div>
+            {cloudError && (
+              <div className="mt-1 p-1 bg-red-50 text-red-600 rounded text-[10px] leading-tight">
+                {cloudError}
+              </div>
+            )}
+            <div className="flex justify-between">
               <span>Last Sync:</span>
               <span>{syncService.getLastSyncTime() ? new Date(syncService.getLastSyncTime()!).toLocaleTimeString() : 'Never'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Last Cloud Sync:</span>
+              <span>{lastCloudSaved ? lastCloudSaved.toLocaleTimeString() : 'Never'}</span>
             </div>
             <div className="flex justify-between">
               <span>Pending:</span>

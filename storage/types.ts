@@ -4,7 +4,7 @@ export interface IStorageProvider {
   name: string;
   getUserId(): string;
   loadBooks(includeDeleted?: boolean): Promise<Book[]>;
-  saveBooks(books: Book[]): Promise<void>;
+  saveBooks(books: Book[], onlyIds?: string[]): Promise<void>;
 }
 
 export type StorageMode = 'local' | 'cloud';

@@ -39,6 +39,7 @@ export class SyncService {
     }
 
     const conflicts: string[] = [];
+    const modifiedRemoteIds: string[] = [];
     let pushedCount = 0;
     let pulledCount = 0;
 
@@ -144,6 +145,7 @@ export class SyncService {
 
           updatedLocalBooks[i] = syncedBook;
           remoteMap.set(syncedBook.id, syncedBook);
+          modifiedRemoteIds.push(syncedBook.id);
           pushedCount++;
         } else if (remoteBook && hasLocalChanges && hasRemoteChanges) {
           // CONFLICT: Both changed since last sync
@@ -184,6 +186,7 @@ export class SyncService {
 
           updatedLocalBooks[i] = syncedBook;
           remoteMap.set(syncedBook.id, syncedBook);
+          modifiedRemoteIds.push(syncedBook.id);
           pushedCount++;
         } else if (remoteBook && hasRemoteChanges) {
           // Pull from remote
@@ -220,8 +223,12 @@ export class SyncService {
       }
 
       // 4. Save back to remote
-      syncLogger.info(`Sync: Saving ${remoteMap.size} books to remote provider (${this.remote.name})`);
-      await this.remote.saveBooks(Array.from(remoteMap.values()));
+      if (modifiedRemoteIds.length > 0) {
+        syncLogger.info(`Sync: Saving ${modifiedRemoteIds.length} modified books to remote provider (${this.remote.name})`);
+        await this.remote.saveBooks(Array.from(remoteMap.values()), modifiedRemoteIds);
+      } else {
+        syncLogger.info(`Sync: No local changes to push to remote.`);
+      }
       
       console.log(`Sync: Saving ${updatedLocalBooks.length} books to local provider (${this.local.name})`);
       await this.local.saveBooks(updatedLocalBooks);

@@ -133,7 +133,7 @@ export class LocalStorageProvider implements IStorageProvider {
     }
   }
 
-  async saveBooks(books: Book[]): Promise<void> {
+  async saveBooks(books: Book[], onlyIds?: string[]): Promise<void> {
     try {
       const currentUserId = this.getUserId();
       console.log(`[LocalStorageProvider] saveBooks: Saving ${books.length} books for user ${currentUserId}`);

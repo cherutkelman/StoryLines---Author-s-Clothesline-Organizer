@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Project, Scene, QuestionnaireEntry } from '../types';
+import { v4 as uuidv4 } from "uuid";
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -129,6 +130,63 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const suggestionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    // ===== Suggestion Navigation =====
+
+  const getAllSuggestions = () => {
+    return activeScenes
+      .flatMap(scene =>
+        (scene.suggestions || [])
+          .filter(s => s.status === 'pending')
+          .map(s => ({
+            ...s,
+            sceneId: scene.id
+          }))
+      )
+      .sort((a, b) => a.start - b.start);
+  };
+
+  const activateSuggestion = (suggestionId: string) => {
+    const all = getAllSuggestions();
+    const target = all.find(s => s.id === suggestionId);
+
+    if (!target) return;
+
+    setActiveSuggestionId(target.id);
+    handleFocusScene(target.sceneId);
+  };
+
+  const goToNextSuggestion = () => {
+    const all = getAllSuggestions();
+    if (all.length === 0) return;
+
+    if (!activeSuggestionId) {
+      activateSuggestion(all[0].id);
+      return;
+    }
+
+    const index = all.findIndex(s => s.id === activeSuggestionId);
+    const next = all[index + 1] || all[0];
+
+    activateSuggestion(next.id);
+  };
+
+  const goToPreviousSuggestion = () => {
+    const all = getAllSuggestions();
+    if (all.length === 0) return;
+
+    if (!activeSuggestionId) {
+      activateSuggestion(all[all.length - 1].id);
+      return;
+    }
+
+    const index = all.findIndex(s => s.id === activeSuggestionId);
+    const prev = all[index - 1] || all[all.length - 1];
+
+    activateSuggestion(prev.id);
+  };
 
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
     setDisplayMode(mode);
@@ -161,6 +219,17 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
       handleFocusScene(activeScenes[0].id);
     }
   }, [activeScenes, focusedSceneId, displayMode]);
+  useEffect(() => {
+  if (!activeSuggestionId) return;
+
+  const el = suggestionRefs.current[activeSuggestionId];
+  if (!el) return;
+
+  el.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
+}, [activeSuggestionId, focusedSceneId]);
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
@@ -203,6 +272,21 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
         >
           <CopyPlus size={18} />
           <span>הוספה מהירה של סצנות</span>
+        </button>
+        <button
+          onClick={goToPreviousSuggestion}
+          className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+          title="ההצעה הקודמת"
+        >
+          <span>הקודמת</span>
+        </button>
+
+        <button
+          onClick={goToNextSuggestion}
+          className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+          title="ההצעה הבאה"
+        >
+          <span>הבאה</span>
         </button>
       </div>
     );
@@ -388,6 +472,49 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         <CheckCircle2 size={16} />
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
                       </button>
+                      <button
+                        onMouseDown={() => {
+                          console.log('delete test clicked', scene.id, scene.suggestions);
+
+                          if (!scene.content.trim()) return;
+
+                          const activeEl = document.activeElement as HTMLTextAreaElement | null;
+
+                          if (!activeEl) return;
+
+                          const start = activeEl.selectionStart;
+                          const end = activeEl.selectionEnd;
+
+                          if (start === end) return;
+
+                          const selectedText = scene.content.slice(start, end);
+
+                          onUpdateScene(scene.id, {
+                            suggestions: [
+                              ...(scene.suggestions || []),
+                              {
+                                id: uuidv4(),
+                                type: 'delete',
+                                start,
+                                end,
+                                text: selectedText,
+                                createdAt: Date.now(),
+                                status: 'pending',
+                              }
+                            ]
+                          });
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                        title="בדיקת הצעת מחיקה"
+                      >
+                        <X size={16} />
+                        <span>בדיקת מחיקה</span>
+                      </button>
+                    {(scene.suggestions?.length || 0) > 0 && (
+                      <span className="px-3 py-2 rounded-xl text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                        {scene.suggestions!.length} הצעות
+                      </span>
+                    )}
                       <button 
                         onClick={() => onDeleteScene(scene.id)}
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
@@ -397,13 +524,69 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       </button>
                     </div>
                   </header>
-                  <AutoExpandingTextarea 
-                    className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
-                    value={scene.content}
-                    placeholder="התחל לכתוב כאן..."
-                    onChange={(val) => onUpdateScene(scene.id, { content: val })}
-                    minRows={5}
-                  />
+                  <>
+                    <AutoExpandingTextarea 
+                      className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
+                      value={scene.content}
+                      placeholder="התחל לכתוב כאן..."
+                      onChange={(val) => onUpdateScene(scene.id, { content: val })}
+                      minRows={5}
+                    />
+
+                    {scene.suggestions && scene.suggestions.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          {scene.suggestions
+                            .filter(s => s.status === 'pending')
+                            .map((s) => (
+                              <div
+                                key={s.id}
+                                ref={(el) => {
+                                  suggestionRefs.current[s.id] = el;
+                                }}
+                                onClick={() => activateSuggestion(s.id)}
+                                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 cursor-pointer ${
+                                    activeSuggestionId === s.id
+                                      ? 'border-2 border-[var(--theme-primary)] bg-amber-50'
+                                      : 'border border-red-200 bg-red-50'
+                                  }`}
+                                >
+                                <div className="text-sm text-red-700 line-through whitespace-pre-wrap">
+                                  {s.text}
+                                </div>
+
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const newContent =
+                                        scene.content.slice(0, s.start) +
+                                        scene.content.slice(s.end);
+
+                                      onUpdateScene(scene.id, {
+                                        content: newContent,
+                                        suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
+                                      });
+                                    }}
+                                    className="px-3 py-1 rounded-lg bg-green-100 text-green-800 text-xs font-bold hover:bg-green-200"
+                                  >
+                                    קבל
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      onUpdateScene(scene.id, {
+                                        suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
+                                      });
+                                    }}
+                                    className="px-3 py-1 rounded-lg bg-gray-100 text-gray-800 text-xs font-bold hover:bg-gray-200"
+                                  >
+                                    דחה
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                  </>
                 </div>
               )}
             </article>

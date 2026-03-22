@@ -64,6 +64,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export class FirestoreStorageProvider implements IStorageProvider {
   name = 'Firestore';
   private userId: string | null = null;
+  private quotaExceededUntil: number = 0;
 
   setUserId(userId: string | null) {
     this.userId = userId;
@@ -80,6 +81,11 @@ export class FirestoreStorageProvider implements IStorageProvider {
       return [];
     }
 
+    if (Date.now() < this.quotaExceededUntil) {
+      console.warn("[FirestoreStorageProvider] Quota recently exceeded. Skipping loadBooks to avoid errors.");
+      return [];
+    }
+
     const path = "books";
     console.log(`[FirestoreStorageProvider] loadBooks: Fetching from path "${path}" where ownerId == "${this.userId}"`);
     const booksRef = collection(db, path);
@@ -93,10 +99,14 @@ export class FirestoreStorageProvider implements IStorageProvider {
         books.push(doc.data() as Book);
       });
 
+      this.quotaExceededUntil = 0; // Reset on success
       if (includeDeleted) return books;
       return books.filter(b => !b.deletedAt);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[FirestoreStorageProvider] loadBooks: FAILED", error);
+      if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+        this.quotaExceededUntil = Date.now() + 3600000; // 1 hour cooldown
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
     }
@@ -121,18 +131,32 @@ export class FirestoreStorageProvider implements IStorageProvider {
     return newObj;
   }
 
-  async saveBooks(books: Book[]): Promise<void> {
+  async saveBooks(books: Book[], onlyIds?: string[]): Promise<void> {
     if (!this.userId) {
       console.warn("[FirestoreStorageProvider] saveBooks called but userId is null. Aborting write.");
       return;
     }
 
+    if (Date.now() < this.quotaExceededUntil) {
+      console.warn("[FirestoreStorageProvider] Quota recently exceeded. Skipping saveBooks to avoid errors.");
+      return;
+    }
+
     const path = "books";
-    console.log(`[FirestoreStorageProvider] saveBooks: Preparing to write ${books.length} books to path "${path}"`);
+    const booksToSave = onlyIds 
+      ? books.filter(b => onlyIds.includes(b.id))
+      : books;
+
+    if (booksToSave.length === 0) {
+      console.log("[FirestoreStorageProvider] saveBooks: No books to save. Skipping.");
+      return;
+    }
+
+    console.log(`[FirestoreStorageProvider] saveBooks: Preparing to write ${booksToSave.length} books to path "${path}"`);
     const batch = writeBatch(db);
     
     let count = 0;
-    books.forEach(book => {
+    booksToSave.forEach(book => {
       if (book.ownerId === this.userId) {
         const bookRef = doc(db, path, book.id);
         // Remove undefined values before saving to Firestore
@@ -153,8 +177,12 @@ export class FirestoreStorageProvider implements IStorageProvider {
       console.log(`[FirestoreStorageProvider] saveBooks: Committing batch of ${count} documents...`);
       await batch.commit();
       console.log("[FirestoreStorageProvider] saveBooks: SUCCESS. Batch commit complete.");
-    } catch (error) {
+      this.quotaExceededUntil = 0; // Reset on success
+    } catch (error: any) {
       console.error("[FirestoreStorageProvider] saveBooks: FAILED", error);
+      if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+        this.quotaExceededUntil = Date.now() + 3600000; // 1 hour cooldown
+      }
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   }
