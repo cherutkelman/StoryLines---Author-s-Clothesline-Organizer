@@ -48,28 +48,41 @@ const AutoExpandingTextarea: React.FC<{
   placeholder?: string;
   className?: string;
   minRows?: number;
-}> = ({ value, onChange, placeholder, className, minRows = 5 }) => {
+  readOnly?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  textareaRefProp?: React.RefObject<HTMLTextAreaElement | null>;
+  onMouseDown?: () => void;
+}> = ({
+  value,
+  onChange,
+  placeholder,
+  className,
+  minRows = 5,
+  readOnly = false,
+  onKeyDown,
+  textareaRefProp,
+  onMouseDown
+}) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localValue, setLocalValue] = useState(value);
+  const effectiveTextareaRef = textareaRefProp || textareaRef;
 
-  // Update local value when prop changes (e.g. on scene switch)
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
-  // Debounce the onChange call
   useEffect(() => {
     if (localValue === value) return;
-    
+
     const timeoutId = setTimeout(() => {
       onChange(localValue);
-    }, 500); // Wait 500ms after last keystroke
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [localValue, onChange, value]);
 
   const adjustHeight = () => {
-    const textarea = textareaRef.current;
+    const textarea = effectiveTextareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
       const newHeight = Math.max(textarea.scrollHeight, minRows * 28);
@@ -83,13 +96,16 @@ const AutoExpandingTextarea: React.FC<{
 
   return (
     <textarea
-      ref={textareaRef}
+      ref={effectiveTextareaRef}
       className={className}
       value={localValue}
       placeholder={placeholder}
       onChange={(e) => setLocalValue(e.target.value)}
+      onMouseDown={onMouseDown}
+      onKeyDown={onKeyDown}
       rows={minRows}
       style={{ overflow: 'hidden' }}
+      readOnly={readOnly}
     />
   );
 };
@@ -131,7 +147,9 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const reviewTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [editorWorkflow, setEditorWorkflow] = useState<'author' | 'externalReview'>('author');
+  const isExternalReview = editorWorkflow === 'externalReview';
   const suggestionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
     // ===== Suggestion Navigation =====
@@ -385,21 +403,26 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 <span>חיפוש</span>
               </button>
             )}
-            <button
-              onClick={goToPreviousSuggestion}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-              title="ההצעה הקודמת"
-            >
-              <span>הקודמת</span>
-            </button>
+            {editorWorkflow === 'externalReview' && (
+            <>
+              <button
+                onClick={goToPreviousSuggestion}
+                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+                title="ההצעה הקודמת"
+              >
+                <span>הקודמת</span>
+              </button>
 
-            <button
-              onClick={goToNextSuggestion}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-              title="ההצעה הבאה"
-            >
-              <span>הבאה</span>
-            </button>
+              <button
+                onClick={goToNextSuggestion}
+                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+                title="ההצעה הבאה"
+              >
+                <span>הבאה</span>
+              </button>
+            </>
+          )}
+            {!isExternalReview && (
             <button 
               onClick={onOpenBulkAdd}
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -408,6 +431,8 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Plus size={14} />
               <span>סצנה חדשה</span>
             </button>
+            )}
+            {!isExternalReview && (
             <button 
               onClick={() => setBridgeType('characters')} 
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -416,6 +441,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <BookOpen size={14} />
               <span>שלוף משאלון</span>
             </button>
+            )}
             <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
             <button 
               onClick={onExport}
@@ -425,6 +451,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Download size={14} />
               <span>ייצוא</span>
             </button>
+            {!isExternalReview && (
             <button 
               onClick={() => setIsInfoModalOpen(true)}
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -433,6 +460,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Info size={14} />
               <span>טיפים</span>
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -500,6 +528,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                           )}
                         </div>
                       </div>
+                      {!isExternalReview && (
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
@@ -507,6 +536,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         <CheckCircle2 size={16} />
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
                       </button>
+                      )}
                       <button
                         onMouseDown={() => {
                           console.log('delete test clicked', scene.id, scene.suggestions);
@@ -550,6 +580,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         {scene.suggestions!.length} הצעות
                       </span>
                     )}
+                    {!isExternalReview && (
                       <button 
                         onClick={() => onDeleteScene(scene.id)}
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
@@ -557,53 +588,282 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       >
                         <Trash2 size={18} />
                       </button>
+                      )}
                     </div>
                   </header>
                   <>
+                  {isExternalReview && (
+                    <div className="mb-2 text-xs font-bold text-[var(--theme-accent)]">
+                      מצב סקירה: אפשר לסמן טקסט ולהציע מחיקה, אבל לא לערוך ישירות.
+                    </div>
+                  )}
                     <AutoExpandingTextarea 
-                      className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
+                      className={`w-full border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg ${
+                        isExternalReview
+                          ? 'bg-[var(--theme-secondary)]/20 rounded-lg px-3 py-3 cursor-text'
+                          : 'bg-transparent'
+                      }`}
                       value={scene.content}
                       placeholder="התחל לכתוב כאן..."
                       onChange={(val) => onUpdateScene(scene.id, { content: val })}
+                      onKeyDown={(e) => {
+                        if (!isExternalReview) return;
+
+                        const target = e.currentTarget;
+                        const start = target.selectionStart ?? 0;
+                        const end = target.selectionEnd ?? 0;
+
+                        // ======================
+                        // DELETE (Backspace/Delete)
+                        // ======================
+                        if (e.key === 'Backspace' || e.key === 'Delete') {
+                          const activeInsert = (scene.suggestions || []).find(
+                            s =>
+                              s.id === activeSuggestionId &&
+                              s.status === 'pending' &&
+                              s.type === 'insert'
+                          );
+
+                          // מחיקה מתוך insert קיים
+                          if (activeInsert && e.key === 'Backspace' && activeInsert.text.length > 0) {
+                            e.preventDefault();
+
+                            const updatedText = activeInsert.text.slice(0, -1);
+
+                            if (updatedText.length === 0) {
+                              onUpdateScene(scene.id, {
+                                suggestions: (scene.suggestions || []).filter(s => s.id !== activeInsert.id)
+                              });
+                              setActiveSuggestionId(null);
+                            } else {
+                              onUpdateScene(scene.id, {
+                                suggestions: (scene.suggestions || []).map(s =>
+                                  s.id === activeInsert.id
+                                    ? { ...s, text: updatedText, end: s.end - 1 }
+                                    : s
+                                )
+                              });
+                            }
+
+                            return;
+                          }
+
+                          // מחיקה של טקסט מסומן
+                          if (start !== end) {
+                            e.preventDefault();
+
+                            const selectedText = scene.content.slice(start, end);
+
+                            const deleteSuggestion = {
+                              id: uuidv4(),
+                              type: 'delete' as const,
+                              start,
+                              end,
+                              text: selectedText,
+                              createdAt: Date.now(),
+                              status: 'pending' as const,
+                            };
+
+                            onUpdateScene(scene.id, {
+                              suggestions: [...(scene.suggestions || []), deleteSuggestion]
+                            });
+
+                            setActiveSuggestionId(deleteSuggestion.id);
+                          }
+
+                          return;
+                        }
+
+                        // ======================
+                        // INSERT (typing)
+                        // ======================
+                        if (e.key.length === 1 || e.key === ' ') {
+                          e.preventDefault();
+
+                          // replace (יש סימון)
+                            if (start !== end) {
+                              const selectedText = scene.content.slice(start, end);
+
+                              const suggestions = scene.suggestions || [];
+                              const pairId = uuidv4();
+
+                              // 🔴 האם כבר יש delete באותו טווח
+                              const existingDelete = suggestions.find(
+                                s =>
+                                  s.status === 'pending' &&
+                                  s.type === 'delete' &&
+                                  s.start === start &&
+                                  s.end === end
+                              );
+
+                              // 🟢 האם כבר יש insert פעיל שמתחיל באותו מקום
+                              const existingInsert = suggestions.find(
+                                s =>
+                                  s.id === activeSuggestionId &&
+                                  s.status === 'pending' &&
+                                  s.type === 'insert'
+                              );
+
+                              let newSuggestions = [...suggestions];
+
+                              // יצירת delete רק פעם אחת
+                              if (!existingDelete) {
+                                newSuggestions.push({
+                                  id: uuidv4(),
+                                  pairId,
+                                  type: 'delete',
+                                  start,
+                                  end,
+                                  text: selectedText,
+                                  createdAt: Date.now(),
+                                  status: 'pending',
+                                });
+                              }
+
+                              // אם יש insert קיים → ממשיכים אותו
+                              if (existingInsert) {
+                                newSuggestions = newSuggestions.map(s =>
+                                  s.id === existingInsert.id
+                                    ? {
+                                        ...s,
+                                        text: s.text + e.key,
+                                        end: s.end + 1
+                                      }
+                                    : s
+                                );
+
+                                onUpdateScene(scene.id, { suggestions: newSuggestions });
+                                return;
+                              }
+
+                              // אחרת → יוצרים insert חדש
+                              const newInsert = {
+                                id: uuidv4(),
+                                pairId,
+                                type: 'insert' as const,
+                                start,
+                                end: start + 1,
+                                text: e.key,
+                                createdAt: Date.now(),
+                                status: 'pending' as const,
+                              };
+
+                              newSuggestions.push(newInsert);
+
+                              onUpdateScene(scene.id, { suggestions: newSuggestions });
+                              setActiveSuggestionId(newInsert.id);
+                              return;
+                            }
+                      }}
+                      textareaRefProp={reviewTextareaRef}
                       minRows={5}
+                      readOnly={isExternalReview}
                     />
                   
                      {scene.suggestions && scene.suggestions.length > 0 && (
-                      <div className="mt-3 p-3 rounded-lg bg-[var(--theme-secondary)]/30 text-sm leading-relaxed whitespace-pre-wrap">
+                      <div
+                          className="mt-3 p-3 rounded-lg bg-[var(--theme-secondary)]/30 text-sm leading-relaxed whitespace-pre-wrap"
+                          onMouseDown={(e) => {
+                            if (e.target === e.currentTarget) {
+                              setActiveSuggestionId(null);
+                            }
+                          }}
+                        >
                         {(() => {
                           const suggestions = (scene.suggestions || [])
                             .filter(s => s.status === 'pending')
-                            .sort((a, b) => a.start - b.start);
+                            .sort((a, b) => {
+                              if (a.start !== b.start) return a.start - b.start;
+                              if (a.type === 'delete' && b.type === 'insert') return -1;
+                              if (a.type === 'insert' && b.type === 'delete') return 1;
+                              return 0;
+                            });
 
                           let result: React.ReactNode[] = [];
                           let lastIndex = 0;
 
                           suggestions.forEach((s, i) => {
-                            // טקסט רגיל
+                            // 1. Plain text before the suggestion
                             if (s.start > lastIndex) {
                               result.push(
                                 <span key={`text-${i}`}>
                                   {scene.content.slice(lastIndex, s.start)}
                                 </span>
                               );
+                              lastIndex = s.start;
                             }
 
-                            // מחיקה
-                            result.push(
-                              <span
-                                key={`del-${s.id}`}
-                                onClick={() => setActiveSuggestionId(s.id)}
-                                className={
-                                  s.id === activeSuggestionId
-                                    ? "line-through text-red-700 bg-red-200 px-1 rounded cursor-pointer"
-                                    : "line-through text-red-400 cursor-pointer"
-                                }
-                              >
-                                {scene.content.slice(s.start, s.end)}
-                              </span>
-                            );
+                            // 2. The suggestion itself
+                            if (s.type === 'delete') {
+                              result.push(
+                                <span
+                                  key={`del-${s.id}`}
+                                  onClick={() => {
+                                    setActiveSuggestionId(s.id);
+                                    reviewTextareaRef.current?.focus();
+                                  }}
+                                  className={
+                                    s.id === activeSuggestionId
+                                      ? "line-through text-red-700 bg-red-200 px-1 rounded cursor-pointer"
+                                      : "line-through text-red-400 cursor-pointer"
+                                  }
+                                >
+                                  {scene.content.slice(s.start, s.end)}
+                                </span>
+                              );
+                              lastIndex = Math.max(lastIndex, s.end);
+                            } else if (s.type === 'insert') {
+                              result.push(
+                                <span
+                                  key={`ins-${s.id}`}
+                                  onClick={() => {
+                                    setActiveSuggestionId(s.id);
+                                    reviewTextareaRef.current?.focus();
+                                  }}
+                                  className={
+                                    s.id === activeSuggestionId
+                                      ? "text-green-800 bg-green-200 px-1 rounded cursor-pointer"
+                                      : "text-green-600 cursor-pointer"
+                                  }
+                                >
+                                  {s.id === activeSuggestionId ? (
+                                    <input
+                                      value={s.text}
+                                     onChange={(e) => {
+                                        const newText = e.target.value;
 
-                            lastIndex = s.end;
+                                        // אם ריק → מוחקים את ההצעה
+                                        if (newText.length === 0) {
+                                          onUpdateScene(scene.id, {
+                                            suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
+                                          });
+
+                                          setActiveSuggestionId(null);
+                                          return;
+                                        }
+
+                                        // אחרת → מעדכנים רגיל
+                                        onUpdateScene(scene.id, {
+                                          suggestions: (scene.suggestions || []).map(item =>
+                                            item.id === s.id
+                                              ? {
+                                                  ...item,
+                                                  text: newText,
+                                                  end: item.start + newText.length
+                                                }
+                                              : item
+                                          )
+                                        });
+                                      }}
+                                      className="bg-transparent outline-none border-none text-green-800"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    s.text
+                                  )}
+                                </span>
+                              );
+                            }
                           });
 
                           // שאר הטקסט
@@ -614,7 +874,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                               </span>
                             );
                           }
-
+                          
                           return result;
                         })()}
                       </div>
@@ -630,6 +890,35 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             onClick={() => {
+                              if (activeSuggestion.type === 'insert') {
+                                const pairedDelete = (scene.suggestions || []).find(
+                                  item =>
+                                    item.status === 'pending' &&
+                                    item.type === 'delete' &&
+                                    activeSuggestion?.pairId && item.pairId === activeSuggestion.pairId
+                                );
+
+                                const newContent = pairedDelete
+                                  ? scene.content.slice(0, pairedDelete.start) +
+                                    activeSuggestion.text +
+                                    scene.content.slice(pairedDelete.end)
+                                  : scene.content.slice(0, activeSuggestion.start) +
+                                    activeSuggestion.text +
+                                    scene.content.slice(activeSuggestion.start);
+
+                                onUpdateScene(scene.id, {
+                                  content: newContent,
+                                  suggestions: (scene.suggestions || []).filter(
+                                    item =>
+                                      item.id !== activeSuggestion.id &&
+                                      item.id !== pairedDelete?.id
+                                  )
+                                });
+
+                                setActiveSuggestionId(null);
+                                return;
+                              }
+
                               const newContent =
                                 scene.content.slice(0, activeSuggestion.start) +
                                 scene.content.slice(activeSuggestion.end);
@@ -648,6 +937,26 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
 
                           <button
                             onClick={() => {
+                              if (activeSuggestion.type === 'insert') {
+                                const pairedDelete = (scene.suggestions || []).find(
+                                  item =>
+                                    item.status === 'pending' &&
+                                    item.type === 'delete' &&
+                                    item.pairId && item.pairId === activeSuggestion.pairId
+                                );
+
+                                onUpdateScene(scene.id, {
+                                  suggestions: (scene.suggestions || []).filter(
+                                    item =>
+                                      item.id !== activeSuggestion.id &&
+                                      item.id !== pairedDelete?.id
+                                  )
+                                });
+
+                                setActiveSuggestionId(null);
+                                return;
+                              }
+
                               onUpdateScene(scene.id, {
                                 suggestions: (scene.suggestions || []).filter(item => item.id !== activeSuggestion.id)
                               });

@@ -50,7 +50,6 @@ import {
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
-import ExternalReview from './components/ExternalReview';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
