@@ -276,6 +276,20 @@ export interface Project {
 
 export type SyncStatus = 'synced' | 'pending' | 'error' | 'local_only' | 'conflict';
 
+export type BookRole =
+  | 'owner'
+  | 'coAuthor'
+  | 'editor'
+  | 'reviewer'
+  | 'publisher_readonly'
+  | 'publisher_edit'
+  | 'publisher_full';
+
+export interface BookMember {
+  userId: string;
+  role: BookRole;
+}
+
 export interface BookUIState {
   lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
   editorFocusedSceneId?: string | null;
@@ -291,6 +305,8 @@ export interface BookUIState {
 export interface Book extends Project {
   id: string;
   ownerId: string;
+  members?: BookMember[];
+  memberIds?: string[];
   title: string;
   universeId?: string;
   theme?: keyof typeof THEMES;

@@ -17,8 +17,11 @@ interface PlotStructureProps {
   }[];
   onUpdateArcs: (arcs: any[]) => void;
   characters: any[];
+  onUpdateCharacters: (chars: any[]) => void;
   relationships: any[];
   onUpdateRelationships: (rels: any[]) => void;
+  conflicts: any[];
+  onUpdateConflicts: (conflicts: any[]) => void;
 }
 
 const STRUCTURES = [
