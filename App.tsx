@@ -663,8 +663,12 @@ const App: React.FC = () => {
 
   const deleteBook = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // In a real app we'd show a custom modal here. 
-    // For now, we'll just proceed to comply with "no confirm" rule.
+    const book = books.find(b => b.id === id);
+    const bookTitle = book?.title || 'הספר הזה';
+    const confirmed = window.confirm(`האם למחוק את "${bookTitle}"?`);
+
+    if (!confirmed) return;
+
     const remainingBooks = books.filter(b => b.id !== id && !b.deletedAt);
     if (remainingBooks.length === 0) {
       const freshBook = createNewBook('ספר חדש', currentUserId);
