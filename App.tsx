@@ -1231,6 +1231,7 @@ const App: React.FC = () => {
                     onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
                     onExport={exportManuscript}
                     onUpdateChapterMarker={updateChapterMarker}
+                    isLibrarySidebarCollapsed={isSidebarCollapsed}
                   />
                 </div>
               )}
