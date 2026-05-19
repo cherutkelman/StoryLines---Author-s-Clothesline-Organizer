@@ -87,17 +87,32 @@ export class FirestoreStorageProvider implements IStorageProvider {
     }
 
     const path = "books";
-    console.log(`[FirestoreStorageProvider] loadBooks: Fetching from path "${path}" where ownerId == "${this.userId}"`);
+    console.log(`[FirestoreStorageProvider] loadBooks: Fetching from path "${path}" for owner/member "${this.userId}"`);
     const booksRef = collection(db, path);
-    const q = query(booksRef, where("ownerId", "==", this.userId));
-    
+    const ownerQuery = query(booksRef, where("ownerId", "==", this.userId));
+    const memberQuery = query(booksRef, where("memberIds", "array-contains", this.userId));
+
     try {
-      const querySnapshot = await getDocs(q);
-      console.log(`[FirestoreStorageProvider] loadBooks: Success. Found ${querySnapshot.size} documents.`);
-      const books: Book[] = [];
-      querySnapshot.forEach((doc) => {
-        books.push(doc.data() as Book);
+      const ownerSnap = await getDocs(ownerQuery);
+      const memberSnap = await getDocs(memberQuery);
+
+      console.log(
+      `[FirestoreStorageProvider] loadBooks: Success. Found ${ownerSnap.size} owner docs and ${memberSnap.size} member docs.`
+      );
+
+      const map = new Map<string, Book>();
+
+      ownerSnap.forEach((docSnap) => {
+        const book = docSnap.data() as Book;
+        map.set(book.id, book);
       });
+
+      memberSnap.forEach((docSnap) => {
+        const book = docSnap.data() as Book;
+        map.set(book.id, book);
+      });
+
+      const books = Array.from(map.values());
 
       this.quotaExceededUntil = 0; // Reset on success
       if (includeDeleted) return books;
@@ -157,14 +172,28 @@ export class FirestoreStorageProvider implements IStorageProvider {
     
     let count = 0;
     booksToSave.forEach(book => {
-      if (book.ownerId === this.userId) {
+      const isOwner = book.ownerId === this.userId;
+      const isMember = Array.isArray(book.memberIds) && book.memberIds.includes(this.userId!);
+
+      if (isOwner || isMember) {
         const bookRef = doc(db, path, book.id);
-        // Remove undefined values before saving to Firestore
-        const cleanBook = this.removeUndefined(book);
+
+        const normalizedBook = {
+          ...book,
+          memberIds: Array.isArray(book.members)
+            ? book.members
+                .map(member => member?.userId)
+                .filter((id): id is string => Boolean(id))
+            : []
+        };
+
+        const cleanBook = this.removeUndefined(normalizedBook);
         batch.set(bookRef, cleanBook);
         count++;
       } else {
-        console.warn(`[FirestoreStorageProvider] saveBooks: Skipping book "${book.title}" (${book.id}) - ownerId mismatch. Book owner: "${book.ownerId}", Current user: "${this.userId}"`);
+        console.warn(
+          `[FirestoreStorageProvider] saveBooks: Skipping book "${book.title}" (${book.id}) - user is neither owner nor member. Book owner: "${book.ownerId}", Current user: "${this.userId}"`
+        );
       }
     });
 

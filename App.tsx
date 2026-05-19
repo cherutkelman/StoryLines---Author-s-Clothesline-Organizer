@@ -1179,8 +1179,11 @@ const App: React.FC = () => {
                     characterArcs={activeBook.characterArcs || []}
                     onUpdateArcs={(arcs) => updateActiveBook({ characterArcs: arcs })}
                     characters={activeBook.characters || []}
+                    onUpdateCharacters={(chars) => updateEntries('characters', chars)}
                     relationships={activeBook.relationships || []}
                     onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
+                    conflicts={(activeBook as any).conflicts || []}
+                    onUpdateConflicts={(conflicts) => updateActiveBook({ conflicts } as Partial<Book>)}
                   />
                 </div>
               )}
