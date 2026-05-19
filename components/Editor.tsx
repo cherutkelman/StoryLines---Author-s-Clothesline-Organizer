@@ -754,6 +754,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                               setActiveSuggestionId(newInsert.id);
                               return;
                             }
+                          }
                       }}
                       textareaRefProp={reviewTextareaRef}
                       minRows={5}
