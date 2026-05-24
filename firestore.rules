@@ -70,9 +70,8 @@ service cloud.firestore {
     }
 
     function isBookMember(bookData) {
-      return isAuthenticated() &&
-             bookData.memberIds is list &&
-             request.auth.uid in bookData.memberIds;
+      return isAuthenticated()
+        && request.auth.uid in bookData.memberIds;
     }
 
     function canAccessBook(bookData) {
@@ -111,13 +110,16 @@ service cloud.firestore {
 
     match /books/{bookId} {
       allow read: if canAccessBook(resource.data);
-      allow create: if isBookOwner(request.resource.data) &&
-                      isBookMember(request.resource.data) &&
-                      isValidBook(request.resource.data);
-      allow update: if canAccessBook(resource.data) &&
-                      request.resource.data.ownerId == resource.data.ownerId &&
-                      isBookMember(request.resource.data) &&
-                      isValidBook(request.resource.data);
+
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerId == request.auth.uid
+        && isValidBook(request.resource.data);
+
+      allow update: if canAccessBook(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && canAccessBook(request.resource.data)
+        && isValidBook(request.resource.data);
+
       allow delete: if isBookOwner(resource.data) || isAdmin();
     }
 
