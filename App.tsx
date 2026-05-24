@@ -1428,7 +1428,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-[var(--theme-border)] pt-8">
+            <div className="hidden border-t border-[var(--theme-border)] pt-8">
               {!isMergingManually ? (
                 <button 
                   onClick={() => {

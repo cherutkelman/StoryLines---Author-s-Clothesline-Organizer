@@ -5,6 +5,43 @@ const fs = require('fs');
 const http = require('http');
 const { autoUpdater } = require('electron-updater');
 
+function focusStoryLinesWindow() {
+  const win = BrowserWindow.getAllWindows().find(window => {
+    return window && !window.isDestroyed() && window.isVisible();
+  }) || BrowserWindow.getAllWindows().find(window => {
+    return window && !window.isDestroyed();
+  });
+
+  if (!win) {
+    return;
+  }
+
+  if (win.isMinimized()) {
+    win.restore();
+  }
+
+  win.show();
+
+  if (typeof app.focus === 'function') {
+    app.focus();
+  }
+
+  win.focus();
+
+  // Windows/Chrome sometimes prevent normal focus stealing.
+  // Bring the app above the browser briefly, then immediately restore normal behavior.
+  win.setAlwaysOnTop(true);
+  win.show();
+  win.focus();
+
+  setTimeout(() => {
+    if (!win.isDestroyed()) {
+      win.setAlwaysOnTop(false);
+      win.focus();
+    }
+  }, 700);
+}
+
 function startOAuthCodeListener(redirectUri) {
   let redirectUrl;
 
@@ -78,7 +115,34 @@ function startOAuthCodeListener(redirectUri) {
         }
 
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end('<h1>You can return to StoryLines</h1>');
+        res.end(`
+          <!doctype html>
+          <html lang="he" dir="rtl">
+          <head>
+            <meta charset="utf-8" />
+            <title>StoryLines</title>
+          </head>
+          <body>
+            <h1>ההתחברות הושלמה</h1>
+            <p id="fallback" style="display:none;">החיבור ל־StoryLines יתרחש תוך זמן קצר.</p>
+
+            <script>
+              setTimeout(function () {
+                window.open('', '_self');
+                window.close();
+              }, 300);
+
+              setTimeout(function () {
+                var fallback = document.getElementById('fallback');
+                if (fallback) {
+                  fallback.style.display = 'block';
+                }
+              }, 1200);
+            </script>
+          </body>
+          </html>
+          `);
+        focusStoryLinesWindow();  
         finish(null, code);
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
