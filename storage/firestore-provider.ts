@@ -93,8 +93,21 @@ export class FirestoreStorageProvider implements IStorageProvider {
     const memberQuery = query(booksRef, where("memberIds", "array-contains", this.userId));
 
     try {
+      console.log(
+        `[FirestoreStorageProvider] loadBooks: Running owner query where ownerId == "${this.userId}"`
+      );
       const ownerSnap = await getDocs(ownerQuery);
+      console.log(
+        `[FirestoreStorageProvider] loadBooks: Owner query OK. Found ${ownerSnap.size} docs.`
+      );
+
+      console.log(
+        `[FirestoreStorageProvider] loadBooks: Running member query where memberIds array-contains "${this.userId}"`
+      );
       const memberSnap = await getDocs(memberQuery);
+      console.log(
+        `[FirestoreStorageProvider] loadBooks: Member query OK. Found ${memberSnap.size} docs.`
+      );
 
       console.log(
       `[FirestoreStorageProvider] loadBooks: Success. Found ${ownerSnap.size} owner docs and ${memberSnap.size} member docs.`

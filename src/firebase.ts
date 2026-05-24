@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,9 +14,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 
 const isElectron = window.location.protocol === 'file:';
+
+type ExchangeGoogleOAuthCodeResponse = {
+  idToken?: string | null;
+  accessToken?: string | null;
+};
 
 function base64UrlEncode(arrayBuffer: ArrayBuffer) {
   return btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
@@ -43,73 +50,87 @@ export const signIn = async () => {
     let result;
 
     if (isElectron) {
-        console.log('[AUTH] Electron mode - external browser flow');
-        if (isElectron) {
-    console.log('[AUTH] Electron mode - external browser flow');
+      console.log('[AUTH] Electron mode - external browser flow');
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const redirectUri = "http://127.0.0.1:3000"
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const redirectUri = 'http://127.0.0.1:3000';
 
-const codeVerifier = generateCodeVerifier()
-const codeChallenge = await generateCodeChallenge(codeVerifier)
+      if (!clientId) {
+        throw new Error('Missing Google OAuth client ID');
+      }
 
-sessionStorage.setItem('google_code_verifier', codeVerifier)
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-const url =
-  "https://accounts.google.com/o/oauth2/v2/auth" +
-  `?client_id=${encodeURIComponent(clientId)}` +
-  `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-  `&response_type=code` +
-  `&scope=${encodeURIComponent('openid email profile')}` +
-  `&code_challenge=${encodeURIComponent(codeChallenge)}` +
-  `&code_challenge_method=S256` +
-  `&access_type=offline` + `&prompt=consent`
+      sessionStorage.setItem('google_code_verifier', codeVerifier);
 
-    // קריאה ל־Electron לפתוח דפדפן
-    // @ts-ignore
-  let code = null;
+      const url =
+        'https://accounts.google.com/o/oauth2/v2/auth' +
+        `?client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent('openid email profile')}` +
+        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
+        `&code_challenge_method=S256` +
+        `&access_type=offline` +
+        `&prompt=consent`;
 
-  if ((window as any).require) {
-    const electron = (window as any).require('electron');
-    code = await electron.ipcRenderer.invoke('open-external-url', url);
-  }
+      let code: string | null = null;
 
-   const storedCodeVerifier = sessionStorage.getItem('google_code_verifier')
+      if ((window as any).require) {
+        const electron = (window as any).require('electron');
+        code = await electron.ipcRenderer.invoke('open-external-url', url);
+      }
 
-    if (!storedCodeVerifier) {
-    throw new Error('Missing code verifier')
-    }
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-        client_id: clientId,
+      console.log('[AUTH] OAuth code received:', Boolean(code));
+
+      if (!code) {
+        throw new Error('Missing authorization code from Google');
+      }
+
+      const storedCodeVerifier = sessionStorage.getItem('google_code_verifier');
+
+      if (!storedCodeVerifier) {
+        throw new Error('Missing code verifier');
+      }
+
+      console.log('[AUTH] Exchanging Google OAuth code through Firebase Function', {
+        redirectUri,
+        hasCode: Boolean(code),
+        hasCodeVerifier: Boolean(storedCodeVerifier),
+      });
+
+      const exchangeGoogleOAuthCode = httpsCallable<
+        { code: string; codeVerifier: string; redirectUri: string },
+        ExchangeGoogleOAuthCodeResponse
+      >(functions, 'exchangeGoogleOAuthCode');
+
+      const tokenResult = await exchangeGoogleOAuthCode({
         code,
-        code_verifier: storedCodeVerifier,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
-    }),
-    })
+        codeVerifier: storedCodeVerifier,
+        redirectUri,
+      });
 
-    const tokenData = await tokenResponse.json()
+      const tokenData = tokenResult.data;
+      const hasIdToken = Boolean(tokenData.idToken);
+      const hasAccessToken = Boolean(tokenData.accessToken);
 
-    if (!tokenData.id_token) {
-      throw new Error('No id_token received from Google')
-    }
+      console.log('[AUTH] Google token response received from Firebase Function:', {
+        hasIdToken,
+        hasAccessToken,
+      });
 
-    const credential = GoogleAuthProvider.credential(tokenData.id_token)
-    await signInWithCredential(auth, credential)
+      if (!hasIdToken && !hasAccessToken) {
+        throw new Error('No id_token or access_token received from Google');
+      }
 
-    return result
-
-
-    return;
-    }
-    return;
+      const credential = GoogleAuthProvider.credential(
+        tokenData.idToken || null,
+        tokenData.accessToken || undefined
+      );
+      result = await signInWithCredential(auth, credential);
     } else {
-    result = await signInWithPopup(auth, googleProvider);
+      result = await signInWithPopup(auth, googleProvider);
     }
     console.log('[AUTH] SUCCESS', {
       uid: result.user?.uid,

@@ -1,8 +1,106 @@
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const { autoUpdater } = require('electron-updater');
+
+function startOAuthCodeListener(redirectUri) {
+  let redirectUrl;
+
+  try {
+    redirectUrl = new URL(redirectUri);
+  } catch (error) {
+    throw new Error('Invalid OAuth redirect URI');
+  }
+
+  if (redirectUrl.protocol !== 'http:' || redirectUrl.hostname !== '127.0.0.1') {
+    throw new Error('OAuth redirect URI must use http://127.0.0.1');
+  }
+
+  const port = Number(redirectUrl.port || 80);
+  let settled = false;
+  let resolveReady;
+  let rejectReady;
+  let server;
+
+  const readyPromise = new Promise((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
+
+  const codePromise = new Promise((resolve, reject) => {
+    const finish = (error, code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+
+      if (server) {
+        server.close(() => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(code);
+          }
+        });
+        return;
+      }
+
+      if (error) {
+        reject(error);
+      } else {
+        resolve(code);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      finish(new Error('OAuth callback timed out'));
+    }, 5 * 60 * 1000);
+
+    server = http.createServer((req, res) => {
+      try {
+        const callbackUrl = new URL(req.url || '/', redirectUri);
+        const error = callbackUrl.searchParams.get('error');
+        const code = callbackUrl.searchParams.get('code');
+
+        if (error) {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>Google sign-in failed</h1><p>You can return to StoryLines.</p>');
+          finish(new Error(`OAuth callback error: ${error}`));
+          return;
+        }
+
+        if (!code) {
+          res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>Missing authorization code</h1><p>You can return to StoryLines.</p>');
+          finish(new Error('OAuth callback did not include a code'));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>You can return to StoryLines</h1>');
+        finish(null, code);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>Google sign-in failed</h1><p>You can return to StoryLines.</p>');
+        finish(error);
+      }
+    });
+
+    server.on('error', (error) => {
+      console.error('Main: OAuth callback server error:', error);
+      rejectReady(error);
+      finish(error);
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      console.log(`Main: OAuth callback server listening on 127.0.0.1:${port}`);
+      resolveReady();
+    });
+  });
+
+  return { readyPromise, codePromise };
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -56,6 +154,34 @@ function createWindow() {
       return dataUrl;
     } catch (error) {
       console.error('Main: error reading file:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('open-external-url', async (_event, url) => {
+    try {
+      console.log('Main: open-external-url called');
+      if (typeof url !== 'string' || !url.startsWith('https://')) {
+        throw new Error('Invalid external URL');
+      }
+
+      const authUrl = new URL(url);
+      const redirectUri = authUrl.searchParams.get('redirect_uri');
+      if (!redirectUri) {
+        throw new Error('Missing OAuth redirect URI');
+      }
+
+      const { readyPromise, codePromise } = startOAuthCodeListener(redirectUri);
+      try {
+        await readyPromise;
+      } catch (error) {
+        codePromise.catch(() => {});
+        throw error;
+      }
+      await shell.openExternal(url);
+      return await codePromise;
+    } catch (error) {
+      console.error('Main: error opening external URL:', error);
       throw error;
     }
   });
