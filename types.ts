@@ -103,11 +103,12 @@ export const THEMES = {
 
 export interface Suggestion {
   id: string;
-  type: 'delete' | 'insert';
+  type: 'delete';
   start: number;
   end: number;
   text: string;
   createdAt: number;
+  userId?: string;
   status: 'pending' | 'accepted' | 'rejected';
 }
 
