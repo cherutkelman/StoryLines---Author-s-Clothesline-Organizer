@@ -103,7 +103,6 @@ export const THEMES = {
 
 export interface Suggestion {
   id: string;
-  pairId?: string;
   type: 'delete' | 'insert';
   start: number;
   end: number;

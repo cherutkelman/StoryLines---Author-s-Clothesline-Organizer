@@ -40,7 +40,6 @@ interface EditorProps {
   onDisplayModeChange?: (mode: 'full' | 'focus') => void;
   onExport?: () => void;
   onUpdateChapterMarker?: (id: string, updates: any) => void;
-  isLibrarySidebarCollapsed?: boolean;
 }
 
 const AutoExpandingTextarea: React.FC<{
@@ -49,41 +48,28 @@ const AutoExpandingTextarea: React.FC<{
   placeholder?: string;
   className?: string;
   minRows?: number;
-  readOnly?: boolean;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  textareaRefProp?: React.RefObject<HTMLTextAreaElement | null>;
-  onMouseDown?: () => void;
-}> = ({
-  value,
-  onChange,
-  placeholder,
-  className,
-  minRows = 5,
-  readOnly = false,
-  onKeyDown,
-  textareaRefProp,
-  onMouseDown
-}) => {
+}> = ({ value, onChange, placeholder, className, minRows = 5 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localValue, setLocalValue] = useState(value);
-  const effectiveTextareaRef = textareaRefProp || textareaRef;
 
+  // Update local value when prop changes (e.g. on scene switch)
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
+  // Debounce the onChange call
   useEffect(() => {
     if (localValue === value) return;
-
+    
     const timeoutId = setTimeout(() => {
       onChange(localValue);
-    }, 500);
+    }, 500); // Wait 500ms after last keystroke
 
     return () => clearTimeout(timeoutId);
   }, [localValue, onChange, value]);
 
   const adjustHeight = () => {
-    const textarea = effectiveTextareaRef.current;
+    const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
       const newHeight = Math.max(textarea.scrollHeight, minRows * 28);
@@ -97,16 +83,13 @@ const AutoExpandingTextarea: React.FC<{
 
   return (
     <textarea
-      ref={effectiveTextareaRef}
+      ref={textareaRef}
       className={className}
       value={localValue}
       placeholder={placeholder}
       onChange={(e) => setLocalValue(e.target.value)}
-      onMouseDown={onMouseDown}
-      onKeyDown={onKeyDown}
       rows={minRows}
       style={{ overflow: 'hidden' }}
-      readOnly={readOnly}
     />
   );
 };
@@ -139,7 +122,7 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker, isLibrarySidebarCollapsed = false }) => {
+const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [bridgeType, setBridgeType] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | null>(null);
@@ -148,11 +131,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
-  const [showChaptersInNav, setShowChaptersInNav] = useState(true);
-  const [quickNavExpandedOverride, setQuickNavExpandedOverride] = useState<boolean | null>(null);
-  const reviewTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [editorWorkflow, setEditorWorkflow] = useState<'author' | 'externalReview'>('author');
-  const isExternalReview = editorWorkflow === 'externalReview';
   const suggestionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
     // ===== Suggestion Navigation =====
@@ -270,31 +249,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     return activeScenes.reduce((sum: number, scene: Scene) => sum + countWords(scene.content), 0);
   }, [activeScenes]);
 
-  const navItems = useMemo(() => {
-    const items: { id: string; title: string; type: 'scene' | 'chapter'; sceneId?: string }[] = [];
-
-    activeScenes.forEach((scene) => {
-      const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
-
-      if (chapterMarker) {
-        items.push({
-          id: `chapter-${chapterMarker.id}`,
-          title: chapterMarker.title || 'פרק ללא כותרת',
-          type: 'chapter'
-        });
-      }
-
-      items.push({
-        id: `scene-${scene.id}`,
-        title: scene.title || 'סצנה ללא כותרת',
-        type: 'scene',
-        sceneId: scene.id
-      });
-    });
-
-    return items;
-  }, [activeScenes, project.chapterMarkers]);
-
   const handlePullInfo = (info: string) => {
     if (!focusedSceneId) return;
     const scene = project.scenes.find((s: Scene) => s.id === focusedSceneId);
@@ -366,86 +320,8 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     { id: 'fantasyWorlds', label: 'עולמות פנטזיה', icon: <BookOpen size={14} /> },
   ] as const;
 
-  const scrollToElement = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const isQuickNavExpanded = quickNavExpandedOverride ?? isLibrarySidebarCollapsed;
-  const isQuickNavCompact = !isQuickNavExpanded;
-  const quickNavWidthClass = isQuickNavCompact
-    ? 'w-[10rem] min-w-[10rem]'
-    : 'w-[16rem] min-w-[16rem]';
-  const quickNavSize = isQuickNavCompact ? '10rem' : '16rem';
-  const editorContentOffset = isQuickNavCompact ? '12rem' : '18rem';
-
   return (
-    <div className="max-w-[90rem] mx-auto py-12 px-8 relative" dir="rtl">
-      <aside
-        className={`absolute right-8 top-32 z-20 flex flex-col ${quickNavWidthClass} max-h-[calc(100vh-120px)] bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-[2rem] shadow-sm overflow-hidden transition-all duration-300 ease-in-out`}
-        style={{
-          width: quickNavSize,
-          minWidth: quickNavSize,
-          flexBasis: quickNavSize
-        }}
-      >
-        <button
-          onClick={() => setQuickNavExpandedOverride(!isQuickNavExpanded)}
-          className="absolute left-2 top-20 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)] shadow-sm hover:bg-[var(--theme-secondary)] transition-all"
-          title={isQuickNavExpanded ? "כווץ ניווט מהיר" : "הרחב ניווט מהיר"}
-        >
-          {isQuickNavExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-        </button>
-        <div className="p-3 xl:p-4 2xl:p-5 border-b border-[var(--theme-border)] bg-[var(--theme-secondary)]/10 flex items-center justify-between gap-2">
-          <h3 className="min-w-0 truncate font-black text-[10px] xl:text-xs uppercase tracking-widest text-[var(--theme-primary)]" title="ניווט מהיר">
-            {isQuickNavCompact ? 'ניווט' : 'ניווט מהיר'}
-          </h3>
-          <button
-            onClick={() => setShowChaptersInNav(!showChaptersInNav)}
-            className={`shrink-0 p-1.5 rounded-lg transition-colors ${showChaptersInNav ? 'text-[var(--theme-accent)] bg-[var(--theme-accent)]/10' : 'text-[var(--theme-primary)]/30 hover:bg-[var(--theme-secondary)]'}`}
-            title={showChaptersInNav ? "הסתר פרקים" : "הצג פרקים"}
-          >
-            <Flag size={14} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 xl:p-3 2xl:p-4 space-y-1 scrollbar-hide">
-          {navItems.map((item) => {
-            if (item.type === 'chapter' && !showChaptersInNav) return null;
-            const compactTitle = item.title.trim().split(/\s+/)[0] || item.title;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.type === 'scene' && item.sceneId) {
-                    handleFocusScene(item.sceneId);
-                  }
-                  setTimeout(() => scrollToElement(item.id), 100);
-                }}
-                className={`w-full text-right px-3 py-2 rounded-xl text-xs transition-all flex items-center gap-2 group ${
-                  item.type === 'chapter'
-                    ? 'font-black text-[var(--theme-primary)] mt-4 mb-1 border-r-2 border-[var(--theme-primary)] rounded-r-none'
-                    : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
-                } ${focusedSceneId === item.sceneId && item.type === 'scene' ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] font-bold' : ''}`}
-                title={item.title}
-              >
-                {item.type === 'chapter' ? (
-                  <Flag size={12} className="shrink-0" />
-                ) : (
-                  <div className="w-1 h-1 rounded-full bg-[var(--theme-primary)]/20 group-hover:bg-[var(--theme-primary)] shrink-0" />
-                )}
-                <span className="min-w-0 truncate">{isQuickNavCompact ? compactTitle : item.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-      <div
-        className="max-w-4xl transition-all duration-300 ease-in-out"
-        style={{ marginRight: editorContentOffset }}
-      >
+    <div className="max-w-4xl mx-auto py-12 px-8 relative">
       <div className="sticky top-4 z-40 mb-12 flex flex-col items-center gap-4">
         <div className="bg-[var(--theme-primary)]/90 backdrop-blur-md text-[var(--theme-bg)] px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-6 border border-[var(--theme-primary)]/50">
           <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg shadow-sm">
@@ -509,26 +385,21 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 <span>חיפוש</span>
               </button>
             )}
-            {editorWorkflow === 'externalReview' && (
-            <>
-              <button
-                onClick={goToPreviousSuggestion}
-                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-                title="ההצעה הקודמת"
-              >
-                <span>הקודמת</span>
-              </button>
+            <button
+              onClick={goToPreviousSuggestion}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              title="ההצעה הקודמת"
+            >
+              <span>הקודמת</span>
+            </button>
 
-              <button
-                onClick={goToNextSuggestion}
-                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-                title="ההצעה הבאה"
-              >
-                <span>הבאה</span>
-              </button>
-            </>
-          )}
-            {!isExternalReview && (
+            <button
+              onClick={goToNextSuggestion}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              title="ההצעה הבאה"
+            >
+              <span>הבאה</span>
+            </button>
             <button 
               onClick={onOpenBulkAdd}
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -537,8 +408,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Plus size={14} />
               <span>סצנה חדשה</span>
             </button>
-            )}
-            {!isExternalReview && (
             <button 
               onClick={() => setBridgeType('characters')} 
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -547,7 +416,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <BookOpen size={14} />
               <span>שלוף משאלון</span>
             </button>
-            )}
             <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
             <button 
               onClick={onExport}
@@ -557,7 +425,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Download size={14} />
               <span>ייצוא</span>
             </button>
-            {!isExternalReview && (
             <button 
               onClick={() => setIsInfoModalOpen(true)}
               className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
@@ -566,7 +433,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <Info size={14} />
               <span>טיפים</span>
             </button>
-            )}
           </div>
         </div>
       </div>
@@ -581,7 +447,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
           return (
             <React.Fragment key={scene.id}>
               {chapterMarker && (
-                <div id={`chapter-${chapterMarker.id}`} className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4 scroll-mt-32">
+                <div className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
                   <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
                     <Flag size={20} />
                   </div>
@@ -593,7 +459,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 </div>
               )}
               
-              <article id={`scene-${scene.id}`} className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out scroll-mt-32 ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
+              <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
                 {!isExpanded ? (
                   <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                     <div className="flex items-center gap-4">
@@ -634,7 +500,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                           )}
                         </div>
                       </div>
-                      {!isExternalReview && (
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${scene.isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)] hover:bg-[var(--theme-secondary)]'}`}
@@ -642,7 +507,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         <CheckCircle2 size={16} />
                         <span>{scene.isCompleted ? 'הושלם' : 'סיימתי לכתוב'}</span>
                       </button>
-                      )}
                       <button
                         onMouseDown={() => {
                           console.log('delete test clicked', scene.id, scene.suggestions);
@@ -686,7 +550,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         {scene.suggestions!.length} הצעות
                       </span>
                     )}
-                    {!isExternalReview && (
                       <button 
                         onClick={() => onDeleteScene(scene.id)}
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
@@ -694,283 +557,53 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       >
                         <Trash2 size={18} />
                       </button>
-                      )}
                     </div>
                   </header>
                   <>
-                  {isExternalReview && (
-                    <div className="mb-2 text-xs font-bold text-[var(--theme-accent)]">
-                      מצב סקירה: אפשר לסמן טקסט ולהציע מחיקה, אבל לא לערוך ישירות.
-                    </div>
-                  )}
                     <AutoExpandingTextarea 
-                      className={`w-full border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg ${
-                        isExternalReview
-                          ? 'bg-[var(--theme-secondary)]/20 rounded-lg px-3 py-3 cursor-text'
-                          : 'bg-transparent'
-                      }`}
+                      className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
                       value={scene.content}
                       placeholder="התחל לכתוב כאן..."
                       onChange={(val) => onUpdateScene(scene.id, { content: val })}
-                      onKeyDown={(e) => {
-                        if (!isExternalReview) return;
-
-                        const target = e.currentTarget;
-                        const start = target.selectionStart ?? 0;
-                        const end = target.selectionEnd ?? 0;
-
-                        // ======================
-                        // DELETE (Backspace/Delete)
-                        // ======================
-                        if (e.key === 'Backspace' || e.key === 'Delete') {
-                          const activeInsert = (scene.suggestions || []).find(
-                            s =>
-                              s.id === activeSuggestionId &&
-                              s.status === 'pending' &&
-                              s.type === 'insert'
-                          );
-
-                          // מחיקה מתוך insert קיים
-                          if (activeInsert && e.key === 'Backspace' && activeInsert.text.length > 0) {
-                            e.preventDefault();
-
-                            const updatedText = activeInsert.text.slice(0, -1);
-
-                            if (updatedText.length === 0) {
-                              onUpdateScene(scene.id, {
-                                suggestions: (scene.suggestions || []).filter(s => s.id !== activeInsert.id)
-                              });
-                              setActiveSuggestionId(null);
-                            } else {
-                              onUpdateScene(scene.id, {
-                                suggestions: (scene.suggestions || []).map(s =>
-                                  s.id === activeInsert.id
-                                    ? { ...s, text: updatedText, end: s.end - 1 }
-                                    : s
-                                )
-                              });
-                            }
-
-                            return;
-                          }
-
-                          // מחיקה של טקסט מסומן
-                          if (start !== end) {
-                            e.preventDefault();
-
-                            const selectedText = scene.content.slice(start, end);
-
-                            const deleteSuggestion = {
-                              id: uuidv4(),
-                              type: 'delete' as const,
-                              start,
-                              end,
-                              text: selectedText,
-                              createdAt: Date.now(),
-                              status: 'pending' as const,
-                            };
-
-                            onUpdateScene(scene.id, {
-                              suggestions: [...(scene.suggestions || []), deleteSuggestion]
-                            });
-
-                            setActiveSuggestionId(deleteSuggestion.id);
-                          }
-
-                          return;
-                        }
-
-                        // ======================
-                        // INSERT (typing)
-                        // ======================
-                        if (e.key.length === 1 || e.key === ' ') {
-                          e.preventDefault();
-
-                          // replace (יש סימון)
-                            if (start !== end) {
-                              const selectedText = scene.content.slice(start, end);
-
-                              const suggestions = scene.suggestions || [];
-                              const pairId = uuidv4();
-
-                              // 🔴 האם כבר יש delete באותו טווח
-                              const existingDelete = suggestions.find(
-                                s =>
-                                  s.status === 'pending' &&
-                                  s.type === 'delete' &&
-                                  s.start === start &&
-                                  s.end === end
-                              );
-
-                              // 🟢 האם כבר יש insert פעיל שמתחיל באותו מקום
-                              const existingInsert = suggestions.find(
-                                s =>
-                                  s.id === activeSuggestionId &&
-                                  s.status === 'pending' &&
-                                  s.type === 'insert'
-                              );
-
-                              let newSuggestions = [...suggestions];
-
-                              // יצירת delete רק פעם אחת
-                              if (!existingDelete) {
-                                newSuggestions.push({
-                                  id: uuidv4(),
-                                  pairId,
-                                  type: 'delete',
-                                  start,
-                                  end,
-                                  text: selectedText,
-                                  createdAt: Date.now(),
-                                  status: 'pending',
-                                });
-                              }
-
-                              // אם יש insert קיים → ממשיכים אותו
-                              if (existingInsert) {
-                                newSuggestions = newSuggestions.map(s =>
-                                  s.id === existingInsert.id
-                                    ? {
-                                        ...s,
-                                        text: s.text + e.key,
-                                        end: s.end + 1
-                                      }
-                                    : s
-                                );
-
-                                onUpdateScene(scene.id, { suggestions: newSuggestions });
-                                return;
-                              }
-
-                              // אחרת → יוצרים insert חדש
-                              const newInsert = {
-                                id: uuidv4(),
-                                pairId,
-                                type: 'insert' as const,
-                                start,
-                                end: start + 1,
-                                text: e.key,
-                                createdAt: Date.now(),
-                                status: 'pending' as const,
-                              };
-
-                              newSuggestions.push(newInsert);
-
-                              onUpdateScene(scene.id, { suggestions: newSuggestions });
-                              setActiveSuggestionId(newInsert.id);
-                              return;
-                            }
-                          }
-                      }}
-                      textareaRefProp={reviewTextareaRef}
                       minRows={5}
-                      readOnly={isExternalReview}
                     />
                   
                      {scene.suggestions && scene.suggestions.length > 0 && (
-                      <div
-                          className="mt-3 p-3 rounded-lg bg-[var(--theme-secondary)]/30 text-sm leading-relaxed whitespace-pre-wrap"
-                          onMouseDown={(e) => {
-                            if (e.target === e.currentTarget) {
-                              setActiveSuggestionId(null);
-                            }
-                          }}
-                        >
+                      <div className="mt-3 p-3 rounded-lg bg-[var(--theme-secondary)]/30 text-sm leading-relaxed whitespace-pre-wrap">
                         {(() => {
                           const suggestions = (scene.suggestions || [])
                             .filter(s => s.status === 'pending')
-                            .sort((a, b) => {
-                              if (a.start !== b.start) return a.start - b.start;
-                              if (a.type === 'delete' && b.type === 'insert') return -1;
-                              if (a.type === 'insert' && b.type === 'delete') return 1;
-                              return 0;
-                            });
+                            .sort((a, b) => a.start - b.start);
 
                           let result: React.ReactNode[] = [];
                           let lastIndex = 0;
 
                           suggestions.forEach((s, i) => {
-                            // 1. Plain text before the suggestion
+                            // טקסט רגיל
                             if (s.start > lastIndex) {
                               result.push(
                                 <span key={`text-${i}`}>
                                   {scene.content.slice(lastIndex, s.start)}
                                 </span>
                               );
-                              lastIndex = s.start;
                             }
 
-                            // 2. The suggestion itself
-                            if (s.type === 'delete') {
-                              result.push(
-                                <span
-                                  key={`del-${s.id}`}
-                                  onClick={() => {
-                                    setActiveSuggestionId(s.id);
-                                    reviewTextareaRef.current?.focus();
-                                  }}
-                                  className={
-                                    s.id === activeSuggestionId
-                                      ? "line-through text-red-700 bg-red-200 px-1 rounded cursor-pointer"
-                                      : "line-through text-red-400 cursor-pointer"
-                                  }
-                                >
-                                  {scene.content.slice(s.start, s.end)}
-                                </span>
-                              );
-                              lastIndex = Math.max(lastIndex, s.end);
-                            } else if (s.type === 'insert') {
-                              result.push(
-                                <span
-                                  key={`ins-${s.id}`}
-                                  onClick={() => {
-                                    setActiveSuggestionId(s.id);
-                                    reviewTextareaRef.current?.focus();
-                                  }}
-                                  className={
-                                    s.id === activeSuggestionId
-                                      ? "text-green-800 bg-green-200 px-1 rounded cursor-pointer"
-                                      : "text-green-600 cursor-pointer"
-                                  }
-                                >
-                                  {s.id === activeSuggestionId ? (
-                                    <input
-                                      value={s.text}
-                                     onChange={(e) => {
-                                        const newText = e.target.value;
+                            // מחיקה
+                            result.push(
+                              <span
+                                key={`del-${s.id}`}
+                                onClick={() => setActiveSuggestionId(s.id)}
+                                className={
+                                  s.id === activeSuggestionId
+                                    ? "line-through text-red-700 bg-red-200 px-1 rounded cursor-pointer"
+                                    : "line-through text-red-400 cursor-pointer"
+                                }
+                              >
+                                {scene.content.slice(s.start, s.end)}
+                              </span>
+                            );
 
-                                        // אם ריק → מוחקים את ההצעה
-                                        if (newText.length === 0) {
-                                          onUpdateScene(scene.id, {
-                                            suggestions: (scene.suggestions || []).filter(item => item.id !== s.id)
-                                          });
-
-                                          setActiveSuggestionId(null);
-                                          return;
-                                        }
-
-                                        // אחרת → מעדכנים רגיל
-                                        onUpdateScene(scene.id, {
-                                          suggestions: (scene.suggestions || []).map(item =>
-                                            item.id === s.id
-                                              ? {
-                                                  ...item,
-                                                  text: newText,
-                                                  end: item.start + newText.length
-                                                }
-                                              : item
-                                          )
-                                        });
-                                      }}
-                                      className="bg-transparent outline-none border-none text-green-800"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    s.text
-                                  )}
-                                </span>
-                              );
-                            }
+                            lastIndex = s.end;
                           });
 
                           // שאר הטקסט
@@ -981,7 +614,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                               </span>
                             );
                           }
-                          
+
                           return result;
                         })()}
                       </div>
@@ -997,35 +630,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             onClick={() => {
-                              if (activeSuggestion.type === 'insert') {
-                                const pairedDelete = (scene.suggestions || []).find(
-                                  item =>
-                                    item.status === 'pending' &&
-                                    item.type === 'delete' &&
-                                    activeSuggestion?.pairId && item.pairId === activeSuggestion.pairId
-                                );
-
-                                const newContent = pairedDelete
-                                  ? scene.content.slice(0, pairedDelete.start) +
-                                    activeSuggestion.text +
-                                    scene.content.slice(pairedDelete.end)
-                                  : scene.content.slice(0, activeSuggestion.start) +
-                                    activeSuggestion.text +
-                                    scene.content.slice(activeSuggestion.start);
-
-                                onUpdateScene(scene.id, {
-                                  content: newContent,
-                                  suggestions: (scene.suggestions || []).filter(
-                                    item =>
-                                      item.id !== activeSuggestion.id &&
-                                      item.id !== pairedDelete?.id
-                                  )
-                                });
-
-                                setActiveSuggestionId(null);
-                                return;
-                              }
-
                               const newContent =
                                 scene.content.slice(0, activeSuggestion.start) +
                                 scene.content.slice(activeSuggestion.end);
@@ -1044,26 +648,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
 
                           <button
                             onClick={() => {
-                              if (activeSuggestion.type === 'insert') {
-                                const pairedDelete = (scene.suggestions || []).find(
-                                  item =>
-                                    item.status === 'pending' &&
-                                    item.type === 'delete' &&
-                                    item.pairId && item.pairId === activeSuggestion.pairId
-                                );
-
-                                onUpdateScene(scene.id, {
-                                  suggestions: (scene.suggestions || []).filter(
-                                    item =>
-                                      item.id !== activeSuggestion.id &&
-                                      item.id !== pairedDelete?.id
-                                  )
-                                });
-
-                                setActiveSuggestionId(null);
-                                return;
-                              }
-
                               onUpdateScene(scene.id, {
                                 suggestions: (scene.suggestions || []).filter(item => item.id !== activeSuggestion.id)
                               });
@@ -1238,7 +822,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 };
