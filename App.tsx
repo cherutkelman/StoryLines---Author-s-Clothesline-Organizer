@@ -91,6 +91,9 @@ const App: React.FC = () => {
           setCloudError(null);
         } catch (error: any) {
           console.error("App: Initial sync failed", error);
+          const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
+          console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
+          setBooks(deduplicateBooks(localFallbackBooks));
           if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
             setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
           }
