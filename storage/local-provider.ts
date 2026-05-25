@@ -122,8 +122,11 @@ export class LocalStorageProvider implements IStorageProvider {
         localStorage.setItem('storylines_ui_state_v1', JSON.stringify(uiStates));
       }
 
-      // Filter by current user
-      const userBooks = allBooks.filter((b: Book) => b.ownerId === currentUserId);
+      // In cloud mode, only show books owned by the signed-in Firebase user.
+      // In local/logged-out mode, show all local books so legacy ownerId values do not hide existing books.
+      const userBooks = this.externalUserId
+        ? allBooks.filter((b: Book) => b.ownerId === currentUserId)
+        : allBooks;
 
       if (includeDeleted) return userBooks;
       return userBooks.filter((b: Book) => !b.deletedAt);
