@@ -101,17 +101,6 @@ export const THEMES = {
   }
 };
 
-export interface Suggestion {
-  id: string;
-  type: 'delete';
-  start: number;
-  end: number;
-  text: string;
-  createdAt: number;
-  userId?: string;
-  status: 'pending' | 'accepted' | 'rejected';
-}
-
 export interface Scene {
   id: string;
   plotlineId: string;
@@ -120,7 +109,6 @@ export interface Scene {
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
   chapterTitle?: string;
-  suggestions?: Suggestion[];
 }
 
 export interface ChapterMarker {
