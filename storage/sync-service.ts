@@ -34,8 +34,9 @@ export class SyncService {
   async sync(): Promise<{ updatedBooks: Book[], conflicts: string[] }> {
     console.log(`[SyncService] sync() called. Current state: ${this.state}`);
     if (this.state === 'syncing') {
-      syncLogger.warn("Sync already in progress, skipping.");
-      return { updatedBooks: [], conflicts: [] };
+      syncLogger.warn("Sync already in progress, returning current local books instead of an empty list.");
+      const localBooks = await this.local.loadBooks(true);
+      return { updatedBooks: localBooks.filter(b => !b.deletedAt), conflicts: [] };
     }
 
     const conflicts: string[] = [];
