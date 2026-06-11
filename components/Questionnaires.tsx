@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
-import { 
+import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
   Download, LayoutList, Globe, Home, Eye, PencilLine, ClipboardList,
@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Camera
 } from 'lucide-react';
+import { isElectron, openDesktopImageDialog } from '../src/platform';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -321,19 +322,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     if (!selectedEntry) return;
     console.log('Renderer: handleImageUpload triggered for entry:', selectedEntry.id);
     
-    // Safer check for Electron
-    let isElectron = false;
-    try {
-      isElectron = !!((window as any).require && (window as any).require('electron'));
-    } catch (err) {
-      isElectron = false;
-    }
-    
     if (isElectron) {
       console.log('Renderer: Electron environment detected, using IPC dialog');
       try {
-        const { ipcRenderer } = (window as any).require('electron');
-        const dataUrl = await ipcRenderer.invoke('open-image-dialog');
+        const dataUrl = await openDesktopImageDialog();
         
         console.log('Renderer: IPC dialog returned result');
         if (dataUrl) {
@@ -821,13 +813,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <label 
                               className="absolute inset-0 flex items-center justify-center bg-[var(--theme-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-[var(--theme-card)]"
                               onClick={(e) => {
-                                let isElectron = false;
-                                try {
-                                  isElectron = !!((window as any).require && (window as any).require('electron'));
-                                } catch (err) {
-                                  isElectron = false;
-                                }
-                                
                                 if (isElectron) {
                                   e.preventDefault();
                                   handleImageUpload(null as any);

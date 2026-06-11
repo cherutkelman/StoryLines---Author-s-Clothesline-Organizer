@@ -1,6 +1,7 @@
 import { storageProvider, syncService, SyncState, SyncStatus, syncLogger, storageManager } from "./storage/index";
 import { v4 as uuidv4 } from "uuid";
 import type { Book, Project, BookUIState } from "./types";
+import { isWeb } from "./src/platform";
 
 export { syncService, syncLogger, storageManager };
 export type { SyncState, SyncStatus };
@@ -14,8 +15,9 @@ export const setUserId = (userId: string | null) => {
 };
 
 export const setStorageMode = (mode: 'local' | 'cloud') => {
-  console.log(`Storage: Setting mode to ${mode}`);
-  storageManager.setMode(mode);
+  const targetMode = isWeb ? 'cloud' : mode;
+  console.log(`Storage: Setting mode to ${targetMode}`);
+  storageManager.setMode(targetMode);
 };
 
 export const migrateLegacyBooks = async (newUserId: string) => {
@@ -42,6 +44,23 @@ export const loadBooks = async (includeDeleted = false): Promise<Book[]> => {
 
 export const saveBooks = async (books: Book[], skipCloud = false): Promise<Book[]> => {
   const cleanBooks = deduplicateBooks(books);
+
+  if (isWeb) {
+    if (skipCloud) {
+      console.log("Storage: Web mode skipCloud save ignored; LocalStorageProvider is not used for books.");
+      return cleanBooks;
+    }
+
+    const remoteProvider = storageManager.getRemoteProvider();
+    const pendingIds = cleanBooks.filter(b => b.pendingSync).map(b => b.id);
+    const idsToSave = pendingIds.length > 0 ? pendingIds : cleanBooks.map(b => b.id);
+    console.log(`Storage: Web mode saving ${idsToSave.length} books to ${remoteProvider.name} provider`);
+    await remoteProvider.saveBooks(cleanBooks, idsToSave);
+
+    return cleanBooks.map(b =>
+      idsToSave.includes(b.id) ? { ...b, pendingSync: false, syncStatus: 'synced' as SyncStatus } : b
+    );
+  }
   
   // Always save to LocalStorage as our local cache/source for sync
   const localProvider = storageManager.getLocalProvider();

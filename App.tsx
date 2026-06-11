@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
 import { auth, signIn as signInWithGoogle, logOut as logout } from './src/firebase';
+import { isElectron, isWeb, restartDesktopApp, subscribeToDesktopUpdates } from './src/platform';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { v4 as uuidv4 } from "uuid";
 import { 
@@ -60,12 +61,15 @@ const SHARED_FIELDS = [
   'characterMapConnections', 'maps', 'mindMaps'
 ];
 
+type WebSaveStatus = 'saved' | 'saving' | 'error';
+
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
+      setHasLoadedBooks(false);
       setUser(firebaseUser);
       
       if (firebaseUser) {
@@ -73,43 +77,70 @@ const App: React.FC = () => {
         console.log("App: User logged in, initializing cloud storage");
         setUserId(firebaseUser.uid);
         setCurrentUserId(firebaseUser.uid);
-        
-        // 1. Migrate legacy books in local storage to the new UID
-        await migrateLegacyBooks(firebaseUser.uid);
-        
-        // 2. Switch to cloud mode
+
         setStorageMode('cloud');
         setStorageModeState('cloud');
-        
-        // 3. Perform initial sync to merge local and remote
-        console.log("App: Performing initial sync...");
-        try {
-          setIsSyncing(true);
-          const { updatedBooks } = await syncService.sync();
-          console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
-          setBooks(deduplicateBooks(updatedBooks));
-          setCloudError(null);
-        } catch (error: any) {
-          console.error("App: Initial sync failed", error);
-          const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
-          console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
-          setBooks(deduplicateBooks(localFallbackBooks));
-          if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
-            setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+
+        if (isWeb) {
+          console.log("App: Web mode, loading books from Firestore only");
+          try {
+            const cloudBooks = await loadBooks();
+            setBooks(deduplicateBooks(cloudBooks));
+            setHasLoadedBooks(true);
+            setCloudError(null);
+          } catch (error: any) {
+            console.error("App: Web cloud load failed", error);
+            setBooks([]);
+            setHasLoadedBooks(true);
+            setWebSaveStatus('error');
+            setCloudError('טעינת הספרים מהענן נכשלה. נסה שוב בקרוב.');
           }
-        } finally {
-          setIsSyncing(false);
+        } else {
+          // 1. Migrate legacy books in local storage to the new UID
+          await migrateLegacyBooks(firebaseUser.uid);
+
+          // 2. Perform initial sync to merge local and remote
+          console.log("App: Performing initial sync...");
+          try {
+            setIsSyncing(true);
+            const { updatedBooks } = await syncService.sync();
+            console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
+            setBooks(deduplicateBooks(updatedBooks));
+            setHasLoadedBooks(true);
+            setCloudError(null);
+          } catch (error: any) {
+            console.error("App: Initial sync failed", error);
+            const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
+            console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
+            setBooks(deduplicateBooks(localFallbackBooks));
+            setHasLoadedBooks(true);
+            if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+              setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+            }
+          } finally {
+            setIsSyncing(false);
+          }
         }
       } else {
-        // Logged out
-        console.log("App: User logged out, switching to local storage");
+        console.log(isWeb ? "App: Web user logged out, requiring Firebase login" : "App: User logged out, switching to local storage");
         setUserId(null);
-        setCurrentUserId(getOrCreateUserId());
-        setStorageMode('local');
-        setStorageModeState('local');
-        
-        const loadedBooks = await loadBooks();
-        setBooks(deduplicateBooks(loadedBooks));
+
+        if (isWeb) {
+          setCurrentUserId('');
+          setStorageMode('cloud');
+          setStorageModeState('cloud');
+          setBooks([]);
+          setActiveBookId('');
+          setHasLoadedBooks(true);
+        } else {
+          setCurrentUserId(getOrCreateUserId());
+          setStorageMode('local');
+          setStorageModeState('local');
+
+          const loadedBooks = await loadBooks();
+          setBooks(deduplicateBooks(loadedBooks));
+          setHasLoadedBooks(true);
+        }
       }
 
       const loadedUI = loadUIStates();
@@ -135,9 +166,10 @@ const App: React.FC = () => {
   }, []);
 
   const [books, setBooks] = useState<Book[]>([]);
+  const [hasLoadedBooks, setHasLoadedBooks] = useState(false);
   const displayBooks = useMemo(() => deduplicateBooks(books), [books]);
   const [user, setUser] = useState<User | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>(getOrCreateUserId());
+  const [currentUserId, setCurrentUserId] = useState<string>(isWeb ? '' : getOrCreateUserId());
   const [uiStates, setUiStates] = useState<Record<string, BookUIState>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncState>('idle');
@@ -157,6 +189,7 @@ const App: React.FC = () => {
   const [lastCloudSaved, setLastCloudSaved] = useState<Date | null>(null);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [webSaveStatus, setWebSaveStatus] = useState<WebSaveStatus>('saved');
   
   // Modals state
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
@@ -207,6 +240,8 @@ const App: React.FC = () => {
 
   // Local save effect (1s)
   useEffect(() => {
+    if (isWeb || !hasLoadedBooks || isLoading || !isAuthReady || !activeBookId || books.length === 0) return;
+
     const timeout = setTimeout(async () => {
       const updatedBooks = await saveBooks(books, true); // Skip cloud
       // We don't necessarily need to setBooks here because it's just local save
@@ -217,7 +252,14 @@ const App: React.FC = () => {
       setLastSaved(new Date());
     }, 1000); // Debounce local save by 1 second
     return () => clearTimeout(timeout);
-  }, [books, uiStates, activeBookId]);
+  }, [books, uiStates, activeBookId, hasLoadedBooks, isLoading, isAuthReady]);
+
+  useEffect(() => {
+    if (!isWeb || !hasLoadedBooks || isLoading || !isAuthReady) return;
+
+    saveUIStates(uiStates);
+    saveGlobalUIState({ lastActiveBookId: activeBookId || undefined });
+  }, [uiStates, activeBookId, hasLoadedBooks, isLoading, isAuthReady]);
 
   // Cloud save effect (5 minutes)
   useEffect(() => {
@@ -225,14 +267,20 @@ const App: React.FC = () => {
     
     // Only trigger cloud save if there are pending changes
     const hasPendingChanges = books.some(b => b.pendingSync);
-    if (!hasPendingChanges) return;
+    if (!hasPendingChanges) {
+      if (isWeb && !cloudError) setWebSaveStatus('saved');
+      return;
+    }
+
+    if (isWeb && !cloudError) setWebSaveStatus('saving');
 
     // If we recently had a quota error, wait longer before retrying
-    const debounceTime = cloudError?.includes('quota') ? 600000 : 300000; // 10m if quota error, else 5m
+    const debounceTime = isWeb ? (cloudError ? 5000 : 1000) : (cloudError?.includes('quota') ? 600000 : 300000); // Web writes directly to Firestore; desktop keeps longer cloud debounce.
 
     const timeout = setTimeout(async () => {
       try {
         console.log("[App] Debounced cloud save triggered...");
+        if (isWeb) setWebSaveStatus('saving');
         setIsSyncing(true);
         const currentBooks = books; // Capture current state
         const updatedBooks = await saveBooks(currentBooks, false); // Don't skip cloud
@@ -251,8 +299,13 @@ const App: React.FC = () => {
         
         setLastCloudSaved(new Date());
         setCloudError(null);
+        if (isWeb) setWebSaveStatus('saved');
       } catch (e: any) {
         console.error("Cloud save failed", e);
+        if (isWeb) {
+          setWebSaveStatus('error');
+          setCloudError('שגיאת שמירה. השינויים נשארו פתוחים וינוסו שוב כשהחיבור לענן יחזור.');
+        } else
         if (e.message?.includes('resource-exhausted') || e.message?.includes('quota')) {
           setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
         } else {
@@ -281,29 +334,14 @@ const App: React.FC = () => {
   }, [activeBook?.theme]);
 
   useEffect(() => {
-    if ((window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      
-      ipcRenderer.on('update_available', () => {
-        setUpdateStatus('available');
-      });
-
-      ipcRenderer.on('update_downloaded', () => {
-        setUpdateStatus('downloaded');
-      });
-
-      return () => {
-        ipcRenderer.removeAllListeners('update_available');
-        ipcRenderer.removeAllListeners('update_downloaded');
-      };
-    }
+    return subscribeToDesktopUpdates(
+      () => setUpdateStatus('available'),
+      () => setUpdateStatus('downloaded')
+    );
   }, []);
 
   const restartApp = () => {
-    if ((window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      ipcRenderer.send('restart_app');
-    }
+    restartDesktopApp();
   };
 
   const updateActiveBook = (updates: Partial<Book>) => {
@@ -675,7 +713,7 @@ const App: React.FC = () => {
     const remainingBooks = books.filter(b => b.id !== id && !b.deletedAt);
     if (remainingBooks.length === 0) {
       const freshBook = createNewBook('ספר חדש', currentUserId);
-      setBooks([freshBook]);
+      setBooks(prev => [...softDeleteBookInList(prev, id), freshBook]);
       setActiveBookId(freshBook.id);
     } else {
       setBooks(prev => softDeleteBookInList(prev, id));
@@ -696,14 +734,24 @@ const App: React.FC = () => {
 
   const handleSync = async () => {
     console.log("[App] Sync button clicked");
-    if (isSyncing) return;
+    if (isSyncing || (isWeb && !user)) return;
     
     try {
       setIsSyncing(true);
+      if (isWeb) setWebSaveStatus('saving');
       // Ensure latest state is saved before sync
       console.log("[App] Saving books before sync...");
       const currentBooks = books;
       const savedBooks = await saveBooks(currentBooks);
+
+      if (isWeb) {
+        const cloudBooks = await loadBooks();
+        setBooks(deduplicateBooks(cloudBooks.length > 0 ? cloudBooks : savedBooks));
+        setLastCloudSaved(new Date());
+        setCloudError(null);
+        setWebSaveStatus('saved');
+        return;
+      }
       
       setBooks(prev => {
         return prev.map(p => {
@@ -739,6 +787,10 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       console.error("[App] Sync error:", error);
+      if (isWeb) {
+        setWebSaveStatus('error');
+        setCloudError('שגיאת שמירה. השינויים נשארו פתוחים וינוסו שוב כשהחיבור לענן יחזור.');
+      } else
       if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
         setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
       }
@@ -857,6 +909,27 @@ const App: React.FC = () => {
     );
   }
 
+  if (isWeb && isAuthReady && !user) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-text)] p-6">
+        <div className="w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-2xl shadow-xl p-8 text-center">
+          <div className="mx-auto mb-5 w-14 h-14 rounded-2xl bg-[var(--theme-primary)] text-[var(--theme-card)] flex items-center justify-center">
+            <BookOpen size={28} />
+          </div>
+          <h1 className="text-3xl font-bold handwritten text-[var(--theme-primary)] mb-3">StoryLines</h1>
+          <p className="text-sm text-[var(--theme-muted)] mb-6">התחברות נדרשת כדי לטעון ולשמור ספרים בענן.</p>
+          <button
+            onClick={() => signInWithGoogle()}
+            className="w-full flex items-center justify-center gap-3 py-4 px-4 rounded-2xl text-sm font-bold bg-[var(--theme-primary)] text-[var(--theme-card)] hover:opacity-90 transition-all shadow-lg"
+          >
+            <Users size={18} />
+            <span>התחבר עם Google</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
       {cloudError && (
@@ -929,6 +1002,28 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {isWeb && (
+            <div
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold ${
+                webSaveStatus === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-600'
+                  : webSaveStatus === 'saving'
+                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                    : 'bg-green-50 border-green-200 text-green-700'
+              }`}
+              title={cloudError || (lastCloudSaved ? `נשמר לאחרונה: ${lastCloudSaved.toLocaleTimeString()}` : 'נשמר')}
+            >
+              {webSaveStatus === 'saving' ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : webSaveStatus === 'error' ? (
+                <AlertCircle size={16} />
+              ) : (
+                <CheckCircle2 size={16} />
+              )}
+              <span>{webSaveStatus === 'saving' ? 'שומר...' : webSaveStatus === 'error' ? 'שגיאת שמירה' : 'נשמר'}</span>
+            </div>
+          )}
+          {!isWeb && (
           <button 
             onClick={handleSync}
             disabled={syncStatus === 'syncing' || isSyncing}
@@ -957,6 +1052,7 @@ const App: React.FC = () => {
             }
             <span className="hidden xl:inline text-xs font-bold">סנכרון</span>
           </button>
+          )}
           <button 
             onClick={() => setIsThemeModalOpen(true)}
             className="p-2.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)]"
@@ -966,7 +1062,7 @@ const App: React.FC = () => {
           </button>
           <button 
             onClick={() => setShowDebug(!showDebug)}
-            className="p-2.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)]"
+            className={`p-2.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all border border-transparent hover:border-[var(--theme-border)] ${isWeb ? 'hidden' : ''}`}
             title="דיאגנוסטיקה"
           >
             <Settings2 size={20} />
@@ -1294,7 +1390,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Update Notification */}
-      {updateStatus !== 'none' && (
+      {isElectron && updateStatus !== 'none' && (
         <div className="fixed bottom-6 left-6 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="bg-[var(--theme-card)] border border-[var(--theme-border)] p-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[300px]">
             <div className="w-10 h-10 rounded-xl bg-[var(--theme-accent)]/10 flex items-center justify-center text-[var(--theme-accent)]">
@@ -1611,7 +1707,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      {showDebug && (
+      {showDebug && !isWeb && (
         <div className="fixed bottom-4 right-4 z-50 bg-[var(--theme-card)] border border-[var(--theme-border)] p-4 rounded-2xl shadow-2xl max-w-xs w-full handwritten">
           <div className="flex items-center justify-between mb-2">
             <h4 className="font-bold text-sm">Sync Diagnostics</h4>

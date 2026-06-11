@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
+import { isElectron, openDesktopOAuthUrl } from './platform';
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -16,8 +17,6 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
-
-const isElectron = window.location.protocol === 'file:';
 
 type ExchangeGoogleOAuthCodeResponse = {
   idToken?: string | null;
@@ -77,10 +76,7 @@ export const signIn = async () => {
 
       let code: string | null = null;
 
-      if ((window as any).require) {
-        const electron = (window as any).require('electron');
-        code = await electron.ipcRenderer.invoke('open-external-url', url);
-      }
+      code = await openDesktopOAuthUrl(url);
 
       console.log('[AUTH] OAuth code received:', Boolean(code));
 

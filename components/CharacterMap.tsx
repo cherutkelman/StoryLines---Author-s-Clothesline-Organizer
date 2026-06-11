@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
 import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { isElectron, openDesktopImageDialog } from '../src/platform';
 
 interface CharacterMapProps {
   characters: QuestionnaireEntry[];
@@ -173,19 +174,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const handleImageUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Renderer: handleImageUpload triggered for node:', id);
     
-    // Safer check for Electron
-    let isElectron = false;
-    try {
-      isElectron = !!((window as any).require && (window as any).require('electron'));
-    } catch (err) {
-      isElectron = false;
-    }
-    
     if (isElectron) {
       console.log('Renderer: Electron environment detected, using IPC dialog');
       try {
-        const { ipcRenderer } = (window as any).require('electron');
-        const dataUrl = await ipcRenderer.invoke('open-image-dialog');
+        const dataUrl = await openDesktopImageDialog();
         
         console.log('Renderer: IPC dialog returned result');
         if (dataUrl) {
@@ -476,13 +468,6 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                   className="p-2 bg-white text-blue-600 rounded-full shadow-lg hover:bg-blue-50 cursor-pointer border border-blue-100 transition-colors" 
                   title="העלאת תמונה"
                   onClick={(e) => {
-                    let isElectron = false;
-                    try {
-                      isElectron = !!((window as any).require && (window as any).require('electron'));
-                    } catch (err) {
-                      isElectron = false;
-                    }
-                    
                     if (isElectron) {
                       e.preventDefault();
                       handleImageUpload(node.id, null as any);
