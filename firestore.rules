@@ -69,15 +69,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == bookData.ownerId;
     }
 
-    function isBookMember(bookData) {
-      return isAuthenticated()
-        && request.auth.uid in bookData.memberIds;
-    }
-
-    function canAccessBook(bookData) {
-      return isBookOwner(bookData) || isBookMember(bookData);
-    }
-
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
@@ -109,18 +100,19 @@ service cloud.firestore {
     }
 
     match /books/{bookId} {
-      allow read: if canAccessBook(resource.data);
+      // StoryLines Web beta: books are owner-only.
+      // Sharing/member/admin access is intentionally not enabled for this path.
+      allow read: if isBookOwner(resource.data);
 
       allow create: if isAuthenticated()
         && request.resource.data.ownerId == request.auth.uid
         && isValidBook(request.resource.data);
 
-      allow update: if canAccessBook(resource.data)
+      allow update: if isBookOwner(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
-        && canAccessBook(request.resource.data)
         && isValidBook(request.resource.data);
 
-      allow delete: if isBookOwner(resource.data) || isAdmin();
+      allow delete: if isBookOwner(resource.data);
     }
 
     match /users/{userId} {

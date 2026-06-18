@@ -5,10 +5,12 @@ type ElectronIpcRenderer = {
   send: (channel: string, ...args: any[]) => void;
 };
 
-const target = import.meta.env.VITE_APP_TARGET;
+const target = String(import.meta.env.VITE_APP_TARGET || '').toLowerCase();
+const isTargetWeb = target === 'web';
+const isTargetDesktop = target === 'desktop';
 
 const getElectronIpcRenderer = (): ElectronIpcRenderer | null => {
-  if (target === 'web' || typeof window === 'undefined') return null;
+  if (isTargetWeb || typeof window === 'undefined') return null;
 
   try {
     const requireElectron = (window as any).require;
@@ -19,8 +21,8 @@ const getElectronIpcRenderer = (): ElectronIpcRenderer | null => {
   }
 };
 
-export const isElectron = target === 'desktop' || Boolean(getElectronIpcRenderer());
-export const isWeb = target === 'web' || !isElectron;
+export const isElectron = isTargetDesktop || (!isTargetWeb && Boolean(getElectronIpcRenderer()));
+export const isWeb = isTargetWeb || !isElectron;
 
 export const subscribeToDesktopUpdates = (
   onUpdateAvailable: () => void,

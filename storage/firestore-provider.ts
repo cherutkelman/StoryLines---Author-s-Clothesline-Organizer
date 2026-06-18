@@ -1,6 +1,7 @@
 import { Book } from "../types";
 import { IStorageProvider } from "./types";
 import { db, auth } from "../src/firebase";
+import { isWeb } from "../src/platform";
 import { 
   collection, 
   query, 
@@ -90,7 +91,6 @@ export class FirestoreStorageProvider implements IStorageProvider {
     console.log(`[FirestoreStorageProvider] loadBooks: Fetching from path "${path}" for owner/member "${this.userId}"`);
     const booksRef = collection(db, path);
     const ownerQuery = query(booksRef, where("ownerId", "==", this.userId));
-    const memberQuery = query(booksRef, where("memberIds", "array-contains", this.userId));
 
     try {
       console.log(
@@ -101,18 +101,6 @@ export class FirestoreStorageProvider implements IStorageProvider {
         `[FirestoreStorageProvider] loadBooks: Owner query OK. Found ${ownerSnap.size} docs.`
       );
 
-      console.log(
-        `[FirestoreStorageProvider] loadBooks: Running member query where memberIds array-contains "${this.userId}"`
-      );
-      const memberSnap = await getDocs(memberQuery);
-      console.log(
-        `[FirestoreStorageProvider] loadBooks: Member query OK. Found ${memberSnap.size} docs.`
-      );
-
-      console.log(
-      `[FirestoreStorageProvider] loadBooks: Success. Found ${ownerSnap.size} owner docs and ${memberSnap.size} member docs.`
-      );
-
       const map = new Map<string, Book>();
 
       ownerSnap.forEach((docSnap) => {
@@ -120,10 +108,25 @@ export class FirestoreStorageProvider implements IStorageProvider {
         map.set(book.id, book);
       });
 
-      memberSnap.forEach((docSnap) => {
-        const book = docSnap.data() as Book;
-        map.set(book.id, book);
-      });
+      if (!isWeb) {
+        const memberQuery = query(booksRef, where("memberIds", "array-contains", this.userId));
+        console.log(
+          `[FirestoreStorageProvider] loadBooks: Running member query where memberIds array-contains "${this.userId}"`
+        );
+        const memberSnap = await getDocs(memberQuery);
+        console.log(
+          `[FirestoreStorageProvider] loadBooks: Member query OK. Found ${memberSnap.size} docs.`
+        );
+
+        memberSnap.forEach((docSnap) => {
+          const book = docSnap.data() as Book;
+          map.set(book.id, book);
+        });
+      }
+
+      console.log(
+        `[FirestoreStorageProvider] loadBooks: Success. Found ${map.size} accessible docs.`
+      );
 
       const books = Array.from(map.values());
 

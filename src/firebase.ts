@@ -3,13 +3,29 @@ import { getAuth, GoogleAuthProvider, signInWithCredential, signInWithPopup, sig
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
 import { isElectron, openDesktopOAuthUrl } from './platform';
+
+const REQUIRED_FIREBASE_ENV_VARS = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+] as const;
+
+export const missingFirebaseEnvVars = REQUIRED_FIREBASE_ENV_VARS.filter(
+  (name) => !import.meta.env[name]
+);
+
+export const isFirebaseConfigured = missingFirebaseEnvVars.length === 0;
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '__missing_firebase_api_key__',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '__missing_firebase_auth_domain__',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '__missing_firebase_project_id__',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '__missing_firebase_storage_bucket__',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '__missing_firebase_messaging_sender_id__',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '__missing_firebase_app_id__',
 };
 
 const app = initializeApp(firebaseConfig);
