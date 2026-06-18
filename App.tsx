@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
-import { auth, signIn as signInWithGoogle, logOut as logout } from './src/firebase';
+import { auth, isFirebaseConfigured, logOut as logout, missingFirebaseEnvVars, signIn as signInWithGoogle } from './src/firebase';
 import { isElectron, isWeb, restartDesktopApp, subscribeToDesktopUpdates } from './src/platform';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { v4 as uuidv4 } from "uuid";
@@ -46,7 +46,8 @@ import {
   Link,
   RefreshCw,
   Cloud,
-  AlertCircle
+  AlertCircle,
+  Menu
 } from 'lucide-react';
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState } from './types';
 import Board from './components/Board';
@@ -67,6 +68,13 @@ const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
   
   useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setIsAuthReady(true);
+      setIsLoading(false);
+      setHasLoadedBooks(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
       setHasLoadedBooks(false);
@@ -183,6 +191,7 @@ const App: React.FC = () => {
   const [activeBookId, setActiveBookId] = useState<string>('');
   const [storageMode, setStorageModeState] = useState<'local' | 'cloud'>(storageManager.getMode());
   const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>('board');
+  const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
@@ -898,6 +907,31 @@ const App: React.FC = () => {
     setRemoteBookData(null);
   };
 
+  if (!isFirebaseConfigured) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-text)] p-6">
+        <div className="w-full max-w-2xl bg-[var(--theme-card)] border border-red-200 rounded-2xl shadow-xl p-8">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--theme-primary)] mb-2">Firebase configuration is missing</h1>
+              <p className="text-sm text-[var(--theme-muted)] mb-4">
+                StoryLines cannot start until the required Firebase environment variables are configured for this web build.
+              </p>
+              <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-700 font-mono ltr text-left">
+                {missingFirebaseEnvVars.map(name => (
+                  <div key={name}>{name}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-primary)]">
@@ -943,9 +977,16 @@ const App: React.FC = () => {
           </button>
         </div>
       )}
-      <header className="flex-shrink-0 sticky top-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-6 py-3 flex items-center justify-between shadow-sm z-30">
-        <div className="flex items-center gap-6">
+      <header className="flex-shrink-0 sticky top-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-3 sm:px-6 py-3 flex items-center justify-between gap-2 shadow-sm z-30">
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileLibraryOpen(true)}
+              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors lg:hidden"
+              title="ספרים"
+            >
+              <Menu size={22} />
+            </button>
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors lg:flex hidden"
@@ -953,17 +994,17 @@ const App: React.FC = () => {
             >
               {isSidebarCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
             </button>
-            <div className="bg-[var(--theme-primary)] p-2 rounded-lg text-[var(--theme-card)] transition-transform hover:scale-110">
+            <div className="bg-[var(--theme-primary)] p-2 rounded-lg text-[var(--theme-card)] transition-transform hover:scale-110 hidden sm:flex">
               <BookOpen size={20} />
             </div>
             <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setIsAboutModalOpen(true)}>
-              <h1 className="text-xl font-bold text-[var(--theme-primary)] handwritten text-3xl select-none leading-none">StoryLines</h1>
-              <span className="text-[10px] font-bold text-[var(--theme-primary)]/60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
+              <h1 className="text-xl font-bold text-[var(--theme-primary)] handwritten sm:text-3xl select-none leading-none">StoryLines</h1>
+              <span className="hidden sm:block text-[10px] font-bold text-[var(--theme-primary)]/60 uppercase tracking-wider leading-none mt-1">by cherut kelman</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-[var(--theme-secondary)] p-1.5 rounded-2xl border border-[var(--theme-border)]/50 shadow-inner">
+        <div className="hidden lg:flex items-center gap-1 bg-[var(--theme-secondary)] p-1.5 rounded-2xl border border-[var(--theme-border)]/50 shadow-inner">
           <button 
             onClick={() => handleViewChange('planning')} 
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'planning' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
@@ -1069,6 +1110,98 @@ const App: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {isMobileLibraryOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsMobileLibraryOpen(false)}
+            aria-label="סגור תפריט ספרים"
+          />
+          <aside className="absolute right-0 top-0 h-full w-[min(88vw,360px)] bg-[var(--theme-card)] border-l border-[var(--theme-border)] shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--theme-border)]">
+              <div>
+                <h2 className="text-lg font-bold text-[var(--theme-primary)]">הספרים שלי</h2>
+                {activeBook && <p className="text-xs text-[var(--theme-muted)] truncate max-w-48">{activeBook.title}</p>}
+              </div>
+              <button
+                onClick={() => setIsMobileLibraryOpen(false)}
+                className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg"
+                aria-label="סגור"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-[var(--theme-border)]">
+              <button
+                onClick={() => {
+                  addNewBookToLibrary();
+                  setIsMobileLibraryOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] text-sm font-bold shadow-sm"
+              >
+                <Plus size={18} />
+                <span>ספר חדש</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {displayBooks.map(book => (
+                <div
+                  key={book.id}
+                  className={`p-3 rounded-xl border transition-all ${activeBookId === book.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-border)]' : 'border-transparent bg-[var(--theme-bg)]'}`}
+                >
+                  <button
+                    onClick={() => {
+                      setActiveBookId(book.id);
+                      setIsMobileLibraryOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 text-right"
+                  >
+                    <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/40'} />
+                    <span className="flex-1 text-sm font-bold text-[var(--theme-primary)] truncate">{book.title}</span>
+                    {book.syncStatus === 'conflict' && <AlertCircle size={16} className="text-red-500" />}
+                  </button>
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      value={book.title}
+                      onChange={(e) => renameBook(book.id, e.target.value)}
+                      className="min-w-0 flex-1 text-sm font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-primary)]"
+                      aria-label="שם הספר"
+                    />
+                    {book.syncStatus === 'conflict' && (
+                      <button
+                        onClick={() => {
+                          openConflictResolver(book.id);
+                          setIsMobileLibraryOpen(false);
+                        }}
+                        className="p-2 text-red-500 bg-red-50 rounded-lg"
+                        title="פתרון קונפליקט"
+                      >
+                        <AlertCircle size={16} />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => deleteBook(book.id, e)}
+                      className="p-2 text-red-500 bg-red-50 rounded-lg"
+                      title="מחיקת ספר"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {user && (
+              <div className="p-4 border-t border-[var(--theme-border)] text-xs text-[var(--theme-muted)] truncate">
+                {user.email}
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         <aside 
@@ -1257,7 +1390,7 @@ const App: React.FC = () => {
           )}
         </aside>
 
-        <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)]">
+        <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)] mb-16 lg:mb-0">
           {activeBook ? (
             <>
               {activeView === 'planning' && (
@@ -1388,6 +1521,31 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-[var(--theme-card)] border-t border-[var(--theme-border)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
+        <div className="grid grid-cols-5">
+          {[
+            { id: 'planning' as const, icon: Layout, label: 'תכנון' },
+            { id: 'board' as const, icon: Layout, label: 'לוח' },
+            { id: 'editor' as const, icon: LucideType, label: 'כתיבה' },
+            { id: 'maps' as const, icon: MapIcon, label: 'מפות' },
+            { id: 'questionnaires' as const, icon: ListChecks, label: 'שאלונים' },
+          ].map(item => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleViewChange(item.id)}
+                className={`h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition-colors ${isActive ? 'text-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'text-[var(--theme-primary)]/45'}`}
+              >
+                <Icon size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Update Notification */}
       {isElectron && updateStatus !== 'none' && (
