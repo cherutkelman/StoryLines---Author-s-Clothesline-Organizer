@@ -1002,14 +1002,14 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileLibraryOpen(true)}
-              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors lg:hidden"
+              className="flex lg:hidden p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors"
               title="ספרים"
             >
               <Menu size={22} />
             </button>
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors lg:flex hidden"
+              className="hidden lg:flex p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors"
               title={isSidebarCollapsed ? "פתח תפריט" : "סגור תפריט"}
             >
               {isSidebarCollapsed ? <PanelRightOpen size={20} /> : <PanelRightClose size={20} />}
@@ -1112,7 +1112,7 @@ const App: React.FC = () => {
       </header>
 
       {isMobileLibraryOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
           <button
             className="absolute inset-0 bg-black/40"
             onClick={() => setIsMobileLibraryOpen(false)}
