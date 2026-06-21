@@ -160,11 +160,20 @@ export interface RelationshipStep {
   isMerged: boolean;
 }
 
+export interface RelationshipDynamicStep {
+  id: string;
+  sceneDescription: string;
+  char1Position: number | null;
+  char2Position: number | null;
+  relevantScenes: string;
+}
+
 export interface Relationship {
   id: string;
   char1Id: string;
   char2Id: string;
   steps: RelationshipStep[];
+  dynamicSteps?: RelationshipDynamicStep[];
 }
 
 export interface QuestionnaireEntry {
@@ -257,9 +266,38 @@ export interface Project {
   characterArcs?: {
     id: string;
     characterName: string;
-    steps: { id: string; text: string }[];
+    falseBelief?: string;
+    finalGoal?: string;
+    steps: {
+      id: string;
+      text: string;
+      argument?: string;
+      validation?: string;
+      contradiction?: string;
+    }[];
+    sceneLinks?: {
+      id: string;
+      sceneId?: string;
+      sceneName?: string;
+      summary?: string;
+      stepNumber?: number;
+      type?: 'argument' | 'validation' | 'contradiction';
+    }[];
   }[];
   relationships?: Relationship[];
+  conflicts?: {
+    id: string;
+    title: string;
+    rows: {
+      id: string;
+      goal: string;
+      goalScenes: { id: string; sceneId?: string; sceneName?: string }[];
+      obstacle: string;
+      obstacleScenes: { id: string; sceneId?: string; sceneName?: string }[];
+      resolution: string;
+      resolutionScenes: { id: string; sceneId?: string; sceneName?: string }[];
+    }[];
+  }[];
 }
 
 export type SyncStatus = 'synced' | 'pending' | 'error' | 'local_only' | 'conflict';

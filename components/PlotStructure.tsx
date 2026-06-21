@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, GitMerge, GitBranch, Users } from 'lucide-react';
+import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, GitMerge, GitBranch, Users, Circle, Triangle, Square } from 'lucide-react';
 import { Scene } from '../types';
 
 interface PlotStructureProps {
@@ -13,16 +13,125 @@ interface PlotStructureProps {
   characterArcs: {
     id: string;
     characterName: string;
-    steps: { id: string; text: string }[];
+    falseBelief?: string;
+    finalGoal?: string;
+    steps: { 
+      id: string; 
+      text: string;
+      argument?: string;
+      validation?: string;
+      contradiction?: string;
+    }[];
+    sceneLinks?: {
+      id: string;
+      sceneId?: string;
+      sceneName?: string;
+      summary?: string;
+      stepNumber?: number; // 1-indexed to match logic
+      type?: 'argument' | 'validation' | 'contradiction';
+    }[];
   }[];
   onUpdateArcs: (arcs: any[]) => void;
   characters: any[];
-  onUpdateCharacters: (chars: any[]) => void;
   relationships: any[];
   onUpdateRelationships: (rels: any[]) => void;
+  onUpdateCharacters: (chars: any[]) => void;
   conflicts: any[];
   onUpdateConflicts: (conflicts: any[]) => void;
 }
+
+const MultiScenePicker: React.FC<{
+  links: { id: string; sceneId?: string; sceneName?: string }[];
+  onUpdate: (newLinks: any[]) => void;
+  scenes: Scene[];
+  placeholder: string;
+}> = ({ links = [], onUpdate, scenes = [], placeholder }) => {
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customName, setCustomName] = useState('');
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+        {(links || []).map((link, idx) => (
+          <div key={link.id} className="flex items-center gap-1.5 bg-white border border-[var(--theme-border)]/40 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm group/chip">
+            <span className="text-[var(--theme-primary)]">
+              {link.sceneName || scenes.find(s => s.id === link.sceneId)?.title || '...'}
+            </span>
+            <button 
+              onClick={() => onUpdate(links.filter((_, i) => i !== idx))}
+              className="text-red-400 hover:text-red-600 transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        {!isAddingCustom ? (
+          <>
+            <select
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                const scene = (scenes || []).find(s => s.id === e.target.value);
+                onUpdate([...(links || []), { id: `link-${Date.now()}`, sceneId: e.target.value, sceneName: scene?.title }]);
+              }}
+              className="text-[11px] bg-white/80 border border-[var(--theme-border)]/30 rounded-lg px-2 py-1.5 outline-none flex-1 focus:ring-1 focus:ring-[var(--theme-accent)]/30 transition-all font-medium"
+            >
+              <option value="">{placeholder}</option>
+              {(scenes || []).map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+            <button 
+              onClick={() => setIsAddingCustom(true)}
+              className="p-1.5 bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] rounded-lg hover:bg-[var(--theme-accent)]/20 transition-all"
+              title="הוספה חופשית"
+            >
+              <Plus size={14} />
+            </button>
+          </>
+        ) : (
+          <div className="flex gap-1 flex-1">
+            <input 
+              autoFocus
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customName.trim()) {
+                  onUpdate([...links, { id: `link-${Date.now()}`, sceneName: customName.trim() }]);
+                  setCustomName('');
+                  setIsAddingCustom(false);
+                } else if (e.key === 'Escape') {
+                  setIsAddingCustom(false);
+                  setCustomName('');
+                }
+              }}
+              placeholder="שם הסצנה..."
+              className="text-[11px] bg-white border border-[var(--theme-border)]/30 rounded-lg px-2 py-1.5 outline-none flex-1 font-medium"
+            />
+            <button 
+              onClick={() => {
+                if (customName.trim()) {
+                  onUpdate([...links, { id: `link-${Date.now()}`, sceneName: customName.trim() }]);
+                  setCustomName('');
+                  setIsAddingCustom(false);
+                }
+              }}
+              className="px-2 py-1 bg-green-500 text-white rounded-lg text-[10px] font-bold"
+            >
+              הוסף
+            </button>
+            <button 
+              onClick={() => setIsAddingCustom(false)}
+              className="px-2 py-1 bg-gray-200 text-gray-600 rounded-lg text-[10px] font-bold"
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const STRUCTURES = [
   { id: 'three-acts', label: 'מבנה שלוש המערכות' },
@@ -70,10 +179,298 @@ const HEROS_JOURNEY_POINTS = [
   { id: 'hj-9', label: 'חזרה', x: 360, y: 85 },
 ];
 
+interface RelationshipDynamicsTableProps {
+  rel: any;
+  relIndex: number;
+  relationships: any[];
+  onUpdateRelationships: (rels: any[]) => void;
+  characters: any[];
+  onUpdateCharacters: (chars: any[]) => void;
+}
+
+const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({ 
+  rel, 
+  relIndex, 
+  relationships, 
+  onUpdateRelationships,
+  characters,
+  onUpdateCharacters
+}) => {
+  const headerRef = React.useRef<HTMLTableSectionElement>(null);
+  const [headerHeight, setHeaderHeight] = React.useState(130);
+  const dynamicSteps = rel.dynamicSteps || [];
+  
+  React.useEffect(() => {
+    if (headerRef.current) {
+      setHeaderHeight(headerRef.current.offsetHeight);
+    }
+  }, [rel.char1Id, rel.char2Id, characters, relationships]);
+  const char1 = characters.find(c => c.id === rel.char1Id);
+  const char2 = characters.find(c => c.id === rel.char2Id);
+
+  const updateSteps = (newSteps: any[]) => {
+    const newRels = [...relationships];
+    newRels[relIndex] = { ...rel, dynamicSteps: newSteps };
+    onUpdateRelationships(newRels);
+  };
+
+  const addRow = () => {
+    const newRow = {
+      id: `dyn-${Date.now()}`,
+      sceneDescription: '',
+      char1Position: null,
+      char2Position: null,
+      relevantScenes: ''
+    };
+    updateSteps([...dynamicSteps, newRow]);
+  };
+
+  const removeRow = (id: string) => {
+    updateSteps(dynamicSteps.filter((s: any) => s.id !== id));
+  };
+
+  const handleCellClick = (stepIndex: number, char: 1 | 2, posIndex: number) => {
+    const newSteps = [...dynamicSteps];
+    const field = char === 1 ? 'char1Position' : 'char2Position';
+    newSteps[stepIndex][field] = newSteps[stepIndex][field] === posIndex ? null : posIndex;
+    updateSteps(newSteps);
+  };
+
+  const handleRenameCharacter = (charId: string, newName: string, relIndex?: number, charNum?: 1 | 2) => {
+    if (!charId && relIndex !== undefined && charNum !== undefined) {
+      // Create new character if typing in an empty field
+      const newCharId = `char-${Date.now()}`;
+      const newChar = { id: newCharId, name: newName, data: {} };
+      onUpdateCharacters([...characters, newChar]);
+      
+      const newRels = [...relationships];
+      if (charNum === 1) newRels[relIndex].char1Id = newCharId;
+      else newRels[relIndex].char2Id = newCharId;
+      onUpdateRelationships(newRels);
+      return;
+    }
+    if (!charId) return;
+    const newChars = characters.map(c => c.id === charId ? { ...c, name: newName } : c);
+    onUpdateCharacters(newChars);
+  };
+
+  const ROW_HEIGHT = 80;
+
+  // Helper to get line points
+  const getLinePoints = (char: 1 | 2) => {
+    const points: { x: number; y: number }[] = [];
+    dynamicSteps.forEach((step: any, idx: number) => {
+      const pos = char === 1 ? step.char1Position : step.char2Position;
+      if (pos !== null) {
+        // RTL Column Mapping (0-5 from Right to Left)
+        // Char A columns: 0, 1, 2
+        // Char B columns: 3, 4, 5
+        const colIndex = char === 1 ? pos : pos + 3;
+        points.push({
+          x: 600 - ((colIndex * 100) + 50), 
+          y: (idx * ROW_HEIGHT) + (ROW_HEIGHT / 2)
+        });
+      }
+    });
+    return points.map(p => `${p.x},${p.y}`).join(' ');
+  };
+
+  return (
+    <div className="mt-8 space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xl font-bold handwritten text-3xl">טבלת דינמיקה והתקרבות</h4>
+        <button
+          onClick={addRow}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-accent)] text-white rounded-xl font-bold hover:bg-[var(--theme-accent)]/90 transition-all text-sm shadow-sm"
+        >
+          <Plus size={16} />
+          הוספת שורה
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-[2rem] border border-[var(--theme-border)]/50 shadow-sm bg-[var(--theme-card)]">
+        <div className="relative min-w-[800px]">
+          {/* SVG Layer for Lines */}
+          <div className="absolute pointer-events-none z-10" style={{ right: '20%', left: '30%', top: `${headerHeight}px`, bottom: '0' }}>
+            <svg 
+              className="w-full h-full" 
+              viewBox={`0 0 600 ${dynamicSteps.length * ROW_HEIGHT}`} 
+              preserveAspectRatio="none"
+            >
+              {/* Lines for Char 1 (A) */}
+              <polyline
+                points={getLinePoints(1)}
+                fill="none"
+                stroke="rgba(234, 179, 8, 0.7)"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Lines for Char 2 (B) */}
+              <polyline
+                points={getLinePoints(2)}
+                fill="none"
+                stroke="rgba(249, 115, 22, 0.7)"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+
+          <table className="w-full border-collapse">
+            <thead ref={headerRef}>
+              {/* Main Headers */}
+              <tr className="text-center font-bold text-sm bg-[var(--theme-secondary)]/20">
+                <th className="p-4 border-b border-l border-[var(--theme-border)]/30 w-[20%] bg-green-50/50">רשימת סצנות רלוונטיות</th>
+                <th colSpan={3} className="p-4 border-b border-l border-[var(--theme-border)]/30 bg-yellow-50/50 relative">
+                  <div className="flex flex-col gap-2 items-center">
+                    <input 
+                      value={char1?.name || ''} 
+                      onChange={(e) => handleRenameCharacter(rel.char1Id, e.target.value, relIndex, 1)}
+                      placeholder="שם דמות א..."
+                      className="bg-white/50 border border-yellow-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-yellow-400 text-center font-bold w-full text-base shadow-sm hover:bg-white/70 transition-colors"
+                    />
+                    <select
+                      value={rel.char1Id}
+                      onChange={(e) => {
+                        const newRels = [...relationships];
+                        newRels[relIndex].char1Id = e.target.value;
+                        onUpdateRelationships(newRels);
+                      }}
+                      className="text-[10px] bg-white/70 border border-yellow-200 rounded-lg px-2 py-1 outline-none"
+                    >
+                      <option value="">החלפת דמות...</option>
+                      {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </th>
+                <th colSpan={3} className="p-4 border-b border-l border-[var(--theme-border)]/30 bg-orange-50/50">
+                  <div className="flex flex-col gap-2 items-center">
+                    <input 
+                      value={char2?.name || ''} 
+                      onChange={(e) => handleRenameCharacter(rel.char2Id, e.target.value, relIndex, 2)}
+                      placeholder="שם דמות ב..."
+                      className="bg-white/50 border border-orange-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-orange-400 text-center font-bold w-full text-base shadow-sm hover:bg-white/70 transition-colors"
+                    />
+                    <select
+                      value={rel.char2Id}
+                      onChange={(e) => {
+                        const newRels = [...relationships];
+                        newRels[relIndex].char2Id = e.target.value;
+                        onUpdateRelationships(newRels);
+                      }}
+                      className="text-[10px] bg-white/70 border border-orange-200 rounded-lg px-2 py-1 outline-none"
+                    >
+                      <option value="">החלפת דמות...</option>
+                      {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </th>
+                <th className="p-4 border-b border-[var(--theme-border)]/30 w-[30%] bg-blue-50/50">מה קורה בסצנה?</th>
+                <th className="p-4 border-b border-[var(--theme-border)]/30 w-10"></th>
+              </tr>
+              {/* Sub Headers */}
+              <tr className="text-center text-[10px] font-black uppercase tracking-wider bg-[var(--theme-secondary)]/10">
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-green-50/30"></th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-yellow-50/30">רחוק</th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-yellow-50/30">מתקרב</th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-yellow-50/30 text-yellow-700">קרוב</th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-orange-50/30 text-orange-700">קרוב</th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-orange-50/30">מתקרב</th>
+                <th className="p-2 border-b border-l border-[var(--theme-border)]/30 bg-orange-50/30">רחוק</th>
+                <th className="p-2 border-b border-[var(--theme-border)]/30 bg-blue-50/30"></th>
+                <th className="p-2 border-b border-[var(--theme-border)]/30"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {dynamicSteps.map((step: any, idx: number) => (
+              <tr key={step.id} className="group" style={{ height: `${ROW_HEIGHT}px` }}>
+                {/* Relevant Scenes */}
+                <td className="border-b border-l border-[var(--theme-border)]/30 p-2 bg-green-50/10">
+                  <textarea
+                    value={step.relevantScenes}
+                    onChange={(e) => {
+                      const newSteps = [...dynamicSteps];
+                      newSteps[idx].relevantScenes = e.target.value;
+                      updateSteps(newSteps);
+                    }}
+                    placeholder="..."
+                    className="w-full h-full bg-transparent border-none focus:ring-0 text-sm resize-none scrollbar-hide"
+                  />
+                </td>
+
+                {/* Char A Columns (Yellow) */}
+                {[0, 1, 2].map(pos => (
+                  <td 
+                    key={`a-${pos}`}
+                    onClick={() => handleCellClick(idx, 1, pos)}
+                    className="border-b border-l border-[var(--theme-border)]/30 p-0 cursor-pointer hover:bg-yellow-100/30 transition-colors relative bg-yellow-50/10 w-[8.33%]"
+                  >
+                    {step.char1Position === pos && (
+                      <div className="absolute inset-0 flex items-center justify-center z-20">
+                        <div className="w-4 h-4 rounded-full bg-yellow-600 shadow-md ring-4 ring-yellow-600/20" />
+                      </div>
+                    )}
+                  </td>
+                ))}
+
+                {/* Char B Columns (Orange) */}
+                {[0, 1, 2].map(pos => (
+                  <td 
+                    key={`b-${pos}`}
+                    onClick={() => handleCellClick(idx, 2, pos)}
+                    className="border-b border-l border-[var(--theme-border)]/30 p-0 cursor-pointer hover:bg-orange-100/30 transition-colors relative bg-orange-50/10 w-[8.33%]"
+                  >
+                    {step.char2Position === pos && (
+                      <div className="absolute inset-0 flex items-center justify-center z-20">
+                        <div className="w-4 h-4 rounded-full bg-orange-500 shadow-md ring-4 ring-orange-500/20" />
+                      </div>
+                    )}
+                  </td>
+                ))}
+
+                {/* Scene Description */}
+                <td className="border-b border-l border-[var(--theme-border)]/30 p-2 bg-blue-50/10">
+                  <textarea
+                    value={step.sceneDescription}
+                    onChange={(e) => {
+                      const newSteps = [...dynamicSteps];
+                      newSteps[idx].sceneDescription = e.target.value;
+                      updateSteps(newSteps);
+                    }}
+                    placeholder="..."
+                    className="w-full h-full bg-transparent border-none focus:ring-0 text-sm resize-none scrollbar-hide"
+                  />
+                </td>
+
+                {/* Actions */}
+                <td className="border-b border-[var(--theme-border)]/30 p-2 text-center">
+                  <button
+                    onClick={() => removeRow(step.id)}
+                    className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {dynamicSteps.length === 0 && (
+        <p className="text-center text-sm text-[var(--theme-primary)]/40 italic py-8 border-2 border-dashed border-[var(--theme-border)]/20 rounded-[2rem]">
+          עדיין לא נוספו שורות לטבלת הדינמיקה. לחצו על "הוספת שורה" כדי להתחיל.
+        </p>
+      )}
+    </div>
+  );
+};
+
 const PlotStructure: React.FC<PlotStructureProps> = ({ 
   selectedStructure, 
   onSelect, 
-  scenes, 
   pointsData, 
   onUpdatePoint,
   customPlotPoints,
@@ -82,9 +479,14 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   onUpdateArcs,
   characters,
   relationships,
-  onUpdateRelationships
+  onUpdateRelationships,
+  onUpdateCharacters,
+  conflicts = [],
+  onUpdateConflicts,
+  scenes = []
 }) => {
-  const [activeSubView, setActiveSubView] = useState<'structure' | 'arc' | 'relationships'>('structure');
+  const [activeSubView, setActiveSubView] = useState<'structure' | 'arc' | 'relationships' | 'conflicts'>('structure');
+  const [relViewMode, setRelViewMode] = useState<Record<string, 'tracks' | 'dynamics'>>({});
   const [editingPointId, setEditingPointId] = useState<string | null>(null);
   const [pullingDataFor, setPullingDataFor] = useState<{ arcIndex: number; stepIndex: number } | null>(null);
   const [selectedCharForPull, setSelectedCharForPull] = useState<string | null>(null);
@@ -137,7 +539,18 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             }`}
           >
             <Share2 size={18} />
-            מערכות יחסים
+            מערכת יחסים
+          </button>
+          <button
+            onClick={() => setActiveSubView('conflicts')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
+              activeSubView === 'conflicts'
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
+                : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+            }`}
+          >
+            <X size={18} />
+            קונפליקטים
           </button>
         </div>
 
@@ -1036,13 +1449,18 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                 <br />
                 אם נקודת הסיום וההתחלה יכולות להיות מתוארות באותן מילים, פספסנו.
                 <br />
-                זה המקום לתכנן או לשקף את השינוי שהדמויות שלנו עושות.
+               לכל דמות, תהיה אמונה כלשהי שמובילה אותה בדרך. המציאות תעמת אותה מול האמונה הזו, והיא תנסה להלחם במציאות ותביא טיעונים לסיבה שהאמונה הזו, היא הנכונה. 
                 <br />
-                אחרי המצב ההתחלתי, נכתוב על המשברים, על הבחירות שתעשה הדמות, ועל ההשפעה של הבחירות עליה ועל אחרים.
+                כל טיעון שנתייחס אליו במהלך הסיפור: 
                 <br />
-                נוודא שבכל שלב משמעותי בסיפור, משהו בדמות ישתנה. תובנה חדשה, הרגל שמשתנה, נסיון נוסף.
+                נצטרך לוודא שהוא לא נטען 'באוויר'. 
                 <br />
-                כך שבסוף הסיפור, תהיה לנו דמות עשירה ועמוקה יותר מבנקודת ההתחלה.
+                נכתוב לו הוכחות. 
+                <br />
+                נצטרך לוודא שבסופו של דבר הוכח אחרת. בין אם בדיאלוגים, בין אם בהתרחשות שסותרת את הטיעון באופן מוחלט.
+                בסוף הסיפור הדמות תגיע לתובנה חדשה, המבוססת על התהליך שעברה.
+                <br />
+                בטבלה השניה, תוכלו לעבור על התהליך, לכתוב את הסצנות הרלוונטיות, לוודא שכל טיעון נפתח, מוכח, ומופרך.
               </div>
             </div>
 
@@ -1051,8 +1469,15 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                 onClick={() => {
                   const newArc = {
                     id: `arc-${Date.now()}`,
-                    characterName: 'דמות חדשה',
-                    steps: [{ id: `step-${Date.now()}`, text: 'תחילת הספר' }]
+                    characterName: '',
+                    falseBelief: '',
+                    finalGoal: '',
+                    steps: [
+                      { id: `step-${Date.now()}-1`, argument: '', validation: '', contradiction: '', text: '' },
+                      { id: `step-${Date.now()}-2`, argument: '', validation: '', contradiction: '', text: '' },
+                      { id: `step-${Date.now()}-3`, argument: '', validation: '', contradiction: '', text: '' },
+                      { id: `step-${Date.now()}-4`, argument: '', validation: '', contradiction: '', text: '' }
+                    ]
                   };
                   onUpdateArcs([newArc, ...characterArcs]);
                 }}
@@ -1064,7 +1489,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             </div>
 
             <div className="space-y-12">
-              {characterArcs.map((arc, arcIndex) => (
+              {(characterArcs || []).map((arc, arcIndex) => (
                 <div key={arc.id} className="bg-[var(--theme-card)] rounded-[2rem] p-8 border border-[var(--theme-border)]/50 shadow-sm space-y-8">
                   <div className="flex items-center justify-between border-b border-[var(--theme-border)]/30 pb-6">
                     <div className="flex items-center gap-4 flex-1">
@@ -1072,7 +1497,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                         <TrendingUp size={24} />
                       </div>
                       <input
-                        value={arc.characterName}
+                        value={arc.characterName || ''}
                         onChange={(e) => {
                           const newArcs = [...characterArcs];
                           newArcs[arcIndex].characterName = e.target.value;
@@ -1094,71 +1519,351 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-6" dir="rtl">
-                    {arc.steps.map((step, stepIndex) => (
-                      <React.Fragment key={step.id}>
-                        <div className="relative group">
-                          <div className="w-64 bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-2xl p-4 focus-within:border-[var(--theme-accent)] transition-all shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase tracking-wider">
-                                  שלב {stepIndex + 1}
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    setPullingDataFor({ arcIndex, stepIndex });
-                                    setSelectedCharForPull(null);
-                                  }}
-                                  className="text-[var(--theme-accent)] hover:scale-110 transition-transform"
-                                  title="שליפה משאלון דמות"
-                                >
-                                  <FileText size={12} />
-                                </button>
-                              </div>
-                              {arc.steps.length > 1 && (
+                  {/* Character Arc Table */}
+                  <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        {/* Top Header: False Belief */}
+                        <tr className="bg-[var(--theme-accent)]/10">
+                          <th className="w-12 border-b border-l border-[var(--theme-border)]/30"></th>
+                          <th colSpan={3} className="p-4 border-b border-[var(--theme-border)]/30 text-center font-bold text-[var(--theme-accent)]">
+                            <div className="space-y-2">
+                              <span className="text-sm uppercase tracking-widest block opacity-70">אמונה שקרית שמפריעה לגיבור להגיע ליעד</span>
+                              <textarea
+                                value={arc.falseBelief || ''}
+                                onChange={(e) => {
+                                  const newArcs = [...characterArcs];
+                                  newArcs[arcIndex].falseBelief = e.target.value;
+                                  onUpdateArcs(newArcs);
+                                }}
+                                placeholder="כתבו כאן את האמונה השקרית..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-center text-xl font-bold p-0 resize-none h-12 scrollbar-hide"
+                              />
+                            </div>
+                          </th>
+                        </tr>
+                        {/* Middle Headers */}
+                        <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                          <th className="w-12 border-b border-l border-[var(--theme-border)]/30">#</th>
+                          <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/3 leading-tight">
+                            <div className="flex flex-col items-center gap-1">
+                              <Square size={14} className="text-blue-500 fill-blue-500/20" />
+                              <span>טיעונים לאמונה השקרית.</span>
+                            </div>
+                            <span className="text-[9px] block opacity-60">
+                              אמירות שהגיבור אומר לעצמו.
+                            </span>
+                          </th>
+                          <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/3 leading-tight">
+                            <div className="flex flex-col items-center gap-1">
+                              <Triangle size={14} className="text-orange-500 fill-orange-500/20" />
+                              <span>הוכחות בתוך גוף הסיפור</span>
+                            </div>
+                            <span className="text-[9px] block opacity-60">
+                              שמאמתות את הטענות.
+                            </span>
+                          </th>
+                          <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-1/3 leading-tight">
+                            <div className="flex flex-col items-center gap-1">
+                              <Circle size={14} className="text-green-500 fill-green-500/20" />
+                              <span>הוכחות נגד, בתוך גוף הסיפור.</span>
+                            </div>
+                            <span className="text-[9px] block opacity-60">
+                              שמראות שהטענות לא נכונות והאמונה היא שקרית.
+                            </span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(arc.steps || []).map((step: any, idx: number) => (
+                          <tr key={step.id} className="group hover:bg-[var(--theme-accent)]/5 transition-colors">
+                            {/* Counter and Remove */}
+                            <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle font-bold text-[var(--theme-primary)]/20">
+                              <div className="flex flex-col items-center gap-1">
+                                <span>{idx + 1}</span>
                                 <button
                                   onClick={() => {
                                     const newArcs = [...characterArcs];
-                                    newArcs[arcIndex].steps = newArcs[arcIndex].steps.filter(s => s.id !== step.id);
+                                    newArcs[arcIndex].steps = newArcs[arcIndex].steps.filter((s: any) => s.id !== step.id);
                                     onUpdateArcs(newArcs);
                                   }}
-                                  className="text-red-300 hover:text-red-500 transition-colors"
+                                  className="text-red-200 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-1"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </td>
+                            {/* Arguments for False Belief */}
+                            <td className="p-2 border-b border-l border-[var(--theme-border)]/30 align-top">
+                              <textarea
+                                value={step.argument || step.text || ''}
+                                onChange={(e) => {
+                                  const newArcs = [...characterArcs];
+                                  const val = e.target.value;
+                                  newArcs[arcIndex].steps[idx].argument = val;
+                                  newArcs[arcIndex].steps[idx].text = val; // fallback for legacy
+                                  onUpdateArcs(newArcs);
+                                }}
+                                placeholder="..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-24 scrollbar-hide"
+                              />
+                            </td>
+                            {/* Validation Evidence */}
+                            <td className="p-2 border-b border-l border-[var(--theme-border)]/30 align-top">
+                              <textarea
+                                value={step.validation || ''}
+                                onChange={(e) => {
+                                  const newArcs = [...characterArcs];
+                                  newArcs[arcIndex].steps[idx].validation = e.target.value;
+                                  onUpdateArcs(newArcs);
+                                }}
+                                placeholder="..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-24 scrollbar-hide"
+                              />
+                            </td>
+                            {/* Evidence Against */}
+                            <td className="p-2 border-b border-[var(--theme-border)]/30 align-top">
+                              <textarea
+                                value={step.contradiction || ''}
+                                onChange={(e) => {
+                                  const newArcs = [...characterArcs];
+                                  newArcs[arcIndex].steps[idx].contradiction = e.target.value;
+                                  onUpdateArcs(newArcs);
+                                }}
+                                placeholder="..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-24 scrollbar-hide"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        {/* Final Goal Footer */}
+                        <tr className="bg-[var(--theme-accent)]/5">
+                          <td className="p-2 text-center border-l border-[var(--theme-border)]/30 align-middle">
+                            <button
+                              onClick={() => {
+                                const newArcs = [...characterArcs];
+                                if (!newArcs[arcIndex].steps) newArcs[arcIndex].steps = [];
+                                newArcs[arcIndex].steps.push({ 
+                                  id: `step-${Date.now()}`, 
+                                  argument: '', 
+                                  validation: '', 
+                                  contradiction: '',
+                                  text: '' 
+                                });
+                                onUpdateArcs(newArcs);
+                              }}
+                              className="w-8 h-8 rounded-full bg-[var(--theme-accent)] text-white flex items-center justify-center hover:scale-110 transition-all shadow-sm mx-auto"
+                              title="הוספת שורה"
+                            >
+                              <Plus size={18} />
+                            </button>
+                          </td>
+                          <td colSpan={3} className="p-4 text-center font-bold text-[var(--theme-accent)]">
+                             <div className="space-y-2">
+                              <span className="text-sm uppercase tracking-widest block opacity-70">היעד שאליו יגיע הגיבור בסוף הספר</span>
+                               <textarea
+                                value={arc.finalGoal || ''}
+                                onChange={(e) => {
+                                  const newArcs = [...characterArcs];
+                                  newArcs[arcIndex].finalGoal = e.target.value;
+                                  onUpdateArcs(newArcs);
+                                }}
+                                placeholder="כתבו כאן את היעד הסופי..."
+                                className="w-full bg-transparent border-none focus:ring-0 text-center text-xl font-bold p-0 resize-none h-12 scrollbar-hide"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Scene Mapping Table */}
+                  <div className="space-y-4" dir="rtl">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-lg handwritten">מיפוי סצנות לקשת ההתפתחות</h5>
+                      <button
+                        onClick={() => {
+                          const newArcs = [...characterArcs];
+                          if (!newArcs[arcIndex].sceneLinks) newArcs[arcIndex].sceneLinks = [];
+                          newArcs[arcIndex].sceneLinks.push({
+                            id: `link-${Date.now()}`,
+                            sceneName: '',
+                            summary: '',
+                            stepNumber: 1,
+                            type: 'argument'
+                          });
+                          onUpdateArcs(newArcs);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] rounded-lg font-bold hover:bg-[var(--theme-accent)]/20 transition-all text-sm"
+                      >
+                         <Plus size={14} />
+                         הוספת סצנה
+                      </button>
+                    </div>
+
+                    <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 shadow-sm bg-white/30">
+                      <table className="w-full border-collapse">
+                        <thead className="bg-[var(--theme-secondary)]/20 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                          <tr>
+                            <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-12">#</th>
+                            <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right w-1/4">שם הסצנה / קישור</th>
+                            <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right w-1/2">תמצית המתרחש בסצנה</th>
+                            <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-32">שיוך לשלב</th>
+                            <th className="p-3 border-b border-[var(--theme-border)]/30 w-12"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(arc.sceneLinks || []).map((link: any, linkIdx: number) => (
+                            <tr key={link.id} className="group hover:bg-[var(--theme-accent)]/5 transition-colors">
+                              <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle font-bold text-[var(--theme-primary)]/20">
+                                {linkIdx + 1}
+                              </td>
+                              {/* Scene Name / Picker */}
+                              <td className="p-2 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                <div className="space-y-1">
+                                  <input 
+                                    value={link.sceneName || (scenes.find(s => s.id === link.sceneId)?.title || '')}
+                                    onChange={(e) => {
+                                      const newArcs = [...characterArcs];
+                                      const links = newArcs[arcIndex].sceneLinks;
+                                      if (links) {
+                                        links[linkIdx].sceneName = e.target.value;
+                                        links[linkIdx].sceneId = undefined;
+                                      }
+                                      onUpdateArcs(newArcs);
+                                    }}
+                                    placeholder="שם הסצנה..."
+                                    className="w-full bg-transparent border-none focus:ring-0 text-sm font-bold p-0"
+                                  />
+                                  <select
+                                    value={link.sceneId || ''}
+                                    onChange={(e) => {
+                                      const scene = scenes.find(s => s.id === e.target.value);
+                                      const newArcs = [...characterArcs];
+                                      const links = newArcs[arcIndex].sceneLinks;
+                                      if (links) {
+                                        links[linkIdx].sceneId = e.target.value;
+                                        links[linkIdx].sceneName = scene?.title || '';
+                                      }
+                                      onUpdateArcs(newArcs);
+                                    }}
+                                    className="text-[10px] bg-white/50 border border-[var(--theme-border)]/20 rounded-md px-1 py-0.5 outline-none w-full"
+                                  >
+                                    <option value="">קישור לסצנה קיימת...</option>
+                                    {scenes.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                                  </select>
+                                </div>
+                              </td>
+                              {/* Summary */}
+                              <td className="p-2 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                <textarea
+                                  value={link.summary || ''}
+                                  onChange={(e) => {
+                                    const newArcs = [...characterArcs];
+                                    const links = newArcs[arcIndex].sceneLinks;
+                                    if (links) {
+                                      links[linkIdx].summary = e.target.value;
+                                    }
+                                    onUpdateArcs(newArcs);
+                                  }}
+                                  placeholder="מה קורה בסצנה?"
+                                  className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-12 scrollbar-hide"
+                                />
+                              </td>
+                              {/* Association: Step # and Icon */}
+                              <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle">
+                                <div className="flex items-center justify-center gap-2">
+                                  <select
+                                    value={link.stepNumber || 1}
+                                    onChange={(e) => {
+                                      const newArcs = [...characterArcs];
+                                      const links = newArcs[arcIndex].sceneLinks;
+                                      if (links) {
+                                        links[linkIdx].stepNumber = parseInt(e.target.value);
+                                      }
+                                      onUpdateArcs(newArcs);
+                                    }}
+                                    className="text-xs bg-white border border-[var(--theme-border)]/30 rounded px-1 py-0.5"
+                                  >
+                                    {arc.steps.map((_: any, sidx: number) => (
+                                      <option key={sidx} value={sidx + 1}>{sidx + 1}</option>
+                                    ))}
+                                  </select>
+                                  <div className="flex items-center gap-1 bg-[var(--theme-secondary)]/10 p-1 rounded-lg">
+                                    <button 
+                                      onClick={() => {
+                                        const newArcs = [...characterArcs];
+                                        const links = newArcs[arcIndex].sceneLinks;
+                                        if (links) {
+                                          links[linkIdx].type = 'argument';
+                                        }
+                                        onUpdateArcs(newArcs);
+                                      }}
+                                      className={`p-1 rounded transition-all ${link.type === 'argument' || !link.type ? 'bg-blue-500 text-white shadow-sm' : 'text-blue-500/40 hover:bg-blue-500/10'}`}
+                                      title="טיעון"
+                                    >
+                                      <Square size={14} className={link.type === 'argument' || !link.type ? 'fill-white/20' : ''} />
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        const newArcs = [...characterArcs];
+                                        const links = newArcs[arcIndex].sceneLinks;
+                                        if (links) {
+                                          links[linkIdx].type = 'validation';
+                                        }
+                                        onUpdateArcs(newArcs);
+                                      }}
+                                      className={`p-1 rounded transition-all ${link.type === 'validation' ? 'bg-orange-500 text-white shadow-sm' : 'text-orange-500/40 hover:bg-orange-500/10'}`}
+                                      title="הוכחה"
+                                    >
+                                      <Triangle size={14} className={link.type === 'validation' ? 'fill-white/20' : ''} />
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        const newArcs = [...characterArcs];
+                                        const links = newArcs[arcIndex].sceneLinks;
+                                        if (links) {
+                                          links[linkIdx].type = 'contradiction';
+                                        }
+                                        onUpdateArcs(newArcs);
+                                      }}
+                                      className={`p-1 rounded transition-all ${link.type === 'contradiction' ? 'bg-green-500 text-white shadow-sm' : 'text-green-500/40 hover:bg-green-500/10'}`}
+                                      title="הוכחת נגד"
+                                    >
+                                      <Circle size={14} className={link.type === 'contradiction' ? 'fill-white/20' : ''} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                              {/* Remove */}
+                              <td className="p-2 border-b border-[var(--theme-border)]/30 text-center align-middle">
+                                <button
+                                  onClick={() => {
+                                    const newArcs = [...characterArcs];
+                                    const links = newArcs[arcIndex].sceneLinks;
+                                    if (links) {
+                                      newArcs[arcIndex].sceneLinks = links.filter((_: any, i: number) => i !== linkIdx);
+                                    }
+                                    onUpdateArcs(newArcs);
+                                  }}
+                                  className="text-red-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-1"
                                 >
                                   <X size={14} />
                                 </button>
-                              )}
-                            </div>
-                            <textarea
-                              value={step.text}
-                              onChange={(e) => {
-                                const newArcs = [...characterArcs];
-                                newArcs[arcIndex].steps[stepIndex].text = e.target.value;
-                                onUpdateArcs(newArcs);
-                              }}
-                              placeholder={stepIndex === 0 ? "תחילת הספר..." : "תארו את ההתפתחות..."}
-                              className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
-                            />
-                          </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {(arc.sceneLinks || []).length === 0 && (
+                        <div className="p-4 text-center text-xs text-[var(--theme-primary)]/30 italic">
+                          עדיין לא שויכו סצנות לקשת זו.
                         </div>
-                        {stepIndex < arc.steps.length - 1 && (
-                          <div className="text-[var(--theme-accent)] animate-pulse">
-                            <ArrowLeft size={24} />
-                          </div>
-                        )}
-                      </React.Fragment>
-                    ))}
-                    
-                    <button
-                      onClick={() => {
-                        const newArcs = [...characterArcs];
-                        newArcs[arcIndex].steps.push({ id: `step-${Date.now()}`, text: '' });
-                        onUpdateArcs(newArcs);
-                      }}
-                      className="w-12 h-12 rounded-full border-2 border-dashed border-[var(--theme-accent)]/40 text-[var(--theme-accent)] flex items-center justify-center hover:bg-[var(--theme-accent)]/5 transition-all hover:scale-110"
-                      title="הוספת שלב התפתחות"
-                    >
-                      <Plus size={24} />
-                    </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1213,192 +1918,271 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             </div>
 
             <div className="space-y-12">
-              {relationships.map((rel, relIndex) => (
+              {(relationships || []).map((rel, relIndex) => (
                 <div key={rel.id} className="bg-[var(--theme-card)] rounded-[2rem] p-8 border border-[var(--theme-border)]/50 shadow-sm space-y-8">
                   <div className="flex items-center justify-between border-b border-[var(--theme-border)]/30 pb-6">
                     <div className="flex items-center gap-4 flex-1">
-                      <select
-                        value={rel.char1Id}
-                        onChange={(e) => {
-                          const newRels = [...relationships];
-                          newRels[relIndex].char1Id = e.target.value;
-                          onUpdateRelationships(newRels);
-                        }}
-                        className="bg-[var(--theme-secondary)]/30 border-none rounded-xl px-4 py-2 text-[var(--theme-primary)] font-bold focus:ring-2 focus:ring-[var(--theme-accent)]"
-                      >
-                        <option value="">בחירת דמות 1...</option>
-                        {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
+                      <div className="flex flex-col gap-1 w-[200px]">
+                        <input 
+                          value={characters.find(c => c.id === rel.char1Id)?.name || ''} 
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            if (!rel.char1Id) {
+                                const newCharId = `char-${Date.now()}-1`;
+                                const newChar = { id: newCharId, name: newName };
+                                onUpdateCharacters([...characters, newChar]);
+                                const newRels = [...relationships];
+                                newRels[relIndex].char1Id = newCharId;
+                                onUpdateRelationships(newRels);
+                            } else {
+                                const newChars = characters.map(c => c.id === rel.char1Id ? { ...c, name: newName } : c);
+                                onUpdateCharacters(newChars);
+                            }
+                          }}
+                          placeholder="שם דמות 1..."
+                          className="bg-[var(--theme-secondary)]/20 border-b-2 border-transparent focus:border-[var(--theme-accent)] focus:ring-0 text-[var(--theme-primary)] font-bold text-lg px-2 py-1 rounded-t-lg transition-all"
+                        />
+                        <select
+                          value={rel.char1Id}
+                          onChange={(e) => {
+                            const newRels = [...relationships];
+                            newRels[relIndex].char1Id = e.target.value;
+                            onUpdateRelationships(newRels);
+                          }}
+                          className="bg-[var(--theme-secondary)]/30 border-none rounded-lg px-2 py-1 text-[10px] focus:ring-1 focus:ring-[var(--theme-accent)]"
+                        >
+                          <option value="">החלפת דמות...</option>
+                          {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+
                       <div className="text-[var(--theme-accent)]">
                         <Users size={20} />
                       </div>
-                      <select
-                        value={rel.char2Id}
-                        onChange={(e) => {
-                          const newRels = [...relationships];
-                          newRels[relIndex].char2Id = e.target.value;
-                          onUpdateRelationships(newRels);
-                        }}
-                        className="bg-[var(--theme-secondary)]/30 border-none rounded-xl px-4 py-2 text-[var(--theme-primary)] font-bold focus:ring-2 focus:ring-[var(--theme-accent)]"
-                      >
-                        <option value="">בחירת דמות 2...</option>
-                        {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const newRels = relationships.filter(r => r.id !== rel.id);
-                        onUpdateRelationships(newRels);
-                      }}
-                      className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
 
-                  <div className="space-y-6 relative">
-                    {/* Vertical Line */}
-                    <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-[var(--theme-border)]/20 -translate-x-1/2 hidden md:block" />
-                    
-                    {rel.steps.map((step: any, stepIndex: number) => (
-                      <div key={step.id} className="relative z-10">
-                        {step.isMerged ? (
-                          <div className="flex justify-center">
-                            <div className="w-full max-w-2xl bg-[var(--theme-accent)]/5 border-2 border-[var(--theme-accent)]/30 rounded-3xl p-6 relative group">
-                              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[var(--theme-accent)] text-white px-4 py-1 rounded-full text-[10px] font-bold flex items-center gap-2">
-                                <GitMerge size={12} />
-                                מסלול משותף
-                              </div>
-                              <textarea
-                                value={step.track1Text}
-                                onChange={(e) => {
-                                  const newRels = [...relationships];
-                                  newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
-                                  newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
-                                  onUpdateRelationships(newRels);
-                                }}
-                                placeholder="מה קורה כשהם יחד?"
-                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-center font-bold handwritten text-2xl resize-none h-24"
-                              />
-                              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => {
-                                    const newRels = [...relationships];
-                                    newRels[relIndex].steps[stepIndex].isMerged = false;
-                                    onUpdateRelationships(newRels);
-                                  }}
-                                  className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
-                                  title="הפרדה למסלולים נפרדים"
-                                >
-                                  <GitBranch size={16} />
-                                </button>
-                                {rel.steps.length > 1 && (
-                                  <button
-                                    onClick={() => {
-                                      const newRels = [...relationships];
-                                      newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
-                                      onUpdateRelationships(newRels);
-                                    }}
-                                    className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            {/* Track 1 */}
-                            <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
-                              <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
-                                {characters.find((c: any) => c.id === rel.char1Id)?.name || 'דמות 1'}
-                              </div>
-                              <textarea
-                                value={step.track1Text}
-                                onChange={(e) => {
-                                  const newRels = [...relationships];
-                                  newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
-                                  onUpdateRelationships(newRels);
-                                }}
-                                placeholder="מה קורה במסלול הזה?"
-                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
-                              />
-                            </div>
-
-                            {/* Track 2 */}
-                            <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
-                              <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
-                                {characters.find((c: any) => c.id === rel.char2Id)?.name || 'דמות 2'}
-                              </div>
-                              <textarea
-                                value={step.track2Text}
-                                onChange={(e) => {
-                                  const newRels = [...relationships];
-                                  newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
-                                  onUpdateRelationships(newRels);
-                                }}
-                                placeholder="מה קורה במסלול הזה?"
-                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
-                              />
-                              
-                              <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => {
-                                    const newRels = [...relationships];
-                                    newRels[relIndex].steps[stepIndex].isMerged = true;
-                                    newRels[relIndex].steps[stepIndex].track1Text = step.track1Text || step.track2Text;
-                                    onUpdateRelationships(newRels);
-                                  }}
-                                  className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
-                                  title="חיבור למסלול משותף"
-                                >
-                                  <GitMerge size={16} />
-                                </button>
-                                {rel.steps.length > 1 && (
-                                  <button
-                                    onClick={() => {
-                                      const newRels = [...relationships];
-                                      newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
-                                      onUpdateRelationships(newRels);
-                                    }}
-                                    className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {stepIndex < rel.steps.length - 1 && (
-                          <div className="flex justify-center py-4">
-                            <div className="w-0.5 h-8 bg-[var(--theme-accent)]/20 animate-pulse" />
-                          </div>
-                        )}
+                      <div className="flex flex-col gap-1 w-[200px]">
+                        <input 
+                          value={characters.find(c => c.id === rel.char2Id)?.name || ''} 
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            if (!rel.char2Id) {
+                                const newCharId = `char-${Date.now()}-2`;
+                                const newChar = { id: newCharId, name: newName };
+                                onUpdateCharacters([...characters, newChar]);
+                                const newRels = [...relationships];
+                                newRels[relIndex].char2Id = newCharId;
+                                onUpdateRelationships(newRels);
+                            } else {
+                                const newChars = characters.map(c => c.id === rel.char2Id ? { ...c, name: newName } : c);
+                                onUpdateCharacters(newChars);
+                            }
+                          }}
+                          placeholder="שם דמות 2..."
+                          className="bg-[var(--theme-secondary)]/20 border-b-2 border-transparent focus:border-[var(--theme-accent)] focus:ring-0 text-[var(--theme-primary)] font-bold text-lg px-2 py-1 rounded-t-lg transition-all"
+                        />
+                        <select
+                          value={rel.char2Id}
+                          onChange={(e) => {
+                            const newRels = [...relationships];
+                            newRels[relIndex].char2Id = e.target.value;
+                            onUpdateRelationships(newRels);
+                          }}
+                          className="bg-[var(--theme-secondary)]/30 border-none rounded-lg px-2 py-1 text-[10px] focus:ring-1 focus:ring-[var(--theme-accent)]"
+                        >
+                          <option value="">החלפת דמות...</option>
+                          {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
                       </div>
-                    ))}
-                    
-                    <div className="flex justify-center pt-4">
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <div className="flex bg-[var(--theme-secondary)]/50 p-1 rounded-xl">
+                        <button
+                          onClick={() => setRelViewMode(prev => ({ ...prev, [rel.id]: 'tracks' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            (relViewMode[rel.id] || 'tracks') === 'tracks'
+                              ? 'bg-[var(--theme-primary)] text-white shadow-sm'
+                              : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+                          }`}
+                        >
+                          מסלולי סיפור
+                        </button>
+                        <button
+                          onClick={() => setRelViewMode(prev => ({ ...prev, [rel.id]: 'dynamics' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            relViewMode[rel.id] === 'dynamics'
+                              ? 'bg-[var(--theme-primary)] text-white shadow-sm'
+                              : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+                          }`}
+                        >
+                          טבלת דינמיקה
+                        </button>
+                      </div>
                       <button
                         onClick={() => {
-                          const newRels = [...relationships];
-                          newRels[relIndex].steps.push({ 
-                            id: `step-${Date.now()}`, 
-                            track1Text: '', 
-                            track2Text: '', 
-                            isMerged: false 
-                          });
+                          const newRels = relationships.filter(r => r.id !== rel.id);
                           onUpdateRelationships(newRels);
                         }}
-                        className="w-12 h-12 rounded-full border-2 border-dashed border-[var(--theme-accent)]/40 text-[var(--theme-accent)] flex items-center justify-center hover:bg-[var(--theme-accent)]/5 transition-all hover:scale-110"
-                        title="הוספת שלב בסיפור המשותף"
+                        className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
                       >
-                        <Plus size={24} />
+                        <Trash2 size={20} />
                       </button>
                     </div>
                   </div>
+
+                  { (relViewMode[rel.id] || 'tracks') === 'tracks' ? (
+                    <div className="space-y-6 relative">
+                      {/* Vertical Line */}
+                      <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-[var(--theme-border)]/20 -translate-x-1/2 hidden md:block" />
+                      
+                      {rel.steps.map((step: any, stepIndex: number) => (
+                        <div key={step.id} className="relative z-10">
+                          {step.isMerged ? (
+                            <div className="flex justify-center">
+                              <div className="w-full max-w-2xl bg-[var(--theme-accent)]/5 border-2 border-[var(--theme-accent)]/30 rounded-3xl p-6 relative group">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[var(--theme-accent)] text-white px-4 py-1 rounded-full text-[10px] font-bold flex items-center gap-2">
+                                  <GitMerge size={12} />
+                                  מסלול משותף
+                                </div>
+                                <textarea
+                                  value={step.track1Text}
+                                  onChange={(e) => {
+                                    const newRels = [...relationships];
+                                    newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
+                                    newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
+                                    onUpdateRelationships(newRels);
+                                  }}
+                                  placeholder="מה קורה כשהם יחד?"
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-center font-bold handwritten text-2xl resize-none h-24"
+                                />
+                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      const newRels = [...relationships];
+                                      newRels[relIndex].steps[stepIndex].isMerged = false;
+                                      onUpdateRelationships(newRels);
+                                    }}
+                                    className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
+                                    title="הפרדה למסלולים נפרדים"
+                                  >
+                                    <GitBranch size={16} />
+                                  </button>
+                                  {rel.steps.length > 1 && (
+                                    <button
+                                      onClick={() => {
+                                        const newRels = [...relationships];
+                                        newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
+                                        onUpdateRelationships(newRels);
+                                      }}
+                                      className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                              {/* Track 1 */}
+                              <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
+                                <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
+                                  {characters.find((c: any) => c.id === rel.char1Id)?.name || 'דמות 1'}
+                                </div>
+                                <textarea
+                                  value={step.track1Text}
+                                  onChange={(e) => {
+                                    const newRels = [...relationships];
+                                    newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
+                                    onUpdateRelationships(newRels);
+                                  }}
+                                  placeholder="מה קורה במסלול הזה?"
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
+                                />
+                              </div>
+
+                              {/* Track 2 */}
+                              <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
+                                <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
+                                  {characters.find((c: any) => c.id === rel.char2Id)?.name || 'דמות 2'}
+                                </div>
+                                <textarea
+                                  value={step.track2Text}
+                                  onChange={(e) => {
+                                    const newRels = [...relationships];
+                                    newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
+                                    onUpdateRelationships(newRels);
+                                  }}
+                                  placeholder="מה קורה במסלול הזה?"
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
+                                />
+                                
+                                <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      const newRels = [...relationships];
+                                      newRels[relIndex].steps[stepIndex].isMerged = true;
+                                      newRels[relIndex].steps[stepIndex].track1Text = step.track1Text || step.track2Text;
+                                      onUpdateRelationships(newRels);
+                                    }}
+                                    className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
+                                    title="חיבור למסלול משותף"
+                                  >
+                                    <GitMerge size={16} />
+                                  </button>
+                                  {rel.steps.length > 1 && (
+                                    <button
+                                      onClick={() => {
+                                        const newRels = [...relationships];
+                                        newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
+                                        onUpdateRelationships(newRels);
+                                      }}
+                                      className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {stepIndex < rel.steps.length - 1 && (
+                            <div className="flex justify-center py-4">
+                              <div className="w-0.5 h-8 bg-[var(--theme-accent)]/20 animate-pulse" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={() => {
+                            const newRels = [...relationships];
+                            newRels[relIndex].steps.push({ 
+                              id: `step-${Date.now()}`, 
+                              track1Text: '', 
+                              track2Text: '', 
+                              isMerged: false 
+                            });
+                            onUpdateRelationships(newRels);
+                          }}
+                          className="w-12 h-12 rounded-full border-2 border-dashed border-[var(--theme-accent)]/40 text-[var(--theme-accent)] flex items-center justify-center hover:bg-[var(--theme-accent)]/5 transition-all hover:scale-110"
+                          title="הוספת שלב בסיפור המשותף"
+                        >
+                          <Plus size={24} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <RelationshipDynamicsTable 
+                      rel={rel} 
+                      relIndex={relIndex} 
+                      relationships={relationships} 
+                      onUpdateRelationships={onUpdateRelationships} 
+                      characters={characters}
+                      onUpdateCharacters={onUpdateCharacters}
+                    />
+                  )}
                 </div>
               ))}
 
@@ -1408,6 +2192,222 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        ) : activeSubView === 'conflicts' ? (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+             {/* Explanation Space */}
+             <div className="bg-[var(--theme-accent)]/5 p-8 rounded-[2rem] border border-[var(--theme-accent)]/20">
+               <div className="flex items-center gap-3 mb-4 text-[var(--theme-accent)]">
+                 <X size={20} />
+                 <h3 className="text-xl font-bold handwritten text-3xl">ניהול קונפליקטים</h3>
+               </div>
+               <div className="text-[var(--theme-primary)]/70 leading-relaxed italic">
+                 קונפליקט הוא המנוע של הדרמה. כאן תוכלו לרכז את כל המכשולים, הבעיות והעימותים שיש לדמויות שלכם.
+                 <br />
+                 לכל קונפליקט, תוכלו למפות את המטרה, המכשול והפתרון - ולשייך לכל אחד מהם את הסצנות הרלוונטיות.
+               </div>
+             </div>
+
+             <div className="flex justify-center">
+               <button
+                 onClick={() => {
+                   const newConflict = {
+                     id: `conflict-${Date.now()}`,
+                     title: '',
+                     rows: [
+                       {
+                         id: `row-${Date.now()}`,
+                         goal: '',
+                         goalScenes: [],
+                         obstacle: '',
+                         obstacleScenes: [],
+                         resolution: '',
+                         resolutionScenes: []
+                       }
+                     ]
+                   };
+                   onUpdateConflicts([newConflict, ...conflicts]);
+                 }}
+                 className="flex items-center gap-2 px-8 py-4 bg-[var(--theme-accent)] text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-all"
+               >
+                 <Plus size={20} />
+                 הוספת קונפליקט חדש
+               </button>
+             </div>
+
+             <div className="space-y-12">
+               {(conflicts || []).map((conflict, conflictIndex) => (
+                 <div key={conflict.id} className="bg-[var(--theme-card)] rounded-[2rem] p-8 border border-[var(--theme-border)]/50 shadow-sm space-y-8">
+                   <div className="flex items-center justify-between border-b border-[var(--theme-border)]/30 pb-6">
+                     <div className="flex items-center gap-4 flex-1">
+                       <span className="text-lg font-bold text-[var(--theme-primary)]/60 handwritten">שם הקונפליקט:</span>
+                       <input
+                         value={conflict.title || ''}
+                         onChange={(e) => {
+                           const newConflicts = [...conflicts];
+                           newConflicts[conflictIndex].title = e.target.value;
+                           onUpdateConflicts(newConflicts);
+                         }}
+                         className="text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten text-4xl flex-1"
+                         placeholder="..."
+                       />
+                     </div>
+                     <button
+                       onClick={() => {
+                         const newConflicts = conflicts.filter((c: any) => c.id !== conflict.id);
+                         onUpdateConflicts(newConflicts);
+                       }}
+                       className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-colors"
+                       title="מחיקת קונפליקט"
+                     >
+                       <Trash2 size={20} />
+                     </button>
+                   </div>
+
+                   <div className="space-y-6" dir="rtl">
+                     <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 shadow-sm bg-white/30">
+                       <table className="w-full border-collapse">
+                         <thead className="bg-[var(--theme-secondary)]/20 text-xs font-bold text-[var(--theme-primary)]/80">
+                           <tr>
+                             <th className="p-4 border-b border-l border-[var(--theme-border)]/30 text-right w-1/3">מטרה</th>
+                             <th className="p-4 border-b border-l border-[var(--theme-border)]/30 text-right w-1/3">מה מפריע להשיג את המטרה</th>
+                             <th className="p-4 border-b border-[var(--theme-border)]/30 text-right w-1/3">איך נפתרת הבעיה</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           {(conflict?.rows || []).map((row: any, rowIdx: number) => (
+                             <React.Fragment key={row?.id || rowIdx}>
+                               <tr className="bg-white/40">
+                                 <td className="p-4 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                   <textarea
+                                     value={row.goal || ''}
+                                     onChange={(e) => {
+                                       const newConflicts = [...conflicts];
+                                       newConflicts[conflictIndex].rows[rowIdx].goal = e.target.value;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     placeholder="הגדרת המטרה..."
+                                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-20 scrollbar-hide"
+                                   />
+                                 </td>
+                                 <td className="p-4 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                   <textarea
+                                     value={row.obstacle || ''}
+                                     onChange={(e) => {
+                                       const newConflicts = [...conflicts];
+                                       newConflicts[conflictIndex].rows[rowIdx].obstacle = e.target.value;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     placeholder="מה מונע את השגת המטרה?"
+                                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-20 scrollbar-hide"
+                                   />
+                                 </td>
+                                 <td className="p-4 border-b border-[var(--theme-border)]/30 align-top">
+                                   <textarea
+                                     value={row.resolution || ''}
+                                     onChange={(e) => {
+                                       const newConflicts = [...conflicts];
+                                       newConflicts[conflictIndex].rows[rowIdx].resolution = e.target.value;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     placeholder="איך מסתיים הקונפליקט?"
+                                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-20 scrollbar-hide"
+                                   />
+                                 </td>
+                               </tr>
+                               <tr className="bg-[var(--theme-accent)]/5 group/row">
+                                 <td className="p-4 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                   <div className="text-[10px] uppercase font-black tracking-widest text-[var(--theme-primary)]/40 mb-2 font-sans">באילו סצנות מופיעה?</div>
+                                   <MultiScenePicker
+                                     links={row?.goalScenes || []}
+                                     onUpdate={(newLinks) => {
+                                       const newConflicts = [...(conflicts || [])];
+                                       newConflicts[conflictIndex].rows[rowIdx].goalScenes = newLinks;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     scenes={scenes || []}
+                                     placeholder="שיוך סצנה..."
+                                   />
+                                 </td>
+                                 <td className="p-4 border-b border-l border-[var(--theme-border)]/30 align-top">
+                                   <div className="text-[10px] uppercase font-black tracking-widest text-[var(--theme-primary)]/40 mb-2 font-sans">באילו סצנות מופיעה?</div>
+                                   <MultiScenePicker
+                                     links={row?.obstacleScenes || []}
+                                     onUpdate={(newLinks) => {
+                                       const newConflicts = [...(conflicts || [])];
+                                       newConflicts[conflictIndex].rows[rowIdx].obstacleScenes = newLinks;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     scenes={scenes || []}
+                                     placeholder="שיוך סצנה..."
+                                   />
+                                 </td>
+                                 <td className="p-4 border-b border-[var(--theme-border)]/30 align-top relative">
+                                   <div className="text-[10px] uppercase font-black tracking-widest text-[var(--theme-primary)]/40 mb-2 font-sans">באילו סצנות מופיעה?</div>
+                                   <MultiScenePicker
+                                     links={row?.resolutionScenes || []}
+                                     onUpdate={(newLinks) => {
+                                       const newConflicts = [...(conflicts || [])];
+                                       newConflicts[conflictIndex].rows[rowIdx].resolutionScenes = newLinks;
+                                       onUpdateConflicts(newConflicts);
+                                     }}
+                                     scenes={scenes || []}
+                                     placeholder="שיוך סצנה..."
+                                   />
+                                   {(conflict?.rows?.length || 0) > 1 && (
+                                     <button
+                                       onClick={() => {
+                                         const newConflicts = [...conflicts];
+                                         newConflicts[conflictIndex].rows = newConflicts[conflictIndex].rows.filter((_: any, i: number) => i !== rowIdx);
+                                         onUpdateConflicts(newConflicts);
+                                       }}
+                                       className="absolute bottom-2 left-2 p-1 text-red-300 hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-opacity"
+                                       title="מחיקת שורה"
+                                     >
+                                       <Trash2 size={14} />
+                                     </button>
+                                   )}
+                                 </td>
+                               </tr>
+                             </React.Fragment>
+                           ))}
+                         </tbody>
+                       </table>
+                     </div>
+                     <div className="flex justify-center">
+                        <button
+                          onClick={() => {
+                            const newConflicts = [...conflicts];
+                            if (!newConflicts[conflictIndex].rows) {
+                              newConflicts[conflictIndex].rows = [];
+                            }
+                            newConflicts[conflictIndex].rows.push({
+                              id: `row-${Date.now()}`,
+                              goal: '',
+                              goalScenes: [],
+                              obstacle: '',
+                              obstacleScenes: [],
+                              resolution: '',
+                              resolutionScenes: []
+                            });
+                            onUpdateConflicts(newConflicts);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] rounded-xl font-bold hover:bg-[var(--theme-accent)]/20 transition-all text-sm"
+                        >
+                          <Plus size={16} />
+                          הוספת שורת מטרה לקונפליקט
+                        </button>
+                     </div>
+                   </div>
+                 </div>
+               ))}
+
+               {conflicts.length === 0 && (
+                 <div className="text-center py-20 opacity-40">
+                   <p className="handwritten text-3xl">עדיין לא נוספו קונפליקטים</p>
+                 </div>
+               )}
+             </div>
           </div>
         ) : (
           <div className="bg-[var(--theme-card)] rounded-[2rem] p-20 border border-[var(--theme-border)]/50 shadow-sm text-center animate-in fade-in slide-in-from-bottom-4">
@@ -1440,7 +2440,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                 <div className="space-y-2">
                   <p className="text-sm text-[var(--theme-primary)]/60 mb-3">בחרו דמות:</p>
                   {characters.length > 0 ? (
-                    characters.map(char => (
+                    (characters || []).map(char => (
                       <button
                         key={char.id}
                         onClick={() => setSelectedCharForPull(char.id)}
@@ -1463,7 +2463,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                     <ChevronRight size={14} className="rotate-180" /> חזרה לרשימת הדמויות
                   </button>
                   <p className="text-sm text-[var(--theme-primary)]/60 mb-3">בחרו שדה לשליפה:</p>
-                  {Object.entries(characters.find(c => c.id === selectedCharForPull)?.data || {}).map(([key, value]) => (
+                  {Object.entries((characters || []).find(c => c.id === selectedCharForPull)?.data || {}).map(([key, value]) => (
                     <button
                       key={key}
                       onClick={() => {
