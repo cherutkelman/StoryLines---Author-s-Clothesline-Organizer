@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, GitMerge, GitBranch, Users, Circle, Triangle, Square } from 'lucide-react';
-import { Scene } from '../types';
+import { PlotStructureSubView, Scene } from '../types';
 
 interface PlotStructureProps {
   selectedStructure: string | undefined;
@@ -38,6 +38,8 @@ interface PlotStructureProps {
   onUpdateCharacters: (chars: any[]) => void;
   conflicts: any[];
   onUpdateConflicts: (conflicts: any[]) => void;
+  initialSubView?: PlotStructureSubView;
+  onSubViewChange?: (subView: PlotStructureSubView) => void;
 }
 
 const MultiScenePicker: React.FC<{
@@ -527,13 +529,25 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   onUpdateCharacters,
   conflicts = [],
   onUpdateConflicts,
+  initialSubView,
+  onSubViewChange,
   scenes = []
 }) => {
-  const [activeSubView, setActiveSubView] = useState<'structure' | 'arc' | 'relationships' | 'conflicts'>('structure');
+  const [activeSubView, setActiveSubView] = useState<PlotStructureSubView>(initialSubView || 'structure');
   const [relViewMode, setRelViewMode] = useState<Record<string, 'tracks' | 'dynamics'>>({});
   const [editingPointId, setEditingPointId] = useState<string | null>(null);
   const [pullingDataFor, setPullingDataFor] = useState<{ arcIndex: number; stepIndex: number } | null>(null);
   const [selectedCharForPull, setSelectedCharForPull] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialSubView || initialSubView === activeSubView) return;
+    setActiveSubView(initialSubView);
+  }, [initialSubView, activeSubView]);
+
+  const handleSubViewChange = (subView: PlotStructureSubView) => {
+    setActiveSubView(subView);
+    onSubViewChange?.(subView);
+  };
 
   const activePoints = selectedStructure === 'three-acts' ? THREE_ACT_POINTS : 
                       selectedStructure === 'five-acts' ? FIVE_ACT_POINTS :
@@ -553,7 +567,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
         {/* Internal Sub-Navigation */}
         <div className="flex items-center justify-center gap-2 mb-8 bg-[var(--theme-secondary)]/30 p-2 rounded-3xl border border-[var(--theme-border)]/30 w-fit mx-auto">
           <button
-            onClick={() => setActiveSubView('structure')}
+            onClick={() => handleSubViewChange('structure')}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
               activeSubView === 'structure'
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
@@ -564,7 +578,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             מבנה עלילה
           </button>
           <button
-            onClick={() => setActiveSubView('arc')}
+            onClick={() => handleSubViewChange('arc')}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
               activeSubView === 'arc'
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
@@ -575,7 +589,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             קשת התפתחות
           </button>
           <button
-            onClick={() => setActiveSubView('relationships')}
+            onClick={() => handleSubViewChange('relationships')}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
               activeSubView === 'relationships'
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
@@ -586,7 +600,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             מערכת יחסים
           </button>
           <button
-            onClick={() => setActiveSubView('conflicts')}
+            onClick={() => handleSubViewChange('conflicts')}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
               activeSubView === 'conflicts'
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'

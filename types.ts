@@ -320,6 +320,7 @@ export interface BookUIState {
   lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
   editorFocusedSceneId?: string | null;
   editorDisplayMode?: 'full' | 'focus';
+  plotStructureActiveSubView?: PlotStructureSubView;
   questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;
@@ -327,6 +328,8 @@ export interface BookUIState {
   mapsSelectedMapId?: string | null;
   mapsSelectedMindMapId?: string | null;
 }
+
+export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts';
 
 export interface Book extends Project {
   id: string;

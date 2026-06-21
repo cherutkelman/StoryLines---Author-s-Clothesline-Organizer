@@ -9,6 +9,8 @@ import {
   Trash2, 
   BookOpen, 
   Layout, 
+  TrendingUp,
+  Share2,
   Wand2,
   Download,
   Upload,
@@ -49,7 +51,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -73,6 +75,13 @@ const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; shortLab
   { id: 'editor', icon: LucideType, label: 'עורך טקסט', shortLabel: 'כתיבה' },
   { id: 'maps', icon: MapIcon, label: 'מפות', shortLabel: 'מפות' },
   { id: 'questionnaires', icon: ListChecks, label: 'שאלונים', shortLabel: 'שאלונים' },
+];
+
+const PLOT_STRUCTURE_NAV_ITEMS: { id: PlotStructureSubView; icon: React.ElementType; label: string }[] = [
+  { id: 'structure', icon: Layout, label: 'מבנה עלילה' },
+  { id: 'arc', icon: TrendingUp, label: 'קשת התפתחות' },
+  { id: 'relationships', icon: Share2, label: 'מערכות יחסים' },
+  { id: 'conflicts', icon: X, label: 'קונפליקטים' },
 ];
 
 const App: React.FC = () => {
@@ -391,6 +400,16 @@ const App: React.FC = () => {
   const handleMobileMapTabSelect = (tab: MapTabId) => {
     handleViewChange('maps');
     handleMapTabChange(tab);
+    setIsMobileLibraryOpen(false);
+  };
+
+  const handlePlotStructureSubViewChange = (subView: PlotStructureSubView) => {
+    updateBookUiState({ plotStructureActiveSubView: subView });
+  };
+
+  const handleMobilePlotStructureSubViewSelect = (subView: PlotStructureSubView) => {
+    handleViewChange('planning');
+    handlePlotStructureSubViewChange(subView);
     setIsMobileLibraryOpen(false);
   };
 
@@ -1164,6 +1183,7 @@ const App: React.FC = () => {
                   {NAV_ITEMS.map(item => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
+                    const isPlanningItem = item.id === 'planning';
                     const isMapsItem = item.id === 'maps';
                     const isQuestionnairesItem = item.id === 'questionnaires';
 
@@ -1172,7 +1192,7 @@ const App: React.FC = () => {
                         <button
                           onClick={() => {
                             handleViewChange(item.id);
-                            if (!isMapsItem && !isQuestionnairesItem) {
+                            if (!isPlanningItem && !isMapsItem && !isQuestionnairesItem) {
                               setIsMobileLibraryOpen(false);
                             }
                           }}
@@ -1184,6 +1204,9 @@ const App: React.FC = () => {
                         >
                           <Icon size={18} />
                           <span className="flex-1">{item.label}</span>
+                        {isPlanningItem && (
+                          <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
+                        )}
                         {isMapsItem && (
                           <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
                         )}
@@ -1191,6 +1214,30 @@ const App: React.FC = () => {
                           <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
                         )}
                       </button>
+
+                        {isPlanningItem && isActive && (
+                          <div className="space-y-1 pr-8">
+                            {PLOT_STRUCTURE_NAV_ITEMS.map(plotItem => {
+                              const PlotIcon = plotItem.icon;
+                              const isPlotSubViewActive = (activeUI.plotStructureActiveSubView || 'structure') === plotItem.id;
+
+                              return (
+                                <button
+                                  key={plotItem.id}
+                                  onClick={() => handleMobilePlotStructureSubViewSelect(plotItem.id)}
+                                  className={`w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
+                                    isPlotSubViewActive
+                                      ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
+                                      : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                                  }`}
+                                >
+                                  <PlotIcon size={16} />
+                                  <span className="flex-1">{plotItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
 
                         {isMapsItem && isActive && (
                           <div className="space-y-1 pr-8">
@@ -1519,6 +1566,8 @@ const App: React.FC = () => {
                     onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
                     conflicts={(activeBook as any).conflicts || []}
                     onUpdateConflicts={(conflicts) => updateActiveBook({ conflicts } as Partial<Book>)}
+                    initialSubView={activeUI.plotStructureActiveSubView}
+                    onSubViewChange={handlePlotStructureSubViewChange}
                   />
                 </div>
               )}
