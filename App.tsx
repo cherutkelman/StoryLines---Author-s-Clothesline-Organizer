@@ -55,6 +55,7 @@ import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
+import { MAP_NAV_ITEMS, type MapTabId } from './components/mapNavigation';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -63,6 +64,15 @@ const SHARED_FIELDS = [
 ];
 
 type WebSaveStatus = 'saved' | 'saving' | 'error';
+type AppView = 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
+
+const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; shortLabel: string }[] = [
+  { id: 'planning', icon: Layout, label: 'תכנון עלילה', shortLabel: 'תכנון' },
+  { id: 'board', icon: Layout, label: 'לוח עלילה', shortLabel: 'לוח' },
+  { id: 'editor', icon: LucideType, label: 'עורך טקסט', shortLabel: 'כתיבה' },
+  { id: 'maps', icon: MapIcon, label: 'מפות', shortLabel: 'מפות' },
+  { id: 'questionnaires', icon: ListChecks, label: 'שאלונים', shortLabel: 'שאלונים' },
+];
 
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -190,7 +200,7 @@ const App: React.FC = () => {
   
   const [activeBookId, setActiveBookId] = useState<string>('');
   const [storageMode, setStorageModeState] = useState<'local' | 'cloud'>(storageManager.getMode());
-  const [activeView, setActiveView] = useState<'board' | 'editor' | 'questionnaires' | 'maps' | 'planning'>('board');
+  const [activeView, setActiveView] = useState<AppView>('board');
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
@@ -368,9 +378,19 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleViewChange = (view: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning') => {
+  const handleViewChange = (view: AppView) => {
     setActiveView(view);
     updateBookUiState({ lastView: view });
+  };
+
+  const handleMapTabChange = (tab: MapTabId) => {
+    updateBookUiState({ mapsActiveTab: tab });
+  };
+
+  const handleMobileMapTabSelect = (tab: MapTabId) => {
+    handleViewChange('maps');
+    handleMapTabChange(tab);
+    setIsMobileLibraryOpen(false);
   };
 
   const handleBulkAdd = () => {
@@ -1005,41 +1025,21 @@ const App: React.FC = () => {
         </div>
 
         <div className="hidden lg:flex items-center gap-1 bg-[var(--theme-secondary)] p-1.5 rounded-2xl border border-[var(--theme-border)]/50 shadow-inner">
-          <button 
-            onClick={() => handleViewChange('planning')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'planning' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <Layout size={18} />
-            <span className="hidden sm:inline">תכנון עלילה</span>
-          </button>
-          <button 
-            onClick={() => handleViewChange('board')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'board' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <Layout size={18} />
-            <span className="hidden sm:inline">לוח עלילה</span>
-          </button>
-          <button 
-            onClick={() => handleViewChange('editor')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'editor' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <LucideType size={18} />
-            <span className="hidden sm:inline">עורך טקסט</span>
-          </button>
-          <button 
-            onClick={() => handleViewChange('maps')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'maps' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <MapIcon size={18} />
-            <span className="hidden sm:inline">מפות</span>
-          </button>
-          <button 
-            onClick={() => handleViewChange('questionnaires')} 
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${activeView === 'questionnaires' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <ListChecks size={18} />
-            <span className="hidden sm:inline">שאלונים</span>
-          </button>
+          {NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleViewChange(item.id)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
+              >
+                <Icon size={18} />
+                <span className="hidden sm:inline">{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">
@@ -1133,65 +1133,126 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-4 border-b border-[var(--theme-border)]">
-              <button
-                onClick={() => {
-                  addNewBookToLibrary();
-                  setIsMobileLibraryOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] text-sm font-bold shadow-sm"
-              >
-                <Plus size={18} />
-                <span>ספר חדש</span>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {displayBooks.map(book => (
-                <div
-                  key={book.id}
-                  className={`p-3 rounded-xl border transition-all ${activeBookId === book.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-border)]' : 'border-transparent bg-[var(--theme-bg)]'}`}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 border-b border-[var(--theme-border)]">
+                <button
+                  onClick={() => {
+                    addNewBookToLibrary();
+                    setIsMobileLibraryOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] text-sm font-bold shadow-sm"
                 >
-                  <button
-                    onClick={() => {
-                      setActiveBookId(book.id);
-                      setIsMobileLibraryOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 text-right"
-                  >
-                    <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/40'} />
-                    <span className="flex-1 text-sm font-bold text-[var(--theme-primary)] truncate">{book.title}</span>
-                    {book.syncStatus === 'conflict' && <AlertCircle size={16} className="text-red-500" />}
-                  </button>
-                  <div className="mt-3 flex items-center gap-2">
-                    <input
-                      value={book.title}
-                      onChange={(e) => renameBook(book.id, e.target.value)}
-                      className="min-w-0 flex-1 text-sm font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-primary)]"
-                      aria-label="שם הספר"
-                    />
-                    {book.syncStatus === 'conflict' && (
-                      <button
-                        onClick={() => {
-                          openConflictResolver(book.id);
-                          setIsMobileLibraryOpen(false);
-                        }}
-                        className="p-2 text-red-500 bg-red-50 rounded-lg"
-                        title="פתרון קונפליקט"
-                      >
-                        <AlertCircle size={16} />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => deleteBook(book.id, e)}
-                      className="p-2 text-red-500 bg-red-50 rounded-lg"
-                      title="מחיקת ספר"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                  <Plus size={18} />
+                  <span>ספר חדש</span>
+                </button>
+              </div>
+
+              <div className="p-4 border-b border-[var(--theme-border)]">
+                <h3 className="mb-3 text-xs font-black text-[var(--theme-primary)] uppercase tracking-[0.2em]">ניווט</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {NAV_ITEMS.map(item => {
+                    const Icon = item.icon;
+                    const isActive = activeView === item.id;
+                    const isMapsItem = item.id === 'maps';
+
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          onClick={() => {
+                            handleViewChange(item.id);
+                            if (!isMapsItem) {
+                              setIsMobileLibraryOpen(false);
+                            }
+                          }}
+                          className={`w-full min-h-12 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-right transition-all ${
+                            isActive
+                              ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-sm'
+                              : 'bg-[var(--theme-bg)] text-[var(--theme-primary)]/70 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                          }`}
+                        >
+                          <Icon size={18} />
+                          <span className="flex-1">{item.label}</span>
+                          {isMapsItem && (
+                            <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
+                          )}
+                        </button>
+
+                        {isMapsItem && isActive && (
+                          <div className="space-y-1 pr-8">
+                            {MAP_NAV_ITEMS.map(mapItem => {
+                              const MapIconComponent = mapItem.icon;
+                              const isMapTabActive = (activeUI.mapsActiveTab || 'characterDiagram') === mapItem.id;
+
+                              return (
+                                <button
+                                  key={mapItem.id}
+                                  onClick={() => handleMobileMapTabSelect(mapItem.id)}
+                                  className={`w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
+                                    isMapTabActive
+                                      ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
+                                      : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                                  }`}
+                                >
+                                  <MapIconComponent size={16} />
+                                  <span className="flex-1">{mapItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              <div className="p-3 space-y-2">
+                {displayBooks.map(book => (
+                  <div
+                    key={book.id}
+                    className={`p-3 rounded-xl border transition-all ${activeBookId === book.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-border)]' : 'border-transparent bg-[var(--theme-bg)]'}`}
+                  >
+                    <button
+                      onClick={() => {
+                        setActiveBookId(book.id);
+                        setIsMobileLibraryOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 text-right"
+                    >
+                      <BookIcon size={18} className={activeBookId === book.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/40'} />
+                      <span className="flex-1 text-sm font-bold text-[var(--theme-primary)] truncate">{book.title}</span>
+                      {book.syncStatus === 'conflict' && <AlertCircle size={16} className="text-red-500" />}
+                    </button>
+                    <div className="mt-3 flex items-center gap-2">
+                      <input
+                        value={book.title}
+                        onChange={(e) => renameBook(book.id, e.target.value)}
+                        className="min-w-0 flex-1 text-sm font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-primary)]"
+                        aria-label="שם הספר"
+                      />
+                      {book.syncStatus === 'conflict' && (
+                        <button
+                          onClick={() => {
+                            openConflictResolver(book.id);
+                            setIsMobileLibraryOpen(false);
+                          }}
+                          className="p-2 text-red-500 bg-red-50 rounded-lg"
+                          title="פתרון קונפליקט"
+                        >
+                          <AlertCircle size={16} />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => deleteBook(book.id, e)}
+                        className="p-2 text-red-500 bg-red-50 rounded-lg"
+                        title="מחיקת ספר"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {user && (
@@ -1481,7 +1542,7 @@ const App: React.FC = () => {
                       onUpdateMaps={(maps) => updateEntries('maps', maps)}
                       onUpdateMindMaps={(mindMaps) => updateEntries('mindMaps', mindMaps)}
                       initialTab={activeUI.mapsActiveTab}
-                      onTabChange={(tab) => updateBookUiState({ mapsActiveTab: tab })}
+                      onTabChange={handleMapTabChange}
                       selectedMapId={activeUI.mapsSelectedMapId}
                       onMapSelect={(id) => updateBookUiState({ mapsSelectedMapId: id })}
                       selectedMindMapId={activeUI.mapsSelectedMindMapId}
@@ -1524,13 +1585,7 @@ const App: React.FC = () => {
 
       <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-[var(--theme-card)] border-t border-[var(--theme-border)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
         <div className="grid grid-cols-5">
-          {[
-            { id: 'planning' as const, icon: Layout, label: 'תכנון' },
-            { id: 'board' as const, icon: Layout, label: 'לוח' },
-            { id: 'editor' as const, icon: LucideType, label: 'כתיבה' },
-            { id: 'maps' as const, icon: MapIcon, label: 'מפות' },
-            { id: 'questionnaires' as const, icon: ListChecks, label: 'שאלונים' },
-          ].map(item => {
+          {NAV_ITEMS.map(item => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
             return (
@@ -1540,7 +1595,7 @@ const App: React.FC = () => {
                 className={`h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition-colors ${isActive ? 'text-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'text-[var(--theme-primary)]/45'}`}
               >
                 <Icon size={20} />
-                <span>{item.label}</span>
+                <span>{item.shortLabel}</span>
               </button>
             );
           })}

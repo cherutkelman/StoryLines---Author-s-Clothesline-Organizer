@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Map as MapIcon, Plus, Trash2, Edit2, ChevronRight, ChevronLeft, Share2, CopyPlus, X } from 'lucide-react';
+import { Map as MapIcon, Plus, Trash2, Edit2, ChevronRight, ChevronLeft, Share2, CopyPlus, X } from 'lucide-react';
 import { QuestionnaireEntry, CharacterMapConnection, WorldMap, MindMap, Book } from '../types';
 import CharacterMap from './CharacterMap';
 import WorldMapEditor from './WorldMapEditor';
 import MindMapEditor from './MindMapEditor';
+import { MAP_NAV_ITEMS, type MapTabId } from './mapNavigation';
 
 interface MapsManagerProps {
   allBooks: Book[];
@@ -17,8 +18,8 @@ interface MapsManagerProps {
   onUpdateConnections: (conns: CharacterMapConnection[]) => void;
   onUpdateMaps: (maps: WorldMap[]) => void;
   onUpdateMindMaps: (mindMaps: MindMap[]) => void;
-  initialTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
-  onTabChange?: (tab: 'characterDiagram' | 'worldMaps' | 'mindMaps') => void;
+  initialTab?: MapTabId;
+  onTabChange?: (tab: MapTabId) => void;
   selectedMapId?: string | null;
   onMapSelect?: (id: string | null) => void;
   selectedMindMapId?: string | null;
@@ -44,7 +45,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   selectedMindMapId,
   onMindMapSelect
 }) => {
-  const [activeTab, setActiveTab] = useState<'characterDiagram' | 'worldMaps' | 'mindMaps'>(initialTab);
+  const [activeTab, setActiveTab] = useState<MapTabId>(initialTab);
   const [currentMapId, setCurrentMapId] = useState<string | null>(selectedMapId || null);
   const [currentMindMapId, setCurrentMindMapId] = useState<string | null>(selectedMindMapId || null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -64,7 +65,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
     if (selectedMindMapId) setCurrentMindMapId(selectedMindMapId);
   }, [selectedMindMapId]);
 
-  const handleTabChange = (tab: 'characterDiagram' | 'worldMaps' | 'mindMaps') => {
+  const handleTabChange = (tab: MapTabId) => {
     setActiveTab(tab);
     onTabChange?.(tab);
   };
@@ -199,27 +200,19 @@ const MapsManager: React.FC<MapsManagerProps> = ({
     <div className="h-full flex flex-col bg-[var(--theme-bg)]">
       <div className="flex-shrink-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-6 py-2 flex items-center justify-between shadow-sm z-10">
         <div className="flex items-center gap-1 bg-[var(--theme-secondary)]/50 p-1 rounded-xl border border-[var(--theme-border)]/50 overflow-x-auto scrollbar-hide">
-          <button 
-            onClick={() => handleTabChange('characterDiagram')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'characterDiagram' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <Users size={14} />
-            <span>מפת דמויות</span>
-          </button>
-          <button 
-            onClick={() => handleTabChange('worldMaps')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'worldMaps' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <MapIcon size={14} />
-            <span>מפות עולם</span>
-          </button>
-          <button 
-            onClick={() => handleTabChange('mindMaps')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'mindMaps' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <Share2 size={14} />
-            <span>מפות חשיבה</span>
-          </button>
+          {MAP_NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === item.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
+              >
+                <Icon size={14} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {activeTab === 'worldMaps' && currentMapId && (
