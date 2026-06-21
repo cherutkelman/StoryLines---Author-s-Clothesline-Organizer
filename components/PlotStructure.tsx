@@ -196,15 +196,45 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
   characters,
   onUpdateCharacters
 }) => {
-  const headerRef = React.useRef<HTMLTableSectionElement>(null);
-  const [headerHeight, setHeaderHeight] = React.useState(130);
+  const tableWrapperRef = React.useRef<HTMLDivElement>(null);
+  const cellRefs = React.useRef<Record<string, HTMLTableCellElement | null>>({});
+  const [svgSize, setSvgSize] = React.useState({ width: 0, height: 0 });
   const dynamicSteps = rel.dynamicSteps || [];
-  
-  React.useEffect(() => {
-    if (headerRef.current) {
-      setHeaderHeight(headerRef.current.offsetHeight);
+
+  const updateSvgSize = React.useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+
+    setSvgSize(current => {
+      const next = {
+        width: wrapper.clientWidth,
+        height: wrapper.clientHeight
+      };
+
+      return current.width === next.width && current.height === next.height ? current : next;
+    });
+  }, []);
+
+  React.useLayoutEffect(() => {
+    updateSvgSize();
+
+    const wrapper = tableWrapperRef.current;
+    const resizeObserver = wrapper && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateSvgSize)
+      : null;
+
+    if (wrapper && resizeObserver) {
+      resizeObserver.observe(wrapper);
     }
-  }, [rel.char1Id, rel.char2Id, characters, relationships]);
+
+    window.addEventListener('resize', updateSvgSize);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateSvgSize);
+    };
+  }, [dynamicSteps.length, updateSvgSize]);
+
   const char1 = characters.find(c => c.id === rel.char1Id);
   const char2 = characters.find(c => c.id === rel.char2Id);
 
@@ -255,23 +285,29 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
   };
 
   const ROW_HEIGHT = 80;
+  const getCellKey = (stepId: string, char: 1 | 2, posIndex: number) => `${stepId}-${char}-${posIndex}`;
 
-  // Helper to get line points
   const getLinePoints = (char: 1 | 2) => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return '';
+
+    const wrapperRect = wrapper.getBoundingClientRect();
     const points: { x: number; y: number }[] = [];
+
     dynamicSteps.forEach((step: any, idx: number) => {
       const pos = char === 1 ? step.char1Position : step.char2Position;
-      if (pos !== null) {
-        // RTL Column Mapping (0-5 from Right to Left)
-        // Char A columns: 0, 1, 2
-        // Char B columns: 3, 4, 5
-        const colIndex = char === 1 ? pos : pos + 3;
-        points.push({
-          x: 600 - ((colIndex * 100) + 50), 
-          y: (idx * ROW_HEIGHT) + (ROW_HEIGHT / 2)
-        });
-      }
+      if (pos === null || pos === undefined) return;
+
+      const cell = cellRefs.current[getCellKey(step.id, char, pos)];
+      if (!cell) return;
+
+      const cellRect = cell.getBoundingClientRect();
+      points.push({
+        x: cellRect.left - wrapperRect.left + (cellRect.width / 2),
+        y: cellRect.top - wrapperRect.top + (cellRect.height / 2)
+      });
     });
+
     return points.map(p => `${p.x},${p.y}`).join(' ');
   };
 
@@ -289,37 +325,39 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
       </div>
 
       <div className="overflow-x-auto rounded-[2rem] border border-[var(--theme-border)]/50 shadow-sm bg-[var(--theme-card)]">
-        <div className="relative min-w-[800px]">
+        <div ref={tableWrapperRef} className="relative min-w-[800px]">
           {/* SVG Layer for Lines */}
-          <div className="absolute pointer-events-none z-10" style={{ right: '20%', left: '30%', top: `${headerHeight}px`, bottom: '0' }}>
-            <svg 
-              className="w-full h-full" 
-              viewBox={`0 0 600 ${dynamicSteps.length * ROW_HEIGHT}`} 
-              preserveAspectRatio="none"
-            >
-              {/* Lines for Char 1 (A) */}
-              <polyline
-                points={getLinePoints(1)}
-                fill="none"
-                stroke="rgba(234, 179, 8, 0.7)"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Lines for Char 2 (B) */}
-              <polyline
-                points={getLinePoints(2)}
-                fill="none"
-                stroke="rgba(249, 115, 22, 0.7)"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {svgSize.width > 0 && svgSize.height > 0 && (
+              <svg
+                className="w-full h-full"
+                viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
+                preserveAspectRatio="none"
+              >
+                {/* Lines for Char 1 (A) */}
+                <polyline
+                  points={getLinePoints(1)}
+                  fill="none"
+                  stroke="rgba(234, 179, 8, 0.7)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Lines for Char 2 (B) */}
+                <polyline
+                  points={getLinePoints(2)}
+                  fill="none"
+                  stroke="rgba(249, 115, 22, 0.7)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </div>
 
           <table className="w-full border-collapse">
-            <thead ref={headerRef}>
+            <thead>
               {/* Main Headers */}
               <tr className="text-center font-bold text-sm bg-[var(--theme-secondary)]/20">
                 <th className="p-4 border-b border-l border-[var(--theme-border)]/30 w-[20%] bg-green-50/50">רשימת סצנות רלוונטיות</th>
@@ -404,6 +442,9 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
                 {[0, 1, 2].map(pos => (
                   <td 
                     key={`a-${pos}`}
+                    ref={(node) => {
+                      cellRefs.current[getCellKey(step.id, 1, pos)] = node;
+                    }}
                     onClick={() => handleCellClick(idx, 1, pos)}
                     className="border-b border-l border-[var(--theme-border)]/30 p-0 cursor-pointer hover:bg-yellow-100/30 transition-colors relative bg-yellow-50/10 w-[8.33%]"
                   >
@@ -419,6 +460,9 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
                 {[0, 1, 2].map(pos => (
                   <td 
                     key={`b-${pos}`}
+                    ref={(node) => {
+                      cellRefs.current[getCellKey(step.id, 2, pos)] = node;
+                    }}
                     onClick={() => handleCellClick(idx, 2, pos)}
                     className="border-b border-l border-[var(--theme-border)]/30 p-0 cursor-pointer hover:bg-orange-100/30 transition-colors relative bg-orange-50/10 w-[8.33%]"
                   >
