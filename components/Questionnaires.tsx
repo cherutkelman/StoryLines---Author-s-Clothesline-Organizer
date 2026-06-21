@@ -15,6 +15,7 @@ import {
   Camera
 } from 'lucide-react';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
+import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './questionnaireNavigation';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -31,9 +32,9 @@ interface QuestionnairesProps {
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
   onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
   onUpdateBackgrounds: (entries: QuestionnaireEntry[]) => void;
-  initialTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
+  initialTab?: QuestionnaireTabId;
   initialSelectedEntryId?: string | null;
-  onTabChange?: (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds') => void;
+  onTabChange?: (tab: QuestionnaireTabId) => void;
   onEntrySelect?: (id: string | null) => void;
 }
 
@@ -239,7 +240,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
-  const [activeTab, setActiveTab] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds'>(initialTab || 'characters');
+  const [activeTab, setActiveTab] = useState<QuestionnaireTabId>(initialTab || 'characters');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(initialSelectedEntryId || null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
@@ -250,7 +251,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
 
-  const handleTabChange = (tab: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds') => {
+  const handleTabChange = (tab: QuestionnaireTabId) => {
     setActiveTab(tab);
     setSelectedEntryId(null);
     setActiveCategory(null);
@@ -602,17 +603,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto">
       <div className="flex justify-center flex-shrink-0">
         <div className="bg-[var(--theme-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-[var(--theme-border)]/50 overflow-x-auto max-w-full">
-          {[
-            { id: 'characters', label: 'דמויות', icon: User },
-            { id: 'places', label: 'מקומות', icon: MapPin },
-            { id: 'periods', label: 'תקופות', icon: Clock },
-            { id: 'twists', label: 'טוויסטים', icon: Zap },
-            { id: 'fantasyWorlds', label: 'עולם פנטזיה', icon: Wand2 },
-            { id: 'backgrounds', label: 'רקע', icon: FileText },
-          ].map(tab => (
+          {QUESTIONNAIRE_NAV_ITEMS.map(tab => (
             <button 
               key={tab.id}
-              onClick={() => handleTabChange(tab.id as any)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
             >
               <tab.icon size={18} />

@@ -56,6 +56,7 @@ import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
 import { MAP_NAV_ITEMS, type MapTabId } from './components/mapNavigation';
+import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './components/questionnaireNavigation';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -390,6 +391,16 @@ const App: React.FC = () => {
   const handleMobileMapTabSelect = (tab: MapTabId) => {
     handleViewChange('maps');
     handleMapTabChange(tab);
+    setIsMobileLibraryOpen(false);
+  };
+
+  const handleQuestionnaireTabChange = (tab: QuestionnaireTabId) => {
+    updateBookUiState({ questionnaireActiveTab: tab });
+  };
+
+  const handleMobileQuestionnaireTabSelect = (tab: QuestionnaireTabId) => {
+    handleViewChange('questionnaires');
+    handleQuestionnaireTabChange(tab);
     setIsMobileLibraryOpen(false);
   };
 
@@ -1154,13 +1165,14 @@ const App: React.FC = () => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
                     const isMapsItem = item.id === 'maps';
+                    const isQuestionnairesItem = item.id === 'questionnaires';
 
                     return (
                       <div key={item.id} className="space-y-1">
                         <button
                           onClick={() => {
                             handleViewChange(item.id);
-                            if (!isMapsItem) {
+                            if (!isMapsItem && !isQuestionnairesItem) {
                               setIsMobileLibraryOpen(false);
                             }
                           }}
@@ -1172,10 +1184,13 @@ const App: React.FC = () => {
                         >
                           <Icon size={18} />
                           <span className="flex-1">{item.label}</span>
-                          {isMapsItem && (
-                            <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
-                          )}
-                        </button>
+                        {isMapsItem && (
+                          <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
+                        )}
+                        {isQuestionnairesItem && (
+                          <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
+                        )}
+                      </button>
 
                         {isMapsItem && isActive && (
                           <div className="space-y-1 pr-8">
@@ -1195,6 +1210,30 @@ const App: React.FC = () => {
                                 >
                                   <MapIconComponent size={16} />
                                   <span className="flex-1">{mapItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {isQuestionnairesItem && isActive && (
+                          <div className="space-y-1 pr-8">
+                            {QUESTIONNAIRE_NAV_ITEMS.map(questionnaireItem => {
+                              const QuestionnaireIcon = questionnaireItem.icon;
+                              const isQuestionnaireTabActive = (activeUI.questionnaireActiveTab || 'characters') === questionnaireItem.id;
+
+                              return (
+                                <button
+                                  key={questionnaireItem.id}
+                                  onClick={() => handleMobileQuestionnaireTabSelect(questionnaireItem.id)}
+                                  className={`w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
+                                    isQuestionnaireTabActive
+                                      ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
+                                      : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                                  }`}
+                                >
+                                  <QuestionnaireIcon size={16} />
+                                  <span className="flex-1">{questionnaireItem.label}</span>
                                 </button>
                               );
                             })}
@@ -1569,7 +1608,7 @@ const App: React.FC = () => {
                     onUpdateBackgrounds={(e) => updateEntries('backgrounds', e)}
                     initialTab={activeUI.questionnaireActiveTab}
                     initialSelectedEntryId={activeUI.questionnaireSelectedEntryId}
-                    onTabChange={(tab) => updateBookUiState({ questionnaireActiveTab: tab })}
+                    onTabChange={handleQuestionnaireTabChange}
                     onEntrySelect={(id) => updateBookUiState({ questionnaireSelectedEntryId: id })}
                   />
                 </div>
