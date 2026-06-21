@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Scene, Project, ChapterMarker } from '../types';
+import { Scene, Project, ChapterMarker, BoardViewMode } from '../types';
 import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface BoardProps {
@@ -14,6 +14,8 @@ interface BoardProps {
   onDeleteScene: (id: string) => void;
   initialZoom?: number;
   onZoomChange?: (zoom: number) => void;
+  initialViewMode?: BoardViewMode;
+  onViewModeChange?: (viewMode: BoardViewMode) => void;
   onSceneDoubleClick?: (sceneId: string) => void;
   onUpdateSummary: (summary: string) => void;
   onUpdateChapterTitle: (position: number, title: string) => void;
@@ -33,6 +35,8 @@ const Board: React.FC<BoardProps> = ({
   onDeleteScene, 
   initialZoom, 
   onZoomChange, 
+  initialViewMode,
+  onViewModeChange,
   onSceneDoubleClick, 
   onUpdateSummary, 
   onUpdateChapterTitle,
@@ -42,13 +46,23 @@ const Board: React.FC<BoardProps> = ({
 }) => {
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
-  const [viewMode, setViewMode] = useState<'plotlines' | 'chapters'>('plotlines');
+  const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const handleZoomChange = (newZoom: number) => {
     setZoomLevel(newZoom);
     onZoomChange?.(newZoom);
+  };
+
+  useEffect(() => {
+    if (!initialViewMode || initialViewMode === viewMode) return;
+    setViewMode(initialViewMode);
+  }, [initialViewMode, viewMode]);
+
+  const handleViewModeChange = (newViewMode: BoardViewMode) => {
+    setViewMode(newViewMode);
+    onViewModeChange?.(newViewMode);
   };
 
   const handleDragStart = (sceneId: string) => {
@@ -213,7 +227,7 @@ const Board: React.FC<BoardProps> = ({
 
         <div className="flex bg-[var(--theme-secondary)]/50 p-1 rounded-xl border border-[var(--theme-border)]/50">
           <button 
-            onClick={() => setViewMode('plotlines')}
+            onClick={() => handleViewModeChange('plotlines')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'plotlines' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`}
             title="תצוגת קווי עלילה"
           >
@@ -221,7 +235,7 @@ const Board: React.FC<BoardProps> = ({
             <span>קווים</span>
           </button>
           <button 
-            onClick={() => setViewMode('chapters')}
+            onClick={() => handleViewModeChange('chapters')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'chapters' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`}
             title="תצוגת פרקים"
           >

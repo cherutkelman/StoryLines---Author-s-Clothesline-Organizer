@@ -324,12 +324,14 @@ export interface BookUIState {
   questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;
+  boardViewMode?: BoardViewMode;
   mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
   mapsSelectedMapId?: string | null;
   mapsSelectedMindMapId?: string | null;
 }
 
 export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts';
+export type BoardViewMode = 'plotlines' | 'chapters';
 
 export interface Book extends Project {
   id: string;

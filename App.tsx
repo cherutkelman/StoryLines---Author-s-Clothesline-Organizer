@@ -9,6 +9,8 @@ import {
   Trash2, 
   BookOpen, 
   Layout, 
+  LayoutGrid,
+  Rows,
   TrendingUp,
   Share2,
   Wand2,
@@ -51,7 +53,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -82,6 +84,11 @@ const PLOT_STRUCTURE_NAV_ITEMS: { id: PlotStructureSubView; icon: React.ElementT
   { id: 'arc', icon: TrendingUp, label: 'קשת התפתחות' },
   { id: 'relationships', icon: Share2, label: 'מערכות יחסים' },
   { id: 'conflicts', icon: X, label: 'קונפליקטים' },
+];
+
+const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: string }[] = [
+  { id: 'plotlines', icon: LayoutGrid, label: 'קווים' },
+  { id: 'chapters', icon: Rows, label: 'פרקים' },
 ];
 
 const App: React.FC = () => {
@@ -410,6 +417,16 @@ const App: React.FC = () => {
   const handleMobilePlotStructureSubViewSelect = (subView: PlotStructureSubView) => {
     handleViewChange('planning');
     handlePlotStructureSubViewChange(subView);
+    setIsMobileLibraryOpen(false);
+  };
+
+  const handleBoardViewModeChange = (viewMode: BoardViewMode) => {
+    updateBookUiState({ boardViewMode: viewMode });
+  };
+
+  const handleMobileBoardViewModeSelect = (viewMode: BoardViewMode) => {
+    handleViewChange('board');
+    handleBoardViewModeChange(viewMode);
     setIsMobileLibraryOpen(false);
   };
 
@@ -1184,6 +1201,7 @@ const App: React.FC = () => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
                     const isPlanningItem = item.id === 'planning';
+                    const isBoardItem = item.id === 'board';
                     const isMapsItem = item.id === 'maps';
                     const isQuestionnairesItem = item.id === 'questionnaires';
 
@@ -1192,7 +1210,7 @@ const App: React.FC = () => {
                         <button
                           onClick={() => {
                             handleViewChange(item.id);
-                            if (!isPlanningItem && !isMapsItem && !isQuestionnairesItem) {
+                            if (!isPlanningItem && !isBoardItem && !isMapsItem && !isQuestionnairesItem) {
                               setIsMobileLibraryOpen(false);
                             }
                           }}
@@ -1205,6 +1223,9 @@ const App: React.FC = () => {
                           <Icon size={18} />
                           <span className="flex-1">{item.label}</span>
                         {isPlanningItem && (
+                          <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
+                        )}
+                        {isBoardItem && (
                           <ChevronDown size={16} className={`transition-transform ${isActive ? '' : 'rotate-90'}`} />
                         )}
                         {isMapsItem && (
@@ -1233,6 +1254,30 @@ const App: React.FC = () => {
                                 >
                                   <PlotIcon size={16} />
                                   <span className="flex-1">{plotItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {isBoardItem && isActive && (
+                          <div className="space-y-1 pr-8">
+                            {BOARD_NAV_ITEMS.map(boardItem => {
+                              const BoardIcon = boardItem.icon;
+                              const isBoardViewModeActive = (activeUI.boardViewMode || 'plotlines') === boardItem.id;
+
+                              return (
+                                <button
+                                  key={boardItem.id}
+                                  onClick={() => handleMobileBoardViewModeSelect(boardItem.id)}
+                                  className={`w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
+                                    isBoardViewModeActive
+                                      ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
+                                      : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                                  }`}
+                                >
+                                  <BoardIcon size={16} />
+                                  <span className="flex-1">{boardItem.label}</span>
                                 </button>
                               );
                             })}
@@ -1585,6 +1630,8 @@ const App: React.FC = () => {
                     onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
                     initialZoom={activeUI.boardZoomLevel}
                     onZoomChange={(z) => updateBookUiState({ boardZoomLevel: z })}
+                    initialViewMode={activeUI.boardViewMode}
+                    onViewModeChange={handleBoardViewModeChange}
                     onSceneDoubleClick={(id) => {
                       handleViewChange('editor');
                       updateBookUiState({ editorFocusedSceneId: id });
