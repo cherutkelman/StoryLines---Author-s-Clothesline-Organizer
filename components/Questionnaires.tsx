@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
@@ -250,6 +250,18 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
+
+  useEffect(() => {
+    if (!initialTab || initialTab === activeTab) return;
+    setActiveTab(initialTab);
+    setSelectedEntryId(null);
+    setActiveCategory(null);
+    setCurrentCategoryIndex(0);
+    setQuestionSearchQuery('');
+    setIsSearchActive(false);
+    setMode('view');
+    onEntrySelect?.(null);
+  }, [initialTab, activeTab, onEntrySelect]);
 
   const handleTabChange = (tab: QuestionnaireTabId) => {
     setActiveTab(tab);
