@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, Users, Circle, Triangle, Square } from 'lucide-react';
 import { PlotStructureSubView, QuestionnaireEntry, Scene } from '../types';
-import RelationshipQuestionnaire from './RelationshipQuestionnaire';
 
 interface PlotStructureProps {
   selectedStructure: string | undefined;
@@ -2163,13 +2162,6 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                       </button>
                     </div>
                   </div>
-
-                  <RelationshipQuestionnaire
-                    rel={rel}
-                    relationships={relationships}
-                    onUpdateRelationships={onUpdateRelationships}
-                    characters={characters}
-                  />
 
                   <div className="space-y-4">
                     <h4 className="handwritten text-3xl font-bold text-[var(--theme-primary)]">

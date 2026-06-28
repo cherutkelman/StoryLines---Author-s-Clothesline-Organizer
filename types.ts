@@ -330,7 +330,7 @@ export interface BookUIState {
   editorFocusedSceneId?: string | null;
   editorDisplayMode?: 'full' | 'focus';
   plotStructureActiveSubView?: PlotStructureSubView;
-  questionnaireActiveTab?: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
+  questionnaireActiveTab?: 'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;
   boardViewMode?: BoardViewMode;

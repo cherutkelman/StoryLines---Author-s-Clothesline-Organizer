@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './questionnaireNavigation';
+import RelationshipQuestionnaire from './RelationshipQuestionnaire';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -26,12 +27,14 @@ interface QuestionnairesProps {
   twists: QuestionnaireEntry[];
   fantasyWorlds: QuestionnaireEntry[];
   backgrounds: QuestionnaireEntry[];
+  relationships: any[];
   onUpdateCharacters: (entries: QuestionnaireEntry[]) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
   onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
   onUpdateBackgrounds: (entries: QuestionnaireEntry[]) => void;
+  onUpdateRelationships: (relationships: any[]) => void;
   initialTab?: QuestionnaireTabId;
   initialSelectedEntryId?: string | null;
   onTabChange?: (tab: QuestionnaireTabId) => void;
@@ -55,6 +58,12 @@ const normalizeEntryForTab = (entry: QuestionnaireEntry, tab: QuestionnaireTabId
     },
     customFields: entry.customFields || []
   };
+};
+
+const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[]) => {
+  const char1Name = characters.find(char => char.id === relationship.char1Id)?.name || 'דמות ראשונה';
+  const char2Name = characters.find(char => char.id === relationship.char2Id)?.name || 'דמות שנייה';
+  return `${char1Name} ו־${char2Name}`;
 };
 
 const FEMALE_QUESTIONS_CONFIG = [
@@ -255,8 +264,8 @@ const BACKGROUND_TYPES = [
 ];
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
-  characters, places, periods, twists, fantasyWorlds, backgrounds,
-  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds,
+  characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
+  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
   const [activeTab, setActiveTab] = useState<QuestionnaireTabId>(initialTab || 'characters');
@@ -303,10 +312,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     onEntrySelect?.(id);
   };
 
+  const isRelationshipsTab = activeTab === 'relationships';
   const rawEntries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
   const entries = rawEntries.map(entry => normalizeEntryForTab(entry, activeTab));
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
+  const selectedRelationship = isRelationshipsTab ? relationships.find(rel => rel.id === selectedEntryId) : null;
   
   const currentGender = selectedEntry?.data?.gender || 'female';
   const currentPlaceType = selectedEntry?.data?.placeType || 'macro';
@@ -337,7 +348,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
   const currentCategory = activeCategory || categories[currentCategoryIndex] || categories[0];
 
-  const Icon = activeTab === 'characters' ? User : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : activeTab === 'fantasyWorlds' ? Wand2 : FileText;
+  const Icon = activeTab === 'characters' ? User : activeTab === 'relationships' ? Users : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : activeTab === 'fantasyWorlds' ? Wand2 : FileText;
 
   const filteredQuestions = questionsConfig.filter(q => {
     const matchesCategory = mode === 'edit' ? q.category === currentCategory : (activeCategory ? q.category === activeCategory : true);
@@ -412,6 +423,35 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateFn([...entries, newEntry]);
     handleEntrySelect(newEntry.id);
     setMode('edit');
+  };
+
+  const addRelationship = () => {
+    const newRelationship = {
+      id: `rel-${Date.now()}`,
+      char1Id: '',
+      char2Id: '',
+      steps: [{ id: `step-${Date.now()}`, track1Text: 'התחלה', track2Text: 'התחלה', isMerged: false }],
+      questionnaire: {
+        sharedAnswers: {},
+        personalAnswers: {},
+        participantGenders: {}
+      }
+    };
+
+    onUpdateRelationships([newRelationship, ...relationships]);
+    handleEntrySelect(newRelationship.id);
+    setMode('edit');
+  };
+
+  const updateRelationship = (relationshipId: string, updates: Record<string, any>) => {
+    onUpdateRelationships(relationships.map(rel => rel.id === relationshipId ? { ...rel, ...updates } : rel));
+  };
+
+  const removeRelationship = (relationshipId: string) => {
+    onUpdateRelationships(relationships.filter(rel => rel.id !== relationshipId));
+    if (selectedEntryId === relationshipId) {
+      handleEntrySelect(null);
+    }
   };
 
   const updateEntry = (updates: Partial<QuestionnaireEntry>) => {
@@ -684,6 +724,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 );
               })}
             </div>
+          ) : isRelationshipsTab ? (
+            <button 
+              onClick={addRelationship}
+              className="flex items-center justify-center gap-2 p-4 bg-[var(--theme-card)] border-2 border-dashed border-[var(--theme-border)]/50 rounded-2xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] hover:border-[var(--theme-primary)]/40 transition-all shadow-sm"
+            >
+              <Plus size={20} />
+              <span>הוסף מערכת יחסים</span>
+            </button>
           ) : (
             <button 
               onClick={addEntry}
@@ -695,7 +743,31 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           )}
           
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            {activeTab === 'characters' ? (
+            {isRelationshipsTab ? (
+              relationships.map(rel => (
+                <div 
+                  key={rel.id}
+                  onClick={() => handleEntrySelect(rel.id)}
+                  className={`group flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedEntryId === rel.id ? 'bg-[var(--theme-secondary)] border-[var(--theme-primary)]/30 shadow-sm' : 'bg-[var(--theme-card)] border-transparent hover:border-[var(--theme-border)]/50'}`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <Users size={16} className={selectedEntryId === rel.id ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-primary)]/30'} />
+                    <span className={`font-bold text-sm truncate ${selectedEntryId === rel.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>
+                      {getRelationshipLabel(rel, characters)}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('למחוק את מערכת היחסים?')) removeRelationship(rel.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            ) : activeTab === 'characters' ? (
               CHARACTER_ROLES.map(role => {
                 const roleEntries = entries.filter(e => e.role === role.id || (!e.role && role.id === 'others'));
                 if (roleEntries.length === 0) return null;
@@ -812,7 +884,77 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         )}
 
         <div className="flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
-          {selectedEntry ? (
+          {selectedRelationship ? (
+            <>
+              <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-[var(--theme-border)]/50 bg-[var(--theme-card)] flex items-center justify-center">
+                      <Users size={24} className="text-[var(--theme-primary)]/25" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold text-[var(--theme-accent)] handwritten text-5xl">
+                        {getRelationshipLabel(selectedRelationship, characters)}
+                      </h2>
+                      <p className="mt-1 text-sm text-[var(--theme-primary)]/50">
+                        שאלון מערכת היחסים נשמר יחד עם הספר ומופיע גם בתכנון העלילה.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (confirm('למחוק את מערכת היחסים?')) removeRelationship(selectedRelationship.id);
+                    }}
+                    className="self-start p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                    title="מחיקת מערכת יחסים"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-xs font-bold text-[var(--theme-accent)]/60">דמות ראשונה</span>
+                      <select
+                        value={selectedRelationship.char1Id || ''}
+                        onChange={(e) => updateRelationship(selectedRelationship.id, { char1Id: e.target.value })}
+                        className="w-full rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-secondary)]/20 px-4 py-3 text-sm font-bold text-[var(--theme-primary)] outline-none transition-all focus:border-[var(--theme-accent)] focus:ring-2 focus:ring-[var(--theme-accent)]/20"
+                      >
+                        <option value="">בחרו דמות...</option>
+                        {characters.map(character => (
+                          <option key={character.id} value={character.id}>{character.name}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-xs font-bold text-[var(--theme-accent)]/60">דמות שנייה</span>
+                      <select
+                        value={selectedRelationship.char2Id || ''}
+                        onChange={(e) => updateRelationship(selectedRelationship.id, { char2Id: e.target.value })}
+                        className="w-full rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-secondary)]/20 px-4 py-3 text-sm font-bold text-[var(--theme-primary)] outline-none transition-all focus:border-[var(--theme-accent)] focus:ring-2 focus:ring-[var(--theme-accent)]/20"
+                      >
+                        <option value="">בחרו דמות...</option>
+                        {characters.map(character => (
+                          <option key={character.id} value={character.id}>{character.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <RelationshipQuestionnaire
+                    rel={selectedRelationship}
+                    relationships={relationships}
+                    onUpdateRelationships={onUpdateRelationships}
+                    characters={characters}
+                  />
+                </div>
+              </div>
+            </>
+          ) : selectedEntry ? (
             <>
               <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
                 <div className="flex items-center justify-between">
@@ -1631,10 +1773,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 <Icon size={80} className="opacity-20" />
               </div>
               <h3 className="text-2xl font-bold text-[var(--theme-accent)]/40 handwritten text-4xl mb-3">
-                {activeTab === 'places' ? 'ניהול מקומות' : activeTab === 'periods' ? 'ניהול תקופות' : activeTab === 'twists' ? 'ניהול טוויסטים' : activeTab === 'fantasyWorlds' ? 'ניהול עולמות פנטזיה' : 'שאלון בניית דמות'}
+                {activeTab === 'relationships' ? 'שאלון מערכות יחסים' : activeTab === 'places' ? 'ניהול מקומות' : activeTab === 'periods' ? 'ניהול תקופות' : activeTab === 'twists' ? 'ניהול טוויסטים' : activeTab === 'fantasyWorlds' ? 'ניהול עולמות פנטזיה' : 'שאלון בניית דמות'}
               </h3>
               <p className="max-w-xs text-sm text-[var(--theme-text)]/30 leading-relaxed">
-                בחר פריט מהרשימה או צור חדש כדי להתחיל.
+                {activeTab === 'relationships' ? 'בחרו מערכת יחסים מהרשימה או צרו חדשה כדי להתחיל.' : 'בחר פריט מהרשימה או צור חדש כדי להתחיל.'}
               </p>
             </div>
           )}

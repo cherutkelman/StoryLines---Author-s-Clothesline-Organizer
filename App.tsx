@@ -1696,12 +1696,14 @@ const App: React.FC = () => {
                     twists={activeBook.twists || []}
                     fantasyWorlds={activeBook.fantasyWorlds || []}
                     backgrounds={activeBook.backgrounds || []}
+                    relationships={activeBook.relationships || []}
                     onUpdateCharacters={(e) => updateEntries('characters', e)}
                     onUpdatePlaces={(e) => updateEntries('places', e)}
                     onUpdatePeriods={(e) => updateEntries('periods', e)}
                     onUpdateTwists={(e) => updateEntries('twists', e)}
                     onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
                     onUpdateBackgrounds={(e) => updateEntries('backgrounds', e)}
+                    onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
                     initialTab={activeUI.questionnaireActiveTab}
                     initialSelectedEntryId={activeUI.questionnaireSelectedEntryId}
                     onTabChange={handleQuestionnaireTabChange}
