@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, Users, Circle, Triangle, Square } from 'lucide-react';
-import { PlotStructureSubView, Scene } from '../types';
+import { PlotStructureSubView, QuestionnaireEntry, Scene } from '../types';
 import RelationshipQuestionnaire from './RelationshipQuestionnaire';
 
 interface PlotStructureProps {
@@ -182,6 +182,15 @@ const HEROS_JOURNEY_POINTS = [
   { id: 'hj-9', label: 'חזרה', x: 360, y: 85 },
 ];
 
+const createPlanningCharacter = (id: string, name: string): QuestionnaireEntry => ({
+  id,
+  name,
+  x: 200,
+  y: 200,
+  data: { gender: 'female' },
+  customFields: []
+});
+
 interface RelationshipDynamicsTableProps {
   rel: any;
   relIndex: number;
@@ -307,7 +316,7 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
     if (!charId && relIndex !== undefined && charNum !== undefined) {
       // Create new character if typing in an empty field
       const newCharId = `char-${Date.now()}`;
-      const newChar = { id: newCharId, name: newName, data: {} };
+      const newChar = createPlanningCharacter(newCharId, newName);
       onUpdateCharacters([...characters, newChar]);
       
       const newRels = [...relationships];
@@ -2077,7 +2086,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                             const newName = e.target.value;
                             if (!rel.char1Id) {
                                 const newCharId = `char-${Date.now()}-1`;
-                                const newChar = { id: newCharId, name: newName };
+                                const newChar = createPlanningCharacter(newCharId, newName);
                                 onUpdateCharacters([...characters, newChar]);
                                 const newRels = [...relationships];
                                 newRels[relIndex].char1Id = newCharId;
@@ -2115,7 +2124,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                             const newName = e.target.value;
                             if (!rel.char2Id) {
                                 const newCharId = `char-${Date.now()}-2`;
-                                const newChar = { id: newCharId, name: newName };
+                                const newChar = createPlanningCharacter(newCharId, newName);
                                 onUpdateCharacters([...characters, newChar]);
                                 const newRels = [...relationships];
                                 newRels[relIndex].char2Id = newCharId;

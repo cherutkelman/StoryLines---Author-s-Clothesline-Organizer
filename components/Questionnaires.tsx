@@ -38,6 +38,25 @@ interface QuestionnairesProps {
   onEntrySelect?: (id: string | null) => void;
 }
 
+const normalizeEntryForTab = (entry: QuestionnaireEntry, tab: QuestionnaireTabId): QuestionnaireEntry => {
+  const defaultData: Record<string, string> = {};
+  if (tab === 'characters') {
+    defaultData.gender = 'female';
+  } else if (tab === 'places') {
+    defaultData.placeType = 'macro';
+  }
+
+  return {
+    ...entry,
+    name: entry.name || (tab === 'characters' ? 'דמות ללא שם' : 'פריט ללא שם'),
+    data: {
+      ...defaultData,
+      ...(entry.data || {})
+    },
+    customFields: entry.customFields || []
+  };
+};
+
 const FEMALE_QUESTIONS_CONFIG = [
   { id: "name", category: "זהות בסיסית", question: "שם מלא וכינוי (אם יש)", type: "text" },
   { id: "age", category: "זהות בסיסית", question: "גיל", type: "text" },
@@ -284,12 +303,13 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     onEntrySelect?.(id);
   };
 
-  const entries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
+  const rawEntries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
+  const entries = rawEntries.map(entry => normalizeEntryForTab(entry, activeTab));
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
   
-  const currentGender = selectedEntry?.data.gender || 'female';
-  const currentPlaceType = selectedEntry?.data.placeType || 'macro';
+  const currentGender = selectedEntry?.data?.gender || 'female';
+  const currentPlaceType = selectedEntry?.data?.placeType || 'macro';
 
   const questionsConfig = activeTab === 'characters' 
     ? (currentGender === 'male' ? MALE_QUESTIONS_CONFIG : FEMALE_QUESTIONS_CONFIG)
