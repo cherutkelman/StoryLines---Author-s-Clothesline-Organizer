@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, GitMerge, GitBranch, Users, Circle, Triangle, Square } from 'lucide-react';
+import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, Users, Circle, Triangle, Square } from 'lucide-react';
 import { PlotStructureSubView, Scene } from '../types';
+import RelationshipQuestionnaire from './RelationshipQuestionnaire';
 
 interface PlotStructureProps {
   selectedStructure: string | undefined;
@@ -188,6 +189,7 @@ interface RelationshipDynamicsTableProps {
   onUpdateRelationships: (rels: any[]) => void;
   characters: any[];
   onUpdateCharacters: (chars: any[]) => void;
+  scenes: Scene[];
 }
 
 const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({ 
@@ -196,7 +198,8 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
   relationships, 
   onUpdateRelationships,
   characters,
-  onUpdateCharacters
+  onUpdateCharacters,
+  scenes
 }) => {
   const tableWrapperRef = React.useRef<HTMLDivElement>(null);
   const cellRefs = React.useRef<Record<string, HTMLTableCellElement | null>>({});
@@ -265,6 +268,38 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
     const newSteps = [...dynamicSteps];
     const field = char === 1 ? 'char1Position' : 'char2Position';
     newSteps[stepIndex][field] = newSteps[stepIndex][field] === posIndex ? null : posIndex;
+    updateSteps(newSteps);
+  };
+
+  const parseRelevantScenes = (value: string = '') => {
+    const sceneIds = new Set((scenes || []).map(scene => scene.id));
+    const parts = value
+      .split(/\r?\n/)
+      .map(part => part.trim())
+      .filter(Boolean);
+
+    return {
+      selectedSceneIds: parts.filter(part => sceneIds.has(part)),
+      legacyText: parts.filter(part => !sceneIds.has(part)).join('\n')
+    };
+  };
+
+  const formatRelevantScenes = (selectedSceneIds: string[], legacyText: string) => {
+    return [
+      ...selectedSceneIds,
+      ...legacyText
+        .split(/\r?\n/)
+        .map(part => part.trim())
+        .filter(Boolean)
+    ].join('\n');
+  };
+
+  const updateRelevantScenes = (stepIndex: number, selectedSceneIds: string[], legacyText: string) => {
+    const newSteps = [...dynamicSteps];
+    newSteps[stepIndex] = {
+      ...newSteps[stepIndex],
+      relevantScenes: formatRelevantScenes(selectedSceneIds, legacyText)
+    };
     updateSteps(newSteps);
   };
 
@@ -424,20 +459,70 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
               </tr>
             </thead>
             <tbody>
-              {dynamicSteps.map((step: any, idx: number) => (
+              {dynamicSteps.map((step: any, idx: number) => {
+                const { selectedSceneIds, legacyText } = parseRelevantScenes(step.relevantScenes || '');
+                const selectedSceneIdSet = new Set(selectedSceneIds);
+                const selectedScenes = selectedSceneIds
+                  .map(sceneId => scenes.find(scene => scene.id === sceneId))
+                  .filter(Boolean) as Scene[];
+                const availableScenes = (scenes || []).filter(scene => !selectedSceneIdSet.has(scene.id));
+
+                return (
               <tr key={step.id} className="group" style={{ height: `${ROW_HEIGHT}px` }}>
                 {/* Relevant Scenes */}
                 <td className="border-b border-l border-[var(--theme-border)]/30 p-2 bg-green-50/10">
-                  <textarea
-                    value={step.relevantScenes}
-                    onChange={(e) => {
-                      const newSteps = [...dynamicSteps];
-                      newSteps[idx].relevantScenes = e.target.value;
-                      updateSteps(newSteps);
-                    }}
-                    placeholder="..."
-                    className="w-full h-full bg-transparent border-none focus:ring-0 text-sm resize-none scrollbar-hide"
-                  />
+                  <div className="flex h-full min-h-[72px] flex-col gap-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedScenes.map(scene => (
+                        <span
+                          key={scene.id}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--theme-border)]/40 bg-white/80 px-2 py-1 text-[11px] font-bold text-[var(--theme-primary)] shadow-sm"
+                          title={scene.title}
+                        >
+                          <span className="truncate">{scene.title || 'סצנה ללא שם'}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateRelevantScenes(
+                              idx,
+                              selectedSceneIds.filter(sceneId => sceneId !== scene.id),
+                              legacyText
+                            )}
+                            className="shrink-0 text-red-400 transition-colors hover:text-red-600"
+                            aria-label={`הסרת ${scene.title || 'סצנה'}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        updateRelevantScenes(idx, [...selectedSceneIds, e.target.value], legacyText);
+                      }}
+                      className="w-full rounded-lg border border-[var(--theme-border)]/40 bg-white/80 px-2 py-1.5 text-[11px] font-bold text-[var(--theme-primary)] outline-none transition-all focus:border-[var(--theme-accent)] focus:ring-2 focus:ring-[var(--theme-accent)]/20"
+                    >
+                      <option value="">
+                        {availableScenes.length > 0 ? 'בחירת סצנה...' : 'אין סצנות נוספות'}
+                      </option>
+                      {availableScenes.map(scene => (
+                        <option key={scene.id} value={scene.id}>
+                          {scene.title || 'סצנה ללא שם'}
+                        </option>
+                      ))}
+                    </select>
+
+                    {legacyText && (
+                      <textarea
+                        dir="rtl"
+                        value={legacyText}
+                        onChange={(e) => updateRelevantScenes(idx, selectedSceneIds, e.target.value)}
+                        className="min-h-[44px] w-full resize-y rounded-lg border border-[var(--theme-border)]/30 bg-white/50 px-2 py-1.5 text-[11px] text-[var(--theme-primary)] outline-none transition-all focus:border-[var(--theme-accent)] focus:ring-2 focus:ring-[var(--theme-accent)]/20"
+                      />
+                    )}
+                  </div>
                 </td>
 
                 {/* Char A Columns (Yellow) */}
@@ -500,7 +585,8 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
                   </button>
                 </td>
               </tr>
-            ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -534,7 +620,6 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   scenes = []
 }) => {
   const [activeSubView, setActiveSubView] = useState<PlotStructureSubView>(initialSubView || 'structure');
-  const [relViewMode, setRelViewMode] = useState<Record<string, 'tracks' | 'dynamics'>>({});
   const [editingPointId, setEditingPointId] = useState<string | null>(null);
   const [pullingDataFor, setPullingDataFor] = useState<{ arcIndex: number; stepIndex: number } | null>(null);
   const [selectedCharForPull, setSelectedCharForPull] = useState<string | null>(null);
@@ -1964,7 +2049,12 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                     id: `rel-${Date.now()}`,
                     char1Id: '',
                     char2Id: '',
-                    steps: [{ id: `step-${Date.now()}`, track1Text: 'התחלה', track2Text: 'התחלה', isMerged: false }]
+                    steps: [{ id: `step-${Date.now()}`, track1Text: 'התחלה', track2Text: 'התחלה', isMerged: false }],
+                    questionnaire: {
+                      sharedAnswers: {},
+                      personalAnswers: {},
+                      participantGenders: {}
+                    }
                   };
                   onUpdateRelationships([newRel, ...relationships]);
                 }}
@@ -2053,28 +2143,6 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                       <div className="flex bg-[var(--theme-secondary)]/50 p-1 rounded-xl">
-                        <button
-                          onClick={() => setRelViewMode(prev => ({ ...prev, [rel.id]: 'tracks' }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            (relViewMode[rel.id] || 'tracks') === 'tracks'
-                              ? 'bg-[var(--theme-primary)] text-white shadow-sm'
-                              : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
-                          }`}
-                        >
-                          מסלולי סיפור
-                        </button>
-                        <button
-                          onClick={() => setRelViewMode(prev => ({ ...prev, [rel.id]: 'dynamics' }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            relViewMode[rel.id] === 'dynamics'
-                              ? 'bg-[var(--theme-primary)] text-white shadow-sm'
-                              : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
-                          }`}
-                        >
-                          טבלת דינמיקה
-                        </button>
-                      </div>
                       <button
                         onClick={() => {
                           const newRels = relationships.filter(r => r.id !== rel.id);
@@ -2087,151 +2155,17 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                     </div>
                   </div>
 
-                  { (relViewMode[rel.id] || 'tracks') === 'tracks' ? (
-                    <div className="space-y-6 relative">
-                      {/* Vertical Line */}
-                      <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-[var(--theme-border)]/20 -translate-x-1/2 hidden md:block" />
-                      
-                      {rel.steps.map((step: any, stepIndex: number) => (
-                        <div key={step.id} className="relative z-10">
-                          {step.isMerged ? (
-                            <div className="flex justify-center">
-                              <div className="w-full max-w-2xl bg-[var(--theme-accent)]/5 border-2 border-[var(--theme-accent)]/30 rounded-3xl p-6 relative group">
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[var(--theme-accent)] text-white px-4 py-1 rounded-full text-[10px] font-bold flex items-center gap-2">
-                                  <GitMerge size={12} />
-                                  מסלול משותף
-                                </div>
-                                <textarea
-                                  value={step.track1Text}
-                                  onChange={(e) => {
-                                    const newRels = [...relationships];
-                                    newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
-                                    newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
-                                    onUpdateRelationships(newRels);
-                                  }}
-                                  placeholder="מה קורה כשהם יחד?"
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-center font-bold handwritten text-2xl resize-none h-24"
-                                />
-                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => {
-                                      const newRels = [...relationships];
-                                      newRels[relIndex].steps[stepIndex].isMerged = false;
-                                      onUpdateRelationships(newRels);
-                                    }}
-                                    className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
-                                    title="הפרדה למסלולים נפרדים"
-                                  >
-                                    <GitBranch size={16} />
-                                  </button>
-                                  {rel.steps.length > 1 && (
-                                    <button
-                                      onClick={() => {
-                                        const newRels = [...relationships];
-                                        newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
-                                        onUpdateRelationships(newRels);
-                                      }}
-                                      className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                              {/* Track 1 */}
-                              <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
-                                <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
-                                  {characters.find((c: any) => c.id === rel.char1Id)?.name || 'דמות 1'}
-                                </div>
-                                <textarea
-                                  value={step.track1Text}
-                                  onChange={(e) => {
-                                    const newRels = [...relationships];
-                                    newRels[relIndex].steps[stepIndex].track1Text = e.target.value;
-                                    onUpdateRelationships(newRels);
-                                  }}
-                                  placeholder="מה קורה במסלול הזה?"
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
-                                />
-                              </div>
+                  <RelationshipQuestionnaire
+                    rel={rel}
+                    relationships={relationships}
+                    onUpdateRelationships={onUpdateRelationships}
+                    characters={characters}
+                  />
 
-                              {/* Track 2 */}
-                              <div className="bg-[var(--theme-secondary)]/50 border-2 border-[var(--theme-border)]/30 rounded-3xl p-6 relative group">
-                                <div className="absolute -top-3 right-6 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)]/40 px-3 py-0.5 rounded-full text-[10px] font-bold">
-                                  {characters.find((c: any) => c.id === rel.char2Id)?.name || 'דמות 2'}
-                                </div>
-                                <textarea
-                                  value={step.track2Text}
-                                  onChange={(e) => {
-                                    const newRels = [...relationships];
-                                    newRels[relIndex].steps[stepIndex].track2Text = e.target.value;
-                                    onUpdateRelationships(newRels);
-                                  }}
-                                  placeholder="מה קורה במסלול הזה?"
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] text-sm resize-none h-24"
-                                />
-                                
-                                <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => {
-                                      const newRels = [...relationships];
-                                      newRels[relIndex].steps[stepIndex].isMerged = true;
-                                      newRels[relIndex].steps[stepIndex].track1Text = step.track1Text || step.track2Text;
-                                      onUpdateRelationships(newRels);
-                                    }}
-                                    className="p-2 bg-white rounded-lg shadow-sm text-[var(--theme-accent)] hover:scale-110 transition-transform"
-                                    title="חיבור למסלול משותף"
-                                  >
-                                    <GitMerge size={16} />
-                                  </button>
-                                  {rel.steps.length > 1 && (
-                                    <button
-                                      onClick={() => {
-                                        const newRels = [...relationships];
-                                        newRels[relIndex].steps = newRels[relIndex].steps.filter((s: any) => s.id !== step.id);
-                                        onUpdateRelationships(newRels);
-                                      }}
-                                      className="p-2 bg-white rounded-lg shadow-sm text-red-400 hover:scale-110 transition-transform"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {stepIndex < rel.steps.length - 1 && (
-                            <div className="flex justify-center py-4">
-                              <div className="w-0.5 h-8 bg-[var(--theme-accent)]/20 animate-pulse" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      
-                      <div className="flex justify-center pt-4">
-                        <button
-                          onClick={() => {
-                            const newRels = [...relationships];
-                            newRels[relIndex].steps.push({ 
-                              id: `step-${Date.now()}`, 
-                              track1Text: '', 
-                              track2Text: '', 
-                              isMerged: false 
-                            });
-                            onUpdateRelationships(newRels);
-                          }}
-                          className="w-12 h-12 rounded-full border-2 border-dashed border-[var(--theme-accent)]/40 text-[var(--theme-accent)] flex items-center justify-center hover:bg-[var(--theme-accent)]/5 transition-all hover:scale-110"
-                          title="הוספת שלב בסיפור המשותף"
-                        >
-                          <Plus size={24} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+                  <div className="space-y-4">
+                    <h4 className="handwritten text-3xl font-bold text-[var(--theme-primary)]">
+                      דינמיקת מערכת היחסים לאורך העלילה
+                    </h4>
                     <RelationshipDynamicsTable 
                       rel={rel} 
                       relIndex={relIndex} 
@@ -2239,8 +2173,9 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                       onUpdateRelationships={onUpdateRelationships} 
                       characters={characters}
                       onUpdateCharacters={onUpdateCharacters}
+                      scenes={scenes}
                     />
-                  )}
+                  </div>
                 </div>
               ))}
 

@@ -168,12 +168,21 @@ export interface RelationshipDynamicStep {
   relevantScenes: string;
 }
 
+export type CharacterGender = 'male' | 'female';
+
+export interface RelationshipQuestionnaireData {
+  sharedAnswers?: Record<string, string>;
+  personalAnswers?: Record<string, Record<string, string>>;
+  participantGenders?: Record<string, CharacterGender>;
+}
+
 export interface Relationship {
   id: string;
   char1Id: string;
   char2Id: string;
   steps: RelationshipStep[];
   dynamicSteps?: RelationshipDynamicStep[];
+  questionnaire?: RelationshipQuestionnaireData;
 }
 
 export interface QuestionnaireEntry {
