@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Project, Scene, QuestionnaireEntry } from '../types';
+import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -23,7 +24,9 @@ import {
   Trash2,
   Flag,
   Info,
-  Pin
+  Pin,
+  FileText,
+  Users
 } from 'lucide-react';
 
 interface EditorProps {
@@ -125,7 +128,7 @@ const DebouncedInput: React.FC<{
 const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
-  const [bridgeType, setBridgeType] = useState<'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | null>(null);
+  const [bridgeType, setBridgeType] = useState<'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -193,6 +196,36 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     }
   };
 
+  const getCharacterName = (characterId: string) => {
+    return project.characters?.find(character => character.id === characterId)?.name || 'דמות ללא שם';
+  };
+
+  const relationshipBridgeItems = useMemo(() => {
+    return (project.relationships || []).map((relationship: any) => {
+      const char1Name = getCharacterName(relationship.char1Id);
+      const char2Name = getCharacterName(relationship.char2Id);
+      const questionnaire = relationship.questionnaire || {};
+      const data: Record<string, string> = {};
+
+      Object.entries(questionnaire.sharedAnswers || {}).forEach(([questionId, value]) => {
+        if (value) data[`shared.${questionId}`] = value as string;
+      });
+
+      Object.entries(questionnaire.personalAnswers || {}).forEach(([characterId, answers]) => {
+        const characterName = getCharacterName(characterId);
+        Object.entries((answers || {}) as Record<string, string>).forEach(([questionId, value]) => {
+          if (value) data[`personal.${characterName}.${questionId}`] = value;
+        });
+      });
+
+      return {
+        id: relationship.id,
+        name: `${char1Name} ו־${char2Name}`,
+        data
+      };
+    });
+  }, [project.relationships, project.characters]);
+
   if (activeScenes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-[var(--theme-primary)]/20 p-10">
@@ -209,7 +242,11 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     );
   }
 
-  const bridgeItems = bridgeType ? (project[bridgeType] || []) : [];
+  const bridgeItems: any[] = bridgeType === 'relationships'
+    ? relationshipBridgeItems
+    : bridgeType
+      ? ((project[bridgeType] || []) as QuestionnaireEntry[])
+      : [];
   const activeItem = bridgeItems.find(i => i.id === selectedItemId);
 
   const getQuestionLabel = (id: string, type: typeof bridgeType): string => {
@@ -225,8 +262,21 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     };
 
     if (activeItem?.customFields) {
-      const custom = activeItem.customFields.find(cf => cf.id === id);
+      const custom = activeItem.customFields.find((cf: any) => cf.id === id);
       if (custom) return custom.label;
+    }
+
+    if (type === 'relationships') {
+      const relationshipQuestionId = id.replace(/^shared\./, '').replace(/^personal\.[^.]+\./, '');
+      for (const section of relationshipQuestionSections) {
+        for (const block of section.blocks) {
+          const question = block.questions.find(q => q.id === relationshipQuestionId);
+          if (question) {
+            const personalMatch = id.match(/^personal\.([^.]+)\./);
+            return personalMatch ? `${personalMatch[1]}: ${section.title}` : section.title;
+          }
+        }
+      }
     }
 
     return mappings[id] || id;
@@ -234,10 +284,12 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
 
   const categories = [
     { id: 'characters', label: 'דמויות', icon: <UserCircle2 size={14} /> },
+    { id: 'relationships', label: 'מערכות יחסים', icon: <Users size={14} /> },
     { id: 'places', label: 'מקומות', icon: <MapPin size={14} /> },
     { id: 'periods', label: 'תקופות', icon: <Circle size={14} /> },
     { id: 'twists', label: 'תפניות', icon: <Hash size={14} /> },
     { id: 'fantasyWorlds', label: 'עולמות פנטזיה', icon: <BookOpen size={14} /> },
+    { id: 'backgrounds', label: 'רקע', icon: <FileText size={14} /> },
   ] as const;
 
   return (
@@ -348,6 +400,11 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
                       <div className="flex flex-col">
                         <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
+                        {scene.summary && (
+                          <p className="mt-0.5 max-w-md truncate text-[11px] font-medium text-[var(--theme-primary)]/40">
+                            {scene.summary}
+                          </p>
+                        )}
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
                       {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
@@ -381,6 +438,11 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                             </span>
                           )}
                         </div>
+                        {scene.summary && (
+                          <p className="mt-1 max-w-2xl text-sm font-medium leading-relaxed text-[var(--theme-primary)]/45">
+                            {scene.summary}
+                          </p>
+                        )}
                       </div>
                       <button 
                         onClick={() => onUpdateScene(scene.id, { isCompleted: !scene.isCompleted })}
@@ -495,9 +557,9 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                          { list: activeItem.specialItems, label: 'חפצים מיוחדים' },
                          { list: activeItem.uniquePowers, label: 'כוחות ייחודיים' },
                          { list: activeItem.specificLocations, label: 'מיקומים ספציפיים' }
-                       ].map(group => group.list && group.list.length > 0 && (
-                         <div key={group.label} className="space-y-3 pt-4">
-                            <div className="text-[10px] font-black text-[var(--theme-primary)]/20 uppercase tracking-widest">{group.label}</div>
+                        ].map(group => group.list && group.list.length > 0 && (
+                          <div key={group.label} className="space-y-3 pt-4">
+                             <div className="text-[10px] font-black text-[var(--theme-primary)]/20 uppercase tracking-widest">{group.label}</div>
                             {group.list.map((item: any) => (
                               <div key={item.id} className="space-y-2">
                                 <div className="text-xs font-bold text-[var(--theme-primary)]/60 px-2">{item.name}</div>
@@ -508,9 +570,21 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                                 ) : null)}
                               </div>
                             ))}
-                         </div>
-                       ))}
-                    </div>
+                          </div>
+                        ))}
+
+                        {activeItem.loreItems && activeItem.loreItems.length > 0 && (
+                          <div className="space-y-3 pt-4">
+                            <div className="text-[10px] font-black text-[var(--theme-primary)]/20 uppercase tracking-widest">פריטי רקע</div>
+                            {activeItem.loreItems.map((item: any) => (
+                              <button key={item.id} onClick={() => handlePullInfo(item.content)} className="w-full text-right p-3 bg-[var(--theme-card)]/50 border border-[var(--theme-border)]/50 rounded-xl hover:border-[var(--theme-accent)] transition-all text-xs text-[var(--theme-primary)]">
+                                <div className="font-bold mb-1">{item.title}</div>
+                                <div className="whitespace-pre-wrap">{item.content}</div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-[var(--theme-primary)]/20 gap-4">
                        <Search size={48} className="opacity-20" />

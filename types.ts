@@ -106,6 +106,7 @@ export interface Scene {
   plotlineId: string;
   title: string;
   content: string;
+  summary?: string;
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
   chapterTitle?: string;

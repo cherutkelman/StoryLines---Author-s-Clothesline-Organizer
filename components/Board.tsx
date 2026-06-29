@@ -129,7 +129,7 @@ const Board: React.FC<BoardProps> = ({
         const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
         text += `סצנה ${index + 1} | קו עלילה: ${plotline?.name || 'ללא'} | מיקום: ${scene.position + 1}\n`;
         text += `כותרת: ${scene.title || 'ללא כותרת'}\n`;
-        text += `תוכן:\n${scene.content || 'סצנה ריקה...'}\n`;
+        text += `תמצית:\n${scene.summary || 'לא נכתבה תמצית...'}\n`;
         text += `-----------------------------------\n\n`;
       });
     }
@@ -410,9 +410,9 @@ const Board: React.FC<BoardProps> = ({
                                 <div className="h-px bg-[var(--theme-secondary)] my-3" />
                                 <textarea 
                                   className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
-                                  value={sceneInThisSlot.content}
-                                  placeholder="סצנה ריקה..."
-                                  onChange={(e) => updateScene(sceneInThisSlot.id, { content: e.target.value })}
+                                  value={sceneInThisSlot.summary || ''}
+                                  placeholder="תמצית ההתרחשות..."
+                                  onChange={(e) => updateScene(sceneInThisSlot.id, { summary: e.target.value })}
                                 />
                                 <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
                                   <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
@@ -496,9 +496,9 @@ const Board: React.FC<BoardProps> = ({
                             <div className="h-px bg-[var(--theme-secondary)] my-3" />
                             <textarea 
                               className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
-                              value={scene.content}
-                              placeholder="סצנה ריקה..."
-                              onChange={(e) => updateScene(scene.id, { content: e.target.value })}
+                              value={scene.summary || ''}
+                              placeholder="תמצית ההתרחשות..."
+                              onChange={(e) => updateScene(scene.id, { summary: e.target.value })}
                             />
                             <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
                               <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline?.color}20`, color: plotline?.color }}>
