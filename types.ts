@@ -298,10 +298,13 @@ export interface Project {
   conflicts?: {
     id: string;
     title: string;
+    characterName?: string;
     rows: {
       id: string;
       goal: string;
       goalScenes: { id: string; sceneId?: string; sceneName?: string }[];
+      needReason?: string;
+      needReasonScenes?: { id: string; sceneId?: string; sceneName?: string }[];
       obstacle: string;
       obstacleScenes: { id: string; sceneId?: string; sceneName?: string }[];
       resolution: string;

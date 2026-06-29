@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, Users, Circle, Triangle, Square } from 'lucide-react';
+import { Layout, CheckCircle2, Info, Link, FileText, X, ChevronRight, Sparkles, TrendingUp, Share2, Plus, Trash2, ArrowLeft, Users, Circle, Triangle, Square, Diamond, Hexagon } from 'lucide-react';
 import { PlotStructureSubView, QuestionnaireEntry, Scene } from '../types';
 
 interface PlotStructureProps {
@@ -134,6 +134,12 @@ const MultiScenePicker: React.FC<{
     </div>
   );
 };
+
+const TrapezoidIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path d="M6 5h12l4 14H2L6 5Z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+  </svg>
+);
 
 const STRUCTURES = [
   { id: 'three-acts', label: 'מבנה שלוש המערכות' },
@@ -653,12 +659,283 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   
   const activePoint = editingPointId ? activePoints.find(p => p.id === editingPointId) : null;
   const activeData = editingPointId ? pointsData[editingPointId] || {} : {};
+  const createArcStep = (id = `step-${Date.now()}`) => ({
+    id,
+    text: '',
+    argument: '',
+    validation: '',
+    contradiction: ''
+  });
+  const createCharacterArc = () => ({
+    id: `arc-${Date.now()}`,
+    characterName: '',
+    falseBelief: '',
+    finalGoal: '',
+    steps: [createArcStep()],
+    sceneLinks: []
+  });
+  const flattenedArcRows = (characterArcs || []).flatMap((arc: any, arcIndex: number) => {
+    const steps = arc.steps?.length ? arc.steps : [createArcStep(`step-${arc.id}-empty`)];
+    return steps.map((step: any, stepIndex: number) => ({ arc, arcIndex, step, stepIndex }));
+  });
+  const arcRows = flattenedArcRows.length > 0
+    ? flattenedArcRows
+    : [{ arc: { id: 'draft-arc', characterName: '', falseBelief: '', finalGoal: '', steps: [createArcStep('draft-step')], sceneLinks: [] }, arcIndex: -1, step: createArcStep('draft-step'), stepIndex: 0 }];
+  const updateArcRow = (
+    row: { arcIndex: number; stepIndex: number },
+    updater: (arc: any, stepIndex: number) => void
+  ) => {
+    if (row.arcIndex < 0) {
+      const newArc = createCharacterArc();
+      updater(newArc, 0);
+      onUpdateArcs([...(characterArcs || []), newArc]);
+      return;
+    }
+
+    const newArcs = [...(characterArcs || [])];
+    const arc = {
+      ...newArcs[row.arcIndex],
+      steps: [...(newArcs[row.arcIndex].steps || [])],
+      sceneLinks: [...(newArcs[row.arcIndex].sceneLinks || [])]
+    };
+    while (!arc.steps[row.stepIndex]) {
+      arc.steps.push(createArcStep());
+    }
+    updater(arc, row.stepIndex);
+    newArcs[row.arcIndex] = arc;
+    onUpdateArcs(newArcs);
+  };
+  const updateArcStepField = (
+    row: { arcIndex: number; stepIndex: number },
+    field: 'argument' | 'validation' | 'contradiction',
+    value: string
+  ) => {
+    updateArcRow(row, (arc, stepIndex) => {
+      arc.steps[stepIndex] = { ...arc.steps[stepIndex], [field]: value };
+      if (field === 'argument') arc.steps[stepIndex].text = value;
+    });
+  };
+  const getArcLinksForCell = (arc: any, stepIndex: number, type: 'argument' | 'validation' | 'contradiction') =>
+    (arc.sceneLinks || []).filter((link: any) =>
+      link.stepNumber === stepIndex + 1 && (link.type || 'argument') === type
+    );
+  const updateArcSceneLinks = (
+    row: { arcIndex: number; stepIndex: number },
+    type: 'argument' | 'validation' | 'contradiction',
+    links: any[]
+  ) => {
+    updateArcRow(row, (arc, stepIndex) => {
+      const stepNumber = stepIndex + 1;
+      const otherLinks = (arc.sceneLinks || []).filter((link: any) =>
+        !(link.stepNumber === stepNumber && (link.type || 'argument') === type)
+      );
+      arc.sceneLinks = [
+        ...otherLinks,
+        ...links.map((link: any) => ({
+          ...link,
+          id: link.id || `link-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          stepNumber,
+          type
+        }))
+      ];
+    });
+  };
+  const arcSceneSummaryRows = arcRows
+    .flatMap((row: any, rowIndex: number) =>
+      (row.arc.sceneLinks || [])
+        .filter((link: any) => link.sceneId && link.stepNumber === row.stepIndex + 1)
+        .map((link: any) => {
+          const scene = scenes.find((s) => s.id === link.sceneId);
+          const type = (link.type || 'argument') as 'argument' | 'validation' | 'contradiction';
+          return scene ? { scene, type, rowNumber: rowIndex + 1, linkId: link.id } : null;
+        })
+        .filter(Boolean)
+    )
+    .sort((a: any, b: any) => {
+      if (a.scene.position !== b.scene.position) return a.scene.position - b.scene.position;
+      return (a.scene.title || '').localeCompare(b.scene.title || '');
+    });
+  const deleteArcRow = (row: { arcIndex: number; stepIndex: number }) => {
+    if (row.arcIndex < 0) return;
+    const newArcs = [...(characterArcs || [])];
+    const arc = newArcs[row.arcIndex];
+    const steps = arc.steps || [];
+    const removedStepNumber = row.stepIndex + 1;
+
+    if (steps.length <= 1) {
+      onUpdateArcs(newArcs.filter((_: any, index: number) => index !== row.arcIndex));
+      return;
+    }
+
+    newArcs[row.arcIndex] = {
+      ...arc,
+      steps: steps.filter((_: any, index: number) => index !== row.stepIndex),
+      sceneLinks: (arc.sceneLinks || [])
+        .filter((link: any) => link.stepNumber !== removedStepNumber)
+        .map((link: any) => (
+          link.stepNumber && link.stepNumber > removedStepNumber
+            ? { ...link, stepNumber: link.stepNumber - 1 }
+            : link
+        ))
+    };
+    onUpdateArcs(newArcs);
+  };
+  const createConflictRow = (id = `row-${Date.now()}`) => ({
+    id,
+    goal: '',
+    goalScenes: [],
+    needReason: '',
+    needReasonScenes: [],
+    obstacle: '',
+    obstacleScenes: [],
+    resolution: '',
+    resolutionScenes: []
+  });
+  const createConflict = () => ({
+    id: `conflict-${Date.now()}`,
+    title: '',
+    characterName: '',
+    rows: [createConflictRow()]
+  });
+  const flattenedConflictRows = (conflicts || []).flatMap((conflict: any, conflictIndex: number) => {
+    const rows = conflict.rows?.length ? conflict.rows : [createConflictRow(`row-${conflict.id}-empty`)];
+    return rows.map((row: any, rowIndex: number) => ({ conflict, conflictIndex, row, rowIndex }));
+  });
+  const conflictRows = flattenedConflictRows.length > 0
+    ? flattenedConflictRows
+    : [{ conflict: { id: 'draft-conflict', title: '', characterName: '', rows: [createConflictRow('draft-conflict-row')] }, conflictIndex: -1, row: createConflictRow('draft-conflict-row'), rowIndex: 0 }];
+  const updateConflictRow = (
+    rowRef: { conflictIndex: number; rowIndex: number },
+    updater: (conflict: any, rowIndex: number) => void
+  ) => {
+    if (rowRef.conflictIndex < 0) {
+      const newConflict = createConflict();
+      updater(newConflict, 0);
+      onUpdateConflicts([...(conflicts || []), newConflict]);
+      return;
+    }
+
+    const newConflicts = [...(conflicts || [])];
+    const conflict = {
+      ...newConflicts[rowRef.conflictIndex],
+      rows: [...(newConflicts[rowRef.conflictIndex].rows || [])]
+    };
+    while (!conflict.rows[rowRef.rowIndex]) {
+      conflict.rows.push(createConflictRow());
+    }
+    updater(conflict, rowRef.rowIndex);
+    newConflicts[rowRef.conflictIndex] = conflict;
+    onUpdateConflicts(newConflicts);
+  };
+  const updateConflictRowField = (
+    rowRef: { conflictIndex: number; rowIndex: number },
+    field: 'goal' | 'needReason' | 'obstacle' | 'resolution',
+    value: string
+  ) => {
+    updateConflictRow(rowRef, (conflict, rowIndex) => {
+      conflict.rows[rowIndex] = { ...conflict.rows[rowIndex], [field]: value };
+    });
+  };
+  const updateConflictSceneLinks = (
+    rowRef: { conflictIndex: number; rowIndex: number },
+    field: 'needReasonScenes' | 'obstacleScenes' | 'resolutionScenes',
+    links: any[]
+  ) => {
+    updateConflictRow(rowRef, (conflict, rowIndex) => {
+      conflict.rows[rowIndex] = { ...conflict.rows[rowIndex], [field]: links };
+    });
+  };
+  const conflictSceneSummaryRows = conflictRows
+    .flatMap((flatRow: any, rowNumber: number) => {
+      const linksByType = [
+        { type: 'needReason' as const, links: flatRow.row.needReasonScenes ?? flatRow.row.goalScenes ?? [] },
+        { type: 'obstacle' as const, links: flatRow.row.obstacleScenes || [] },
+        { type: 'resolution' as const, links: flatRow.row.resolutionScenes || [] }
+      ];
+
+      return linksByType.flatMap(({ type, links }) =>
+        links
+          .filter((link: any) => link.sceneId)
+          .map((link: any) => {
+            const scene = scenes.find((s) => s.id === link.sceneId);
+            return scene ? { scene, type, rowNumber: rowNumber + 1, linkId: link.id } : null;
+          })
+          .filter(Boolean)
+      );
+    })
+    .sort((a: any, b: any) => {
+      if (a.scene.position !== b.scene.position) return a.scene.position - b.scene.position;
+      return (a.scene.title || '').localeCompare(b.scene.title || '');
+    });
+  const deleteConflictRow = (rowRef: { conflictIndex: number; rowIndex: number }) => {
+    if (rowRef.conflictIndex < 0) return;
+    const newConflicts = [...(conflicts || [])];
+    const conflict = newConflicts[rowRef.conflictIndex];
+    const rows = conflict.rows || [];
+
+    if (rows.length <= 1) {
+      onUpdateConflicts(newConflicts.filter((_: any, index: number) => index !== rowRef.conflictIndex));
+      return;
+    }
+
+    newConflicts[rowRef.conflictIndex] = {
+      ...conflict,
+      rows: rows.filter((_: any, index: number) => index !== rowRef.rowIndex)
+    };
+    onUpdateConflicts(newConflicts);
+  };
 
   return (
     <div className="h-full flex flex-col bg-[var(--theme-bg)] p-8 overflow-y-auto">
       <div className="max-w-4xl mx-auto w-full space-y-8 pb-20">
         {/* Internal Sub-Navigation */}
         <div className="flex items-center justify-center gap-2 mb-8 bg-[var(--theme-secondary)]/30 p-2 rounded-3xl border border-[var(--theme-border)]/30 w-fit mx-auto">
+          <button
+            onClick={() => handleSubViewChange('structure')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
+              activeSubView === 'structure'
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
+                : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+            }`}
+          >
+            <Layout size={18} />
+            מבנה עלילה
+          </button>
+          <button
+            onClick={() => handleSubViewChange('relationships')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
+              activeSubView === 'relationships'
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
+                : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+            }`}
+          >
+            <Share2 size={18} />
+            מערכת יחסים
+          </button>
+          <button
+            onClick={() => handleSubViewChange('arc')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
+              activeSubView === 'arc'
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
+                : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+            }`}
+          >
+            <TrendingUp size={18} />
+            קשת התפתחות
+          </button>
+          <button
+            onClick={() => handleSubViewChange('conflicts')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
+              activeSubView === 'conflicts'
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-lg'
+                : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)]'
+            }`}
+          >
+            <X size={18} />
+            מניע ומטרה
+          </button>
+        </div>
+        <div className="hidden">
           <button
             onClick={() => handleSubViewChange('structure')}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all ${
@@ -1615,6 +1892,165 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
               </div>
             </div>
 
+            <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
+              <table className="w-full min-w-[980px] border-collapse">
+                <thead>
+                  <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                    <th className="w-16 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
+                    <th className="w-64 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">דמות ואמונה שקרית</th>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                      <div className="flex flex-col items-center gap-1">
+                        <Square size={14} className="text-blue-500 fill-blue-500/20" />
+                        <span>טיעון שמחזק את האמונה</span>
+                      </div>
+                    </th>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                      <div className="flex flex-col items-center gap-1">
+                        <Triangle size={14} className="text-orange-500 fill-orange-500/20" />
+                        <span>אישור או הוכחה בסיפור</span>
+                      </div>
+                    </th>
+                    <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                      <div className="flex flex-col items-center gap-1">
+                        <Circle size={14} className="text-green-500 fill-green-500/20" />
+                        <span>סתירה או הפרכה</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arcRows.map((row: any, rowIndex: number) => (
+                    <React.Fragment key={`${row.arc.id}-${row.step.id}-${row.stepIndex}`}>
+                      <tr className="group hover:bg-[var(--theme-accent)]/5 transition-colors">
+                        <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle font-bold text-[var(--theme-primary)]/40">
+                          <div className="flex flex-col items-center gap-1">
+                            <span>{rowIndex + 1}</span>
+                            <button
+                              onClick={() => deleteArcRow(row)}
+                              className="text-red-200 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-1"
+                              title="מחיקת שורה"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top bg-[var(--theme-accent)]/5">
+                          <div className="space-y-3">
+                            <input
+                              value={row.arc.characterName || ''}
+                              onChange={(e) => updateArcRow(row, (arc) => { arc.characterName = e.target.value; })}
+                              className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none"
+                              placeholder="שם הדמות"
+                            />
+                            <textarea
+                              value={row.arc.falseBelief || ''}
+                              onChange={(e) => updateArcRow(row, (arc) => { arc.falseBelief = e.target.value; })}
+                              placeholder="האמונה השקרית..."
+                              className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none resize-none h-24 scrollbar-hide"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                          <textarea
+                            value={row.step.argument || row.step.text || ''}
+                            onChange={(e) => updateArcStepField(row, 'argument', e.target.value)}
+                            placeholder="..."
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                          />
+                        </td>
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                          <textarea
+                            value={row.step.validation || ''}
+                            onChange={(e) => updateArcStepField(row, 'validation', e.target.value)}
+                            placeholder="..."
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                          />
+                        </td>
+                        <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
+                          <textarea
+                            value={row.step.contradiction || ''}
+                            onChange={(e) => updateArcStepField(row, 'contradiction', e.target.value)}
+                            placeholder="..."
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                          />
+                        </td>
+                      </tr>
+                      <tr className="bg-[var(--theme-secondary)]/10">
+                        <td className="p-2 border-b border-l border-[var(--theme-border)]/30"></td>
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-[11px] font-bold text-[var(--theme-primary)]/45 align-top">
+                          באילו סצנות זה מתרחש?
+                        </td>
+                        {(['argument', 'validation', 'contradiction'] as const).map((type) => (
+                          <td key={type} className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-black text-[var(--theme-primary)]/45">באילו סצנות זה מתרחש?</p>
+                              <MultiScenePicker
+                                links={getArcLinksForCell(row.arc, row.stepIndex, type)}
+                                onUpdate={(links) => updateArcSceneLinks(row, type, links)}
+                                scenes={scenes}
+                                placeholder="בחירת סצנה קיימת..."
+                              />
+                            </div>
+                          </td>
+                        ))}
+                      </tr>
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 bg-white/40 shadow-sm" dir="rtl">
+              <table className="w-full border-collapse">
+                <thead className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                  <tr>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right">סצנות</th>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-36">צורה</th>
+                    <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-28">שורה</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {arcSceneSummaryRows.length > 0 ? (
+                    arcSceneSummaryRows.map((item: any) => (
+                      <tr key={`${item.scene.id}-${item.type}-${item.rowNumber}-${item.linkId}`} className="hover:bg-[var(--theme-accent)]/5 transition-colors">
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold text-[var(--theme-primary)]">
+                          {item.scene.title}
+                        </td>
+                        <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                          <div className="flex items-center justify-center">
+                            {item.type === 'argument' && <Square size={18} className="text-blue-500 fill-blue-500/20" />}
+                            {item.type === 'validation' && <Triangle size={18} className="text-orange-500 fill-orange-500/20" />}
+                            {item.type === 'contradiction' && <Circle size={18} className="text-green-500 fill-green-500/20" />}
+                          </div>
+                        </td>
+                        <td className="p-3 border-b border-[var(--theme-border)]/30 text-center text-sm font-black text-[var(--theme-primary)]/70">
+                          {item.rowNumber}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">
+                        עדיין לא שויכו סצנות לקשת ההתפתחות.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-center">
+              <button
+                onClick={() => onUpdateArcs([...(characterArcs || []), createCharacterArc()])}
+                className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-accent)] text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-all"
+              >
+                <Plus size={18} />
+                הוספת שורת אמונה שקרית
+              </button>
+            </div>
+
+            {false && (
+            <>
             <div className="flex justify-center">
               <button
                 onClick={() => {
@@ -1624,10 +2060,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                     falseBelief: '',
                     finalGoal: '',
                     steps: [
-                      { id: `step-${Date.now()}-1`, argument: '', validation: '', contradiction: '', text: '' },
-                      { id: `step-${Date.now()}-2`, argument: '', validation: '', contradiction: '', text: '' },
-                      { id: `step-${Date.now()}-3`, argument: '', validation: '', contradiction: '', text: '' },
-                      { id: `step-${Date.now()}-4`, argument: '', validation: '', contradiction: '', text: '' }
+                      { id: `step-${Date.now()}`, argument: '', validation: '', contradiction: '', text: '' }
                     ]
                   };
                   onUpdateArcs([newArc, ...characterArcs]);
@@ -2025,6 +2458,8 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
         ) : activeSubView === 'relationships' ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -2190,9 +2625,10 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
         ) : activeSubView === 'conflicts' ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
              {/* Explanation Space */}
-             <div className="bg-[var(--theme-accent)]/5 p-8 rounded-[2rem] border border-[var(--theme-accent)]/20">
-               <div className="flex items-center gap-3 mb-4 text-[var(--theme-accent)]">
+             <div className="bg-[var(--theme-accent)]/5 p-8 rounded-[2rem] border border-[var(--theme-accent)]/20 [&>div:nth-child(3)]:hidden">
+               <div className="flex items-center gap-3 mb-4 text-[var(--theme-accent)] [&>h3:last-child]:hidden">
                  <X size={20} />
+                 <h3 className="text-xl font-bold handwritten text-3xl">מטרות, בעיות והישגים</h3>
                  <h3 className="text-xl font-bold handwritten text-3xl">ניהול קונפליקטים</h3>
                </div>
                <div className="text-[var(--theme-primary)]/70 leading-relaxed italic">
@@ -2202,6 +2638,185 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                </div>
              </div>
 
+             <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
+               <table className="w-full min-w-[1040px] border-collapse">
+                 <thead>
+                   <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                     <th className="w-16 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
+                     <th className="w-72 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">המטרה של X - שם הדמות</th>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                       <div className="flex flex-col items-center gap-1">
+                         <Diamond size={14} className="text-purple-500 fill-purple-500/20" />
+                         <span>טיעונים - למה היא נצרכת</span>
+                       </div>
+                     </th>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                       <div className="flex flex-col items-center gap-1">
+                         <TrapezoidIcon size={14} className="text-rose-500" />
+                         <span>בעיה - מה מפריע להשגת המטרה</span>
+                       </div>
+                     </th>
+                     <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                       <div className="flex flex-col items-center gap-1">
+                         <Hexagon size={14} className="text-cyan-500 fill-cyan-500/20" />
+                         <span>הישג - השלבים בדרך לפתרון ולהצלחה</span>
+                       </div>
+                     </th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {conflictRows.map((flatRow: any, flatIndex: number) => {
+                     const characterName = flatRow.conflict.characterName ?? flatRow.conflict.title ?? '';
+                     const needReasonScenes = flatRow.row.needReasonScenes ?? flatRow.row.goalScenes ?? [];
+
+                     return (
+                       <React.Fragment key={`${flatRow.conflict.id}-${flatRow.row.id}-${flatRow.rowIndex}`}>
+                         <tr className="group hover:bg-[var(--theme-accent)]/5 transition-colors">
+                           <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle font-bold text-[var(--theme-primary)]/40">
+                             <div className="flex flex-col items-center gap-1">
+                               <span>{flatIndex + 1}</span>
+                               <button
+                                 onClick={() => deleteConflictRow(flatRow)}
+                                 className="text-red-200 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-1"
+                                 title="מחיקת שורה"
+                               >
+                                 <Trash2 size={13} />
+                               </button>
+                             </div>
+                           </td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top bg-[var(--theme-accent)]/5">
+                             <div className="space-y-3">
+                               {characterName && (
+                                 <p className="text-[10px] font-black text-[var(--theme-primary)]/45">המטרה של {characterName}</p>
+                               )}
+                               <input
+                                 value={characterName}
+                                 onChange={(e) => updateConflictRow(flatRow, (conflict) => { conflict.characterName = e.target.value; })}
+                                 className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none"
+                                 placeholder="שם הדמות..."
+                               />
+                               <textarea
+                                 value={flatRow.row.goal || ''}
+                                 onChange={(e) => updateConflictRowField(flatRow, 'goal', e.target.value)}
+                                 placeholder="מה המטרה שלה?"
+                                 className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none resize-none h-24 scrollbar-hide"
+                               />
+                             </div>
+                           </td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                             <textarea
+                               value={flatRow.row.needReason || ''}
+                               onChange={(e) => updateConflictRowField(flatRow, 'needReason', e.target.value)}
+                               placeholder="למה המטרה חשובה או נצרכת לדמות?"
+                               className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                             />
+                           </td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                             <textarea
+                               value={flatRow.row.obstacle || ''}
+                               onChange={(e) => updateConflictRowField(flatRow, 'obstacle', e.target.value)}
+                               placeholder="מה מפריע להשגת המטרה?"
+                               className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                             />
+                           </td>
+                           <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
+                             <textarea
+                               value={flatRow.row.resolution || ''}
+                               onChange={(e) => updateConflictRowField(flatRow, 'resolution', e.target.value)}
+                               placeholder="אילו הישגים ושלבים מובילים לפתרון?"
+                               className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
+                             />
+                           </td>
+                         </tr>
+                         <tr className="bg-[var(--theme-secondary)]/10">
+                           <td className="p-2 border-b border-l border-[var(--theme-border)]/30"></td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-[11px] font-bold text-[var(--theme-primary)]/45 align-top"></td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                             <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
+                             <MultiScenePicker
+                               links={needReasonScenes}
+                               onUpdate={(links) => updateConflictSceneLinks(flatRow, 'needReasonScenes', links)}
+                               scenes={scenes}
+                               placeholder="בחירת סצנה קיימת..."
+                             />
+                           </td>
+                           <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
+                             <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
+                             <MultiScenePicker
+                               links={flatRow.row.obstacleScenes || []}
+                               onUpdate={(links) => updateConflictSceneLinks(flatRow, 'obstacleScenes', links)}
+                               scenes={scenes}
+                               placeholder="בחירת סצנה קיימת..."
+                             />
+                           </td>
+                           <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
+                             <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
+                             <MultiScenePicker
+                               links={flatRow.row.resolutionScenes || []}
+                               onUpdate={(links) => updateConflictSceneLinks(flatRow, 'resolutionScenes', links)}
+                               scenes={scenes}
+                               placeholder="בחירת סצנה קיימת..."
+                             />
+                           </td>
+                         </tr>
+                       </React.Fragment>
+                     );
+                   })}
+                 </tbody>
+               </table>
+             </div>
+
+             <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 bg-white/40 shadow-sm" dir="rtl">
+               <table className="w-full border-collapse">
+                 <thead className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
+                   <tr>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right">סצנות</th>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-36">צורה</th>
+                     <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-28">שורה</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {conflictSceneSummaryRows.length > 0 ? (
+                     conflictSceneSummaryRows.map((item: any) => (
+                       <tr key={`${item.scene.id}-${item.type}-${item.rowNumber}-${item.linkId}`} className="hover:bg-[var(--theme-accent)]/5 transition-colors">
+                         <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold text-[var(--theme-primary)]">
+                           {item.scene.title}
+                         </td>
+                         <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                           <div className="flex items-center justify-center">
+                             {item.type === 'needReason' && <Diamond size={18} className="text-purple-500 fill-purple-500/20" />}
+                             {item.type === 'obstacle' && <TrapezoidIcon size={18} className="text-rose-500" />}
+                             {item.type === 'resolution' && <Hexagon size={18} className="text-cyan-500 fill-cyan-500/20" />}
+                           </div>
+                         </td>
+                         <td className="p-3 border-b border-[var(--theme-border)]/30 text-center text-sm font-black text-[var(--theme-primary)]/70">
+                           {item.rowNumber}
+                         </td>
+                       </tr>
+                     ))
+                   ) : (
+                     <tr>
+                       <td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">
+                         עדיין לא שויכו סצנות למניע ומטרה.
+                       </td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+
+             <div className="flex justify-center">
+               <button
+                 onClick={() => onUpdateConflicts([...(conflicts || []), createConflict()])}
+                 className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-accent)] text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-all"
+               >
+                 <Plus size={18} />
+                 הוספת שורת מטרה
+               </button>
+             </div>
+
+             {false && (
+             <>
              <div className="flex justify-center">
                <button
                  onClick={() => {
@@ -2402,6 +3017,8 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                  </div>
                )}
              </div>
+             </>
+             )}
           </div>
         ) : (
           <div className="bg-[var(--theme-card)] rounded-[2rem] p-20 border border-[var(--theme-border)]/50 shadow-sm text-center animate-in fade-in slide-in-from-bottom-4">
@@ -2418,8 +3035,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
         )}
       </div>
 
-      {/* Pull Data Modal */}
-      {pullingDataFor && (
+      {false && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--theme-card)] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[var(--theme-border)]/30 flex justify-between items-center bg-[var(--theme-secondary)]/20">
@@ -2462,7 +3078,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                       key={key}
                       onClick={() => {
                         const newArcs = [...characterArcs];
-                        const { arcIndex, stepIndex } = pullingDataFor;
+                        const { arcIndex, stepIndex } = pullingDataFor!;
                         const currentText = newArcs[arcIndex].steps[stepIndex].text;
                         newArcs[arcIndex].steps[stepIndex].text = currentText && currentText !== 'תחילת הספר' 
                           ? `${currentText}\n\n${value}` 
