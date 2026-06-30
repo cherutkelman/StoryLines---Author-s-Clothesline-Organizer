@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Project, Scene, QuestionnaireEntry } from '../types';
 import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
@@ -51,7 +51,8 @@ const AutoExpandingTextarea: React.FC<{
   placeholder?: string;
   className?: string;
   minRows?: number;
-}> = ({ value, onChange, placeholder, className, minRows = 5 }) => {
+  focusOnRender?: boolean;
+}> = ({ value, onChange, placeholder, className, minRows = 5, focusOnRender = false }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localValue, setLocalValue] = useState(value);
 
@@ -74,15 +75,54 @@ const AutoExpandingTextarea: React.FC<{
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
+      const shouldPreserveScroll = document.activeElement === textarea;
+      const scrollContainer = (() => {
+        let parent = textarea.parentElement;
+        while (parent) {
+          const overflowY = window.getComputedStyle(parent).overflowY;
+          if (overflowY === 'auto' || overflowY === 'scroll') return parent;
+          parent = parent.parentElement;
+        }
+        return null;
+      })();
+      const previousTop = textarea.getBoundingClientRect().top;
+      const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
+
       textarea.style.height = 'auto';
       const newHeight = Math.max(textarea.scrollHeight, minRows * 28);
       textarea.style.height = `${newHeight}px`;
+
+      if (shouldPreserveScroll) {
+        window.requestAnimationFrame(() => {
+          const nextTop = textarea.getBoundingClientRect().top;
+          const scrollDelta = nextTop - previousTop;
+          if (scrollContainer) {
+            scrollContainer.scrollTop = previousScrollTop + scrollDelta;
+          } else {
+            window.scrollTo({ top: previousScrollTop + scrollDelta });
+          }
+        });
+      }
     }
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     adjustHeight();
   }, [localValue]);
+
+  useEffect(() => {
+    if (!focusOnRender) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const focusTimer = window.setTimeout(() => {
+      textarea.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      textarea.focus();
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [focusOnRender]);
 
   return (
     <textarea
@@ -143,6 +183,11 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     setFocusedSceneId(id);
     onFocusScene?.(id);
   };
+
+  useEffect(() => {
+    if (initialFocusedSceneId === undefined || initialFocusedSceneId === focusedSceneId) return;
+    setFocusedSceneId(initialFocusedSceneId);
+  }, [initialFocusedSceneId, focusedSceneId]);
 
   const activeScenes = useMemo(() => {
     let filtered = project.scenes
@@ -466,6 +511,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       placeholder="התחל לכתוב כאן..."
                       onChange={(val) => onUpdateScene(scene.id, { content: val })}
                       minRows={5}
+                      focusOnRender={focusedSceneId === scene.id}
                     />
 
                 </div>
