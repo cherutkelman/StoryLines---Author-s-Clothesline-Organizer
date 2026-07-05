@@ -40,6 +40,7 @@ interface PlotStructureProps {
   onUpdateConflicts: (conflicts: any[]) => void;
   initialSubView?: PlotStructureSubView;
   onSubViewChange?: (subView: PlotStructureSubView) => void;
+  isLibrarySidebarCollapsed?: boolean;
 }
 
 const MultiScenePicker: React.FC<{
@@ -631,6 +632,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   onUpdateConflicts,
   initialSubView,
   onSubViewChange,
+  isLibrarySidebarCollapsed = false,
   scenes = []
 }) => {
   const [activeSubView, setActiveSubView] = useState<PlotStructureSubView>(initialSubView || 'structure');
@@ -887,7 +889,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-[var(--theme-bg)] p-8 overflow-y-auto">
-      <div className="max-w-4xl mx-auto w-full space-y-8 pb-20">
+      <div className={`${isLibrarySidebarCollapsed ? 'max-w-7xl' : 'max-w-5xl'} mx-auto w-full space-y-8 pb-20`}>
         {/* Internal Sub-Navigation */}
         <div className="flex items-center justify-center gap-2 mb-8 bg-[var(--theme-secondary)]/30 p-2 rounded-3xl border border-[var(--theme-border)]/30 w-fit mx-auto">
           <button
@@ -1893,24 +1895,31 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
-              <table className="w-full min-w-[980px] border-collapse">
+              <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[1120px]' : 'min-w-[960px]'}`}>
+                <colgroup>
+                  <col className="w-14" />
+                  <col className={isLibrarySidebarCollapsed ? 'w-[360px]' : 'w-[320px]'} />
+                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                </colgroup>
                 <thead>
                   <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
-                    <th className="w-16 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
-                    <th className="w-64 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">דמות ואמונה שקרית</th>
-                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">דמות ואמונה שקרית</th>
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
                       <div className="flex flex-col items-center gap-1">
                         <Square size={14} className="text-blue-500 fill-blue-500/20" />
                         <span>טיעון שמחזק את האמונה</span>
                       </div>
                     </th>
-                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                    <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
                       <div className="flex flex-col items-center gap-1">
                         <Triangle size={14} className="text-orange-500 fill-orange-500/20" />
                         <span>אישור או הוכחה בסיפור</span>
                       </div>
                     </th>
-                    <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                    <th className="p-3 border-b border-[var(--theme-border)]/30 text-center leading-tight">
                       <div className="flex flex-col items-center gap-1">
                         <Circle size={14} className="text-green-500 fill-green-500/20" />
                         <span>סתירה או הפרכה</span>
@@ -2639,24 +2648,31 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
              </div>
 
              <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
-               <table className="w-full min-w-[1040px] border-collapse">
+               <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[1120px]' : 'min-w-[960px]'}`}>
+                 <colgroup>
+                   <col className="w-14" />
+                   <col className={isLibrarySidebarCollapsed ? 'w-[360px]' : 'w-[320px]'} />
+                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                 </colgroup>
                  <thead>
                    <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
-                     <th className="w-16 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
-                     <th className="w-72 p-3 border-b border-l border-[var(--theme-border)]/30 text-center">המטרה של X - שם הדמות</th>
-                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">המטרה של X - שם הדמות</th>
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
                        <div className="flex flex-col items-center gap-1">
                          <Diamond size={14} className="text-purple-500 fill-purple-500/20" />
                          <span>טיעונים - למה היא נצרכת</span>
                        </div>
                      </th>
-                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                     <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
                        <div className="flex flex-col items-center gap-1">
                          <TrapezoidIcon size={14} className="text-rose-500" />
                          <span>בעיה - מה מפריע להשגת המטרה</span>
                        </div>
                      </th>
-                     <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-1/4 leading-tight">
+                     <th className="p-3 border-b border-[var(--theme-border)]/30 text-center leading-tight">
                        <div className="flex flex-col items-center gap-1">
                          <Hexagon size={14} className="text-cyan-500 fill-cyan-500/20" />
                          <span>הישג - השלבים בדרך לפתרון ולהצלחה</span>

@@ -1613,6 +1613,7 @@ const App: React.FC = () => {
                     onUpdateConflicts={(conflicts) => updateActiveBook({ conflicts } as Partial<Book>)}
                     initialSubView={activeUI.plotStructureActiveSubView}
                     onSubViewChange={handlePlotStructureSubViewChange}
+                    isLibrarySidebarCollapsed={isSidebarCollapsed}
                   />
                 </div>
               )}
