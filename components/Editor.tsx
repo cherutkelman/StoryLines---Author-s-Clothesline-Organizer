@@ -10,8 +10,7 @@ import {
   CopyPlus, 
   Maximize2, 
   Minimize2, 
-  ChevronDown, 
-  ChevronUp,
+  ChevronDown,
   AlignJustify,
   Focus,
   UserCircle2,
@@ -184,7 +183,6 @@ const DebouncedInput: React.FC<{
 const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
-  const [openSceneIds, setOpenSceneIds] = useState<Set<string>>(() => new Set(initialFocusedSceneId ? [initialFocusedSceneId] : []));
   const [bridgeType, setBridgeType] = useState<'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,61 +194,14 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     onDisplayModeChange?.(mode);
   };
 
-  const handleFocusModeClick = () => {
-    const sceneIdToKeep = focusedSceneId || activeScenes[0]?.id || null;
-    setDisplayMode('focus');
-    onDisplayModeChange?.('focus');
-    setOpenSceneIds(sceneIdToKeep ? new Set([sceneIdToKeep]) : new Set());
-  };
-
   const handleFocusScene = (id: string | null) => {
     setFocusedSceneId(id);
     onFocusScene?.(id);
   };
 
-  const openScene = (id: string) => {
-    setOpenSceneIds((current) => {
-      const next = new Set(current);
-      next.add(id);
-      return next;
-    });
-    handleFocusScene(id);
-  };
-
-  const closeScene = (id: string) => {
-    setOpenSceneIds((current) => {
-      const next = new Set(current);
-      next.delete(id);
-      return next;
-    });
-    if (focusedSceneId === id) {
-      handleFocusScene(null);
-    }
-  };
-
-  const toggleSceneOpen = (id: string) => {
-    setOpenSceneIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        handleFocusScene(id);
-      }
-      return next;
-    });
-  };
-
   useEffect(() => {
     if (initialFocusedSceneId === undefined || initialFocusedSceneId === focusedSceneId) return;
     setFocusedSceneId(initialFocusedSceneId);
-    if (initialFocusedSceneId) {
-      setOpenSceneIds((current) => {
-        const next = new Set(current);
-        next.add(initialFocusedSceneId);
-        return next;
-      });
-    }
   }, [initialFocusedSceneId, focusedSceneId]);
 
   const activeScenes = useMemo(() => {
@@ -271,7 +222,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
 
   useEffect(() => {
     if (activeScenes.length > 0 && !focusedSceneId && displayMode === 'focus') {
-      openScene(activeScenes[0].id);
+      handleFocusScene(activeScenes[0].id);
     }
   }, [activeScenes, focusedSceneId, displayMode]);
 
@@ -411,7 +362,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
           </div>
 
           <div className="flex items-center gap-1 bg-black/10 p-1 rounded-lg">
-            <button onClick={handleFocusModeClick} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
+            <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
             <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
           </div>
 
@@ -483,7 +434,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
       <div className="space-y-4">
         {activeScenes.map((scene, idx) => {
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
-          const isExpanded = displayMode === 'full' || openSceneIds.has(scene.id);
+          const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
           
           const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
 
@@ -502,9 +453,9 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 </div>
               )}
               
-              <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }}>
+              <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
                 {!isExpanded ? (
-                  <div onClick={() => toggleSceneOpen(scene.id)} className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
+                  <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                     <div className="flex items-center gap-4">
                       <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
                       <div className="flex flex-col">
@@ -567,15 +518,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       >
                         <Trash2 size={18} />
                       </button>
-                      {displayMode === 'focus' && (
-                        <button
-                          onClick={() => closeScene(scene.id)}
-                          className="p-2 text-[var(--theme-primary)]/35 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"
-                          title="סגור סצנה"
-                        >
-                          <ChevronUp size={18} />
-                        </button>
-                      )}
                     </div>
                   </header>
                     <AutoExpandingTextarea 

@@ -142,6 +142,26 @@ const TrapezoidIcon: React.FC<{ size?: number; className?: string }> = ({ size =
   </svg>
 );
 
+const TableWidthControl: React.FC<{
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}> = ({ label, value, onChange }) => (
+  <div className="flex items-center justify-end gap-3 text-[11px] font-bold text-[var(--theme-primary)]/55" dir="rtl">
+    <span>{label}</span>
+    <input
+      type="range"
+      min={85}
+      max={140}
+      step={5}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="w-36 accent-[var(--theme-accent)]"
+    />
+    <span className="w-10 text-left tabular-nums">{value}%</span>
+  </div>
+);
+
 const STRUCTURES = [
   { id: 'three-acts', label: 'מבנה שלוש המערכות' },
   { id: 'five-acts', label: 'מבנה חמש המערכות' },
@@ -219,7 +239,9 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
   const tableWrapperRef = React.useRef<HTMLDivElement>(null);
   const cellRefs = React.useRef<Record<string, HTMLTableCellElement | null>>({});
   const [svgSize, setSvgSize] = React.useState({ width: 0, height: 0 });
+  const [tableWidthScale, setTableWidthScale] = React.useState(100);
   const dynamicSteps = rel.dynamicSteps || [];
+  const tableWidth = Math.round(1000 * tableWidthScale / 100);
 
   const updateSvgSize = React.useCallback(() => {
     const wrapper = tableWrapperRef.current;
@@ -253,7 +275,7 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', updateSvgSize);
     };
-  }, [dynamicSteps.length, updateSvgSize]);
+  }, [dynamicSteps.length, tableWidth, updateSvgSize]);
 
   const char1 = characters.find(c => c.id === rel.char1Id);
   const char2 = characters.find(c => c.id === rel.char2Id);
@@ -376,8 +398,14 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
         </button>
       </div>
 
+      <TableWidthControl
+        label="רוחב טבלת דינמיקה"
+        value={tableWidthScale}
+        onChange={setTableWidthScale}
+      />
+
       <div className="overflow-x-auto rounded-[2rem] border border-[var(--theme-border)]/50 shadow-sm bg-[var(--theme-card)]">
-        <div ref={tableWrapperRef} className="relative min-w-[800px]">
+        <div ref={tableWrapperRef} className="relative" style={{ width: tableWidth, minWidth: tableWidth }}>
           {/* SVG Layer for Lines */}
           <div className="absolute inset-0 pointer-events-none z-10">
             {svgSize.width > 0 && svgSize.height > 0 && (
@@ -639,6 +667,17 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   const [editingPointId, setEditingPointId] = useState<string | null>(null);
   const [pullingDataFor, setPullingDataFor] = useState<{ arcIndex: number; stepIndex: number } | null>(null);
   const [selectedCharForPull, setSelectedCharForPull] = useState<string | null>(null);
+  const [arcTableWidthScale, setArcTableWidthScale] = useState(100);
+  const [conflictTableWidthScale, setConflictTableWidthScale] = useState(100);
+  const planningTableIndexColumnWidth = 56;
+  const planningTableMainColumnWidth = isLibrarySidebarCollapsed ? 360 : 320;
+  const planningTableShapeColumnWidth = isLibrarySidebarCollapsed ? 220 : 180;
+  const arcMainColumnWidth = Math.round(planningTableMainColumnWidth * arcTableWidthScale / 100);
+  const arcShapeColumnWidth = Math.round(planningTableShapeColumnWidth * arcTableWidthScale / 100);
+  const arcTableWidth = planningTableIndexColumnWidth + arcMainColumnWidth + (arcShapeColumnWidth * 3);
+  const conflictMainColumnWidth = Math.round(planningTableMainColumnWidth * conflictTableWidthScale / 100);
+  const conflictShapeColumnWidth = Math.round(planningTableShapeColumnWidth * conflictTableWidthScale / 100);
+  const conflictTableWidth = planningTableIndexColumnWidth + conflictMainColumnWidth + (conflictShapeColumnWidth * 3);
 
   useEffect(() => {
     if (!initialSubView || initialSubView === activeSubView) return;
@@ -1894,14 +1933,20 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
               </div>
             </div>
 
+            <TableWidthControl
+              label="רוחב טבלת קשת ההתפתחות"
+              value={arcTableWidthScale}
+              onChange={setArcTableWidthScale}
+            />
+
             <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
-              <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[1120px]' : 'min-w-[960px]'}`}>
+              <table className="table-fixed border-collapse" style={{ width: arcTableWidth, minWidth: arcTableWidth }}>
                 <colgroup>
-                  <col className="w-14" />
-                  <col className={isLibrarySidebarCollapsed ? 'w-[360px]' : 'w-[320px]'} />
-                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
-                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
-                  <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                  <col style={{ width: 56 }} />
+                  <col style={{ width: arcMainColumnWidth }} />
+                  <col style={{ width: arcShapeColumnWidth }} />
+                  <col style={{ width: arcShapeColumnWidth }} />
+                  <col style={{ width: arcShapeColumnWidth }} />
                 </colgroup>
                 <thead>
                   <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
@@ -2647,14 +2692,20 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
                </div>
              </div>
 
+             <TableWidthControl
+               label="רוחב טבלת מניע ומטרה"
+               value={conflictTableWidthScale}
+               onChange={setConflictTableWidthScale}
+             />
+
              <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
-               <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[1120px]' : 'min-w-[960px]'}`}>
+               <table className="table-fixed border-collapse" style={{ width: conflictTableWidth, minWidth: conflictTableWidth }}>
                  <colgroup>
-                   <col className="w-14" />
-                   <col className={isLibrarySidebarCollapsed ? 'w-[360px]' : 'w-[320px]'} />
-                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
-                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
-                   <col className={isLibrarySidebarCollapsed ? 'w-[220px]' : 'w-[180px]'} />
+                   <col style={{ width: 56 }} />
+                   <col style={{ width: conflictMainColumnWidth }} />
+                   <col style={{ width: conflictShapeColumnWidth }} />
+                   <col style={{ width: conflictShapeColumnWidth }} />
+                   <col style={{ width: conflictShapeColumnWidth }} />
                  </colgroup>
                  <thead>
                    <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
