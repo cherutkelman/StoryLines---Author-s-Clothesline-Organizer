@@ -53,8 +53,10 @@ const Board: React.FC<BoardProps> = ({
   const dragItem = useRef<{ sceneId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
-  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
+  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
   const boardRef = useRef<HTMLDivElement>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const pinchGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
 
   const handleZoomChange = (newZoom: number) => {
     setZoomLevel(newZoom);
@@ -90,7 +92,7 @@ const Board: React.FC<BoardProps> = ({
   const handleResetZoom = () => setZoomLevel(1);
 
   useEffect(() => {
-    const boardContainer = boardRef.current?.parentElement;
+    const boardContainer = boardScrollRef.current;
     if (!boardContainer) return;
 
     const handleWheel = (e: WheelEvent) => {
@@ -102,8 +104,56 @@ const Board: React.FC<BoardProps> = ({
       }
     };
 
+    const getTouchDistance = (touches: TouchList) => {
+      const firstTouch = touches[0];
+      const secondTouch = touches[1];
+      return Math.hypot(
+        firstTouch.clientX - secondTouch.clientX,
+        firstTouch.clientY - secondTouch.clientY
+      );
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) {
+        pinchGestureRef.current = null;
+        return;
+      }
+
+      pinchGestureRef.current = {
+        distance: getTouchDistance(e.touches),
+        zoom: zoomLevel
+      };
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const pinchGesture = pinchGestureRef.current;
+      if (e.touches.length !== 2 || !pinchGesture) return;
+
+      e.preventDefault();
+      const nextDistance = getTouchDistance(e.touches);
+      const nextZoom = Math.min(Math.max(0.2, pinchGesture.zoom * (nextDistance / pinchGesture.distance)), 1.5);
+      handleZoomChange(nextZoom);
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        pinchGestureRef.current = null;
+      }
+    };
+
     boardContainer.addEventListener('wheel', handleWheel, { passive: false });
-    return () => boardContainer.removeEventListener('wheel', handleWheel);
+    boardContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+    boardContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+    boardContainer.addEventListener('touchend', handleTouchEnd);
+    boardContainer.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      boardContainer.removeEventListener('wheel', handleWheel);
+      boardContainer.removeEventListener('touchstart', handleTouchStart);
+      boardContainer.removeEventListener('touchmove', handleTouchMove);
+      boardContainer.removeEventListener('touchend', handleTouchEnd);
+      boardContainer.removeEventListener('touchcancel', handleTouchEnd);
+    };
   }, [zoomLevel]);
 
   const exportBoard = () => {
@@ -275,7 +325,7 @@ const Board: React.FC<BoardProps> = ({
   return (
     <div className="relative h-full w-full overflow-hidden flex flex-col">
       {/* Zoom Controls Overlay */}
-      <div className="absolute top-6 left-6 z-40 flex items-center gap-3 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)]">
+      <div className="absolute top-6 left-6 z-40 hidden items-center gap-3 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] lg:flex">
         <button 
           onClick={() => handleZoomChange(Math.max(0.2, zoomLevel - 0.1))}
           className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-colors"
@@ -335,7 +385,7 @@ const Board: React.FC<BoardProps> = ({
       </div>
 
       {/* Top Right Actions */}
-      <div className="absolute top-6 right-6 z-40 flex items-center gap-3">
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+9.25rem)] left-6 z-40 flex items-center gap-3 lg:bottom-auto lg:left-auto lg:right-6 lg:top-6">
         <button 
           onClick={() => onBulkAdd(project.plotlines[0]?.id || '')}
           className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] border border-[var(--theme-primary)] rounded-xl shadow-lg hover:opacity-90 transition-all font-bold text-sm"
@@ -346,7 +396,7 @@ const Board: React.FC<BoardProps> = ({
         </button>
         <button 
           onClick={exportBoard}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm"
+          className="hidden items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm lg:flex"
           title="ייצוא לוח עלילה"
         >
           <Download size={18} />
@@ -355,7 +405,7 @@ const Board: React.FC<BoardProps> = ({
       </div>
 
       {/* Board Scrollable Area */}
-      <div className="flex-1 overflow-auto bg-[var(--theme-bg)] cursor-grab active:cursor-grabbing scrollbar-hide">
+      <div ref={boardScrollRef} className="flex-1 overflow-auto bg-[var(--theme-bg)] cursor-grab active:cursor-grabbing scrollbar-hide">
         <div 
           ref={boardRef}
           className="p-32 pb-64 transition-transform duration-200 origin-top-right"
@@ -379,12 +429,12 @@ const Board: React.FC<BoardProps> = ({
                         width: '2px'
                       }}
                     >
-                      <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[var(--theme-card)] border-2 border-[var(--theme-primary)]/20 rounded-2xl shadow-2xl p-3 flex items-center gap-3 min-w-[200px] backdrop-blur-md">
-                        <div className="bg-[var(--theme-primary)]/10 p-2 rounded-xl">
-                          <Flag size={18} className="text-[var(--theme-primary)]" />
+                      <div className="absolute top-0 lg:-top-12 left-1/2 -translate-x-1/2 bg-[var(--theme-card)] border-2 border-[var(--theme-primary)]/20 rounded-2xl shadow-2xl p-2 lg:p-3 flex items-center gap-2 lg:gap-3 w-[132px] lg:w-auto lg:min-w-[200px] backdrop-blur-md">
+                        <div className="bg-[var(--theme-primary)]/10 p-1.5 lg:p-2 rounded-xl">
+                          <Flag size={16} className="text-[var(--theme-primary)]" />
                         </div>
                         <input 
-                          className="flex-1 bg-transparent border-none focus:ring-0 text-base font-black text-[var(--theme-primary)] p-0 handwritten"
+                          className="min-w-0 flex-1 bg-transparent border-none focus:ring-0 text-xs lg:text-base font-black text-[var(--theme-primary)] p-0 handwritten"
                           value={marker.title}
                           onChange={(e) => onUpdateChapterMarker(marker.id, { title: e.target.value })}
                         />
@@ -403,15 +453,16 @@ const Board: React.FC<BoardProps> = ({
                 </div>
 
                 {/* Add Marker Row */}
-                <div className="flex gap-12 px-8 mb-20">
+                <div className="relative flex gap-12 px-8 mb-8 lg:mb-20 h-10 items-center">
+                  <div className="absolute left-8 right-8 top-1/2 h-px -translate-y-1/2 bg-gray-300/80" />
                   {Array.from({ length: columnCount }).map((_, i) => {
                     const hasMarker = project.chapterMarkers?.some(m => m.position === i);
                     return (
-                      <div key={i} className="w-44 flex justify-center group/marker-btn">
+                      <div key={i} className="relative w-44 flex-shrink-0 flex justify-center group/marker-btn">
                         {!hasMarker && (
                           <button 
                             onClick={() => onAddChapterMarker(i)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--theme-secondary)]/50 text-[var(--theme-primary)]/20 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-all opacity-0 group-hover/marker-btn:opacity-100 border border-dashed border-[var(--theme-border)]"
+                            className="relative z-10 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-transparent text-[var(--theme-primary)]/20 hover:text-[var(--theme-primary)] transition-all"
                           >
                             <Flag size={14} />
                             <span className="text-[10px] font-bold">הוסף פרק</span>
@@ -633,7 +684,7 @@ const Board: React.FC<BoardProps> = ({
       </div>
 
       {/* Plot Summary Box - Sticky at bottom */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-30">
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] lg:bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-30">
         <div className={`bg-[var(--theme-card)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl shadow-2xl p-4 flex flex-col gap-2 transition-all duration-300 ${isSummaryCollapsed ? 'h-14 overflow-hidden' : ''}`}>
           <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest flex items-center gap-2">

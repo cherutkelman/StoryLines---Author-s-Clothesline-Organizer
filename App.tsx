@@ -705,6 +705,48 @@ const App: React.FC = () => {
     a.click();
   };
 
+  const exportBoard = () => {
+    if (!activeBook) return;
+
+    let text = `ייצוא ללוח עלילה - ${activeBook.title}\n`;
+    text += `תאריך: ${new Date().toLocaleDateString('he-IL')}\n`;
+    text += `-----------------------------------\n\n`;
+
+    const exportedScenes = activeBook.scenes
+      .filter(s => visiblePlotlines.includes(s.plotlineId))
+      .sort((a, b) => {
+        if (a.position !== b.position) return a.position - b.position;
+        const plotlineAIndex = activeBook.plotlines.findIndex(p => p.id === a.plotlineId);
+        const plotlineBIndex = activeBook.plotlines.findIndex(p => p.id === b.plotlineId);
+        return plotlineAIndex - plotlineBIndex;
+      });
+
+    if (exportedScenes.length === 0) {
+      text += "אין סצנות להצגה בקווי העלילה הנבחרים.\n";
+    } else {
+      exportedScenes.forEach((scene, index) => {
+        const chapterMarker = activeBook.chapterMarkers?.find(m => m.position === scene.position);
+        if (chapterMarker) {
+          text += `\n=== ${chapterMarker.title} ===\n\n`;
+        }
+
+        const plotline = activeBook.plotlines.find(p => p.id === scene.plotlineId);
+        text += `סצנה ${index + 1} | קו עלילה: ${plotline?.name || 'ללא'} | מיקום: ${scene.position + 1}\n`;
+        text += `כותרת: ${scene.title || 'ללא כותרת'}\n`;
+        text += `תמצית:\n${scene.summary || 'לא נכתבה תמצית...'}\n`;
+        text += `-----------------------------------\n\n`;
+      });
+    }
+
+    const blob = new Blob(["\ufeff", text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `board-export-${activeBook.title}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportDataBackup = () => {
     if (!activeBook) return;
     const dataStr = JSON.stringify(activeBook, null, 2);
@@ -1301,6 +1343,17 @@ const App: React.FC = () => {
                                 </button>
                               );
                             })}
+                            <button
+                              onClick={() => {
+                                handleViewChange('board');
+                                exportBoard();
+                                setIsMobileLibraryOpen(false);
+                              }}
+                              className="w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]"
+                            >
+                              <Download size={16} />
+                              <span className="flex-1">ייצוא לוח</span>
+                            </button>
                           </div>
                         )}
 
@@ -1609,7 +1662,7 @@ const App: React.FC = () => {
           )}
         </aside>
 
-        <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)] mb-16 lg:mb-0">
+        <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)]">
           {activeBook ? (
             <>
               {activeView === 'planning' && (
@@ -1747,25 +1800,6 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
-
-      <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-[var(--theme-card)] border-t border-[var(--theme-border)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
-        <div className="grid grid-cols-5">
-          {NAV_ITEMS.map(item => {
-            const Icon = item.icon;
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleViewChange(item.id)}
-                className={`h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition-colors ${isActive ? 'text-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'text-[var(--theme-primary)]/45'}`}
-              >
-                <Icon size={20} />
-                <span>{item.shortLabel}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
 
       {/* Update Notification */}
       {isElectron && updateStatus !== 'none' && (
