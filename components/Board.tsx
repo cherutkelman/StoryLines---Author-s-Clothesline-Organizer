@@ -424,7 +424,7 @@ const Board: React.FC<BoardProps> = ({
 
                 {/* Plotline Ropes */}
                 {activePlotlines.map((plotline) => (
-                  <div key={plotline.id} className="relative h-48 flex items-center mb-12">
+                  <div key={plotline.id} className="relative h-48 flex items-center mb-12 group/plotline">
                     <div 
                       className="absolute inset-x-0 h-0.5 opacity-40 shadow-sm"
                       style={{ 
@@ -450,14 +450,27 @@ const Board: React.FC<BoardProps> = ({
                       {Array.from({ length: columnCount }).map((_, colIdx) => {
                         const sceneInThisSlot = project.scenes.find(s => s.position === colIdx && s.plotlineId === plotline.id);
                         const isLinkedToPlotStructure = sceneInThisSlot && Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
+                        const hasChapterMarker = project.chapterMarkers?.some(m => m.position === colIdx);
                         
                         return (
                           <div 
                             key={`${plotline.id}-${colIdx}`}
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, colIdx, plotline.id)}
-                            className="w-44 h-44 flex-shrink-0 flex items-center justify-center relative group"
+                            className="w-44 h-44 flex-shrink-0 flex items-center justify-center relative group group/slot"
                           >
+                            {!hasChapterMarker && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAddChapterMarker(colIdx);
+                                }}
+                                className="absolute -top-10 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/90 px-3 py-1.5 text-[var(--theme-primary)]/35 opacity-0 shadow-md backdrop-blur-sm transition-all hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)] group-hover/slot:opacity-100"
+                              >
+                                <Flag size={14} />
+                                <span className="text-[10px] font-bold">הוסף פרק</span>
+                              </button>
+                            )}
                             {sceneInThisSlot ? (
                               <div
                                 draggable
@@ -485,7 +498,7 @@ const Board: React.FC<BoardProps> = ({
 
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); onDeleteScene(sceneInThisSlot.id); }}
-                                  className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover:opacity-100 transition-all"
+                                  className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover/slot:opacity-100 transition-all"
                                   title="מחק סצנה"
                                 >
                                   <Trash2 size={14} />
@@ -513,7 +526,7 @@ const Board: React.FC<BoardProps> = ({
                             ) : (
                               <button 
                                 onClick={() => onAddScene(plotline.id, colIdx)}
-                                className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
+                                className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover/slot:opacity-100 group-hover/plotline:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
                               >
                                 <Plus size={20} />
                               </button>

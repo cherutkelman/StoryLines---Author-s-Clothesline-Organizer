@@ -22,6 +22,14 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportBounds, setExportBounds] = useState<{
+    minX: number;
+    minY: number;
+    width: number;
+    height: number;
+    contentWidth: number;
+    contentHeight: number;
+  } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -214,9 +222,78 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     updateNode(id, { imageUrl: undefined });
   };
 
+  const getMapExportBounds = () => {
+    const padding = 160;
+    const nodeHalfWidth = 100;
+    const nodeHalfHeight = 120;
+    const labelHalfWidth = 160;
+    const labelHalfHeight = 90;
+    const points: { minX: number; minY: number; maxX: number; maxY: number }[] = [];
+
+    localCharacters.forEach((node) => {
+      const x = node.x ?? 200;
+      const y = node.y ?? 200;
+      points.push({
+        minX: x - nodeHalfWidth,
+        minY: y - nodeHalfHeight,
+        maxX: x + nodeHalfWidth,
+        maxY: y + nodeHalfHeight
+      });
+    });
+
+    localConnections.forEach((conn) => {
+      const fromNode = localCharacters.find(n => n.id === conn.fromId);
+      const toNode = localCharacters.find(n => n.id === conn.toId);
+      if (!fromNode || !toNode) return;
+
+      const t = conn.labelPosition ?? 0.5;
+      const x1 = fromNode.x ?? 0;
+      const y1 = fromNode.y ?? 0;
+      const x2 = toNode.x ?? 0;
+      const y2 = toNode.y ?? 0;
+      const labelX = x1 + (x2 - x1) * t;
+      const labelY = y1 + (y2 - y1) * t;
+
+      points.push({
+        minX: Math.min(x1, x2, labelX - labelHalfWidth),
+        minY: Math.min(y1, y2, labelY - labelHalfHeight),
+        maxX: Math.max(x1, x2, labelX + labelHalfWidth),
+        maxY: Math.max(y1, y2, labelY + labelHalfHeight)
+      });
+    });
+
+    if (points.length === 0) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      return {
+        minX: 0,
+        minY: 0,
+        width: Math.max(rect?.width || 800, 800),
+        height: Math.max(rect?.height || 600, 600),
+        contentWidth: Math.max(rect?.width || 800, 800),
+        contentHeight: Math.max(rect?.height || 600, 600)
+      };
+    }
+
+    const minX = Math.floor(Math.min(...points.map(point => point.minX)) - padding);
+    const minY = Math.floor(Math.min(...points.map(point => point.minY)) - padding);
+    const maxX = Math.ceil(Math.max(...points.map(point => point.maxX)) + padding);
+    const maxY = Math.ceil(Math.max(...points.map(point => point.maxY)) + padding);
+
+    return {
+      minX,
+      minY,
+      width: Math.max(maxX - minX, 800),
+      height: Math.max(maxY - minY, 600),
+      contentWidth: Math.max(maxX + padding, 800),
+      contentHeight: Math.max(maxY + padding, 600)
+    };
+  };
+
   const exportAsImage = async () => {
     if (!canvasRef.current) return;
     
+    const bounds = getMapExportBounds();
+    setExportBounds(bounds);
     setIsExporting(true);
     
     // Small delay to allow React to re-render without controls
@@ -229,6 +306,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         scale: 2, // Higher quality
         logging: false,
         removeContainer: true,
+        width: bounds.width,
+        height: bounds.height,
+        windowWidth: bounds.width,
+        windowHeight: bounds.height,
       });
       
       const link = document.createElement('a');
@@ -239,6 +320,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       console.error('Failed to export image:', err);
     } finally {
       setIsExporting(false);
+      setExportBounds(null);
     }
   };
 
@@ -322,7 +404,11 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       {/* Canvas Area */}
       <div 
         ref={canvasRef}
-        className="flex-1 overflow-hidden relative"
+        className={isExporting ? "relative overflow-visible" : "flex-1 overflow-hidden relative"}
+        style={isExporting && exportBounds ? {
+          width: exportBounds.width,
+          height: exportBounds.height
+        } : undefined}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
@@ -333,16 +419,20 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
           }
         }}
         onClick={handleCanvasClick}
-      >
+        >
         <div 
-          className="absolute inset-0 transition-transform duration-75 ease-out origin-top-left"
-          style={{ 
+          className="absolute left-0 top-0 transition-transform duration-75 ease-out origin-top-left"
+          style={isExporting && exportBounds ? {
+            transform: `translate(${-exportBounds.minX}px, ${-exportBounds.minY}px)`,
+            width: exportBounds.contentWidth,
+            height: exportBounds.contentHeight
+          } : { 
             transform: `scale(${zoom}) translate(${panOffset.x}px, ${panOffset.y}px)`, 
             width: `${100/zoom}%`, 
             height: `${100/zoom}%` 
           }}
         >
-          <svg className="absolute inset-0 pointer-events-none w-full h-full z-0">
+          <svg className="absolute inset-0 pointer-events-none w-full h-full z-0 overflow-visible">
             {localConnections.map(conn => {
             const fromNode = localCharacters.find(n => n.id === conn.fromId);
             const toNode = localCharacters.find(n => n.id === conn.toId);
@@ -399,12 +489,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                   {!isExporting && <Move size={14} />}
                 </div>
                 {isExporting ? (
-                  <div className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-2 shadow-md text-center leading-tight whitespace-pre-wrap text-slate-900">
+                  <div className="font-sans text-[12px] font-medium min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-2 shadow-md text-center leading-snug whitespace-pre-wrap text-slate-900">
                     {conn.description}
                   </div>
                 ) : (
                   <textarea 
-                    className="handwritten text-[10px] min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-1 shadow-md focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none resize-none transition-all text-center leading-tight overflow-visible text-slate-900"
+                    className="font-sans text-[12px] font-medium min-w-[60px] max-w-[120px] bg-white/90 border border-slate-200 rounded-lg p-1.5 shadow-md focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none resize-none transition-all text-center leading-snug overflow-visible text-slate-900"
                     value={conn.description}
                     onChange={(e) => {
                       updateConnection(conn.id, e.target.value);
