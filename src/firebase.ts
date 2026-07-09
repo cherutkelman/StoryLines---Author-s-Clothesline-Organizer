@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithCredential, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, getRedirectResult, GoogleAuthProvider, signInWithCredential, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
 import { isElectron, openDesktopOAuthUrl } from './platform';
@@ -33,6 +33,29 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
+
+const shouldUseRedirectAuth = () => {
+  if (typeof window === 'undefined') return false;
+
+  const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+
+  return isSmallScreen || isTouchDevice;
+};
+
+const isLocalNetworkHost = () => {
+  if (typeof window === 'undefined') return false;
+
+  const hostname = window.location.hostname;
+
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  );
+};
 
 type ExchangeGoogleOAuthCodeResponse = {
   idToken?: string | null;
@@ -141,7 +164,12 @@ export const signIn = async () => {
         tokenData.accessToken || undefined
       );
       result = await signInWithCredential(auth, credential);
+    } else if (shouldUseRedirectAuth() && !isLocalNetworkHost()) {
+      console.log('[AUTH] Web mobile/touch mode - redirect flow');
+      await signInWithRedirect(auth, googleProvider);
+      return null;
     } else {
+      console.log('[AUTH] Web desktop mode - popup flow');
       result = await signInWithPopup(auth, googleProvider);
     }
     console.log('[AUTH] SUCCESS', {
@@ -159,4 +187,30 @@ export const signIn = async () => {
     throw error;
   }
 };
+
+export const completeRedirectSignIn = async () => {
+  if (isElectron) return null;
+
+  try {
+    console.log('[AUTH] Checking redirect result...');
+
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      console.log('[AUTH] Redirect sign-in completed', {
+        uid: result.user.uid,
+        email: result.user.email,
+      });
+    } else {
+      console.log('[AUTH] Redirect result is null. Current user:', {
+        uid: auth.currentUser?.uid,
+        email: auth.currentUser?.email,
+      });
+    }
+    return result;
+  } catch (error) {
+    console.error('[Auth] Google redirect sign-in failed:', error);
+    throw error;
+  }
+};
+
 export const logOut = () => signOut(auth);

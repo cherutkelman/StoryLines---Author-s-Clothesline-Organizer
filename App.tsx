@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
-import { auth, isFirebaseConfigured, logOut as logout, missingFirebaseEnvVars, signIn as signInWithGoogle } from './src/firebase';
+import { auth, completeRedirectSignIn, isFirebaseConfigured, logOut as logout, missingFirebaseEnvVars, signIn as signInWithGoogle } from './src/firebase';
 import { isElectron, isWeb, restartDesktopApp, subscribeToDesktopUpdates } from './src/platform';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { v4 as uuidv4 } from "uuid";
@@ -93,6 +93,14 @@ const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: stri
 
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    completeRedirectSignIn().catch((error) => {
+      console.error('[Auth] Google redirect sign-in failed:', error);
+    });
+  }, []);
   
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -103,6 +111,11 @@ const App: React.FC = () => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('[AUTH STATE] changed:', {
+        uid: firebaseUser?.uid,
+        email: firebaseUser?.email,
+      });
+
       setIsLoading(true);
       setHasLoadedBooks(false);
       setUser(firebaseUser);
@@ -1020,7 +1033,14 @@ const App: React.FC = () => {
           <h1 className="text-3xl font-bold handwritten text-[var(--theme-primary)] mb-3">StoryLines</h1>
           <p className="text-sm text-[var(--theme-muted)] mb-6">התחברות נדרשת כדי לטעון ולשמור ספרים בענן.</p>
           <button
-            onClick={() => signInWithGoogle()}
+            onClick={async () => {
+              try {
+                console.log('[AUTH UI] Google sign-in button clicked');
+                await signInWithGoogle();
+              } catch (error) {
+                console.error('[AUTH UI] Google sign-in click failed:', error);
+              }
+            }}
             className="w-full flex items-center justify-center gap-3 py-4 px-4 rounded-2xl text-sm font-bold bg-[var(--theme-primary)] text-[var(--theme-card)] hover:opacity-90 transition-all shadow-lg"
           >
             <Users size={18} />
@@ -1570,7 +1590,14 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   <button
-                    onClick={() => signInWithGoogle()}
+                    onClick={async () => {
+                      try {
+                        console.log('[AUTH UI] Google sign-in button clicked');
+                        await signInWithGoogle();
+                      } catch (error) {
+                        console.error('[AUTH UI] Google sign-in click failed:', error);
+                      }
+                    }}
                     className="w-full flex items-center justify-center gap-3 py-4 px-4 rounded-2xl text-sm font-bold bg-[var(--theme-primary)] text-[var(--theme-card)] hover:opacity-90 transition-all shadow-lg"
                   >
                     <Users size={18} />
