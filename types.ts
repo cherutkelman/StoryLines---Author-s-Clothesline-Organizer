@@ -332,6 +332,7 @@ export interface BookMember {
 export interface BookUIState {
   lastView?: 'board' | 'editor' | 'questionnaires' | 'maps' | 'planning';
   editorFocusedSceneId?: string | null;
+  editorExpandedSceneIds?: string[];
   editorDisplayMode?: 'full' | 'focus';
   plotStructureActiveSubView?: PlotStructureSubView;
   questionnaireActiveTab?: 'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds';

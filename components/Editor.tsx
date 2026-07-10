@@ -23,7 +23,6 @@ import {
   Trash2,
   Flag,
   Info,
-  Pin,
   FileText,
   Users
 } from 'lucide-react';
@@ -37,11 +36,16 @@ interface EditorProps {
   onOpenBulkAdd: () => void;
   initialFocusedSceneId?: string | null;
   onFocusScene?: (id: string | null) => void;
+  initialExpandedSceneIds?: string[];
+  onExpandedScenesChange?: (ids: string[]) => void;
   initialDisplayMode?: 'full' | 'focus';
   onDisplayModeChange?: (mode: 'full' | 'focus') => void;
   onExport?: () => void;
   onUpdateChapterMarker?: (id: string, updates: any) => void;
   isLibrarySidebarCollapsed?: boolean;
+  externalSearchQuery?: string;
+  onExternalSearchQueryChange?: (value: string) => void;
+  externalCommand?: { action: 'tips'; nonce: number } | null;
 }
 
 const AutoExpandingTextarea: React.FC<{
@@ -180,14 +184,17 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker }) => {
+const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
+  const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
   const [bridgeType, setBridgeType] = useState<'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const activeSearchQuery = externalSearchQuery ?? searchQuery;
+  const updateSearchQuery = onExternalSearchQueryChange ?? setSearchQuery;
 
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
     setDisplayMode(mode);
@@ -199,18 +206,48 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     onFocusScene?.(id);
   };
 
+  const handleExpandedScenesChange = (ids: string[]) => {
+    setExpandedSceneIds(ids);
+    onExpandedScenesChange?.(ids);
+  };
+
+  const toggleSceneExpanded = (id: string) => {
+    const nextExpandedSceneIds = expandedSceneIds.includes(id)
+      ? expandedSceneIds.filter(sceneId => sceneId !== id)
+      : [...expandedSceneIds, id];
+
+    handleExpandedScenesChange(nextExpandedSceneIds);
+    handleFocusScene(nextExpandedSceneIds.includes(id) ? id : (nextExpandedSceneIds[nextExpandedSceneIds.length - 1] || null));
+  };
+
   useEffect(() => {
     if (initialFocusedSceneId === undefined || initialFocusedSceneId === focusedSceneId) return;
     setFocusedSceneId(initialFocusedSceneId);
   }, [initialFocusedSceneId, focusedSceneId]);
+
+  useEffect(() => {
+    if (!initialExpandedSceneIds) return;
+    setExpandedSceneIds(initialExpandedSceneIds);
+  }, [initialExpandedSceneIds]);
+
+  useEffect(() => {
+    if (!initialDisplayMode || initialDisplayMode === displayMode) return;
+    setDisplayMode(initialDisplayMode);
+  }, [initialDisplayMode, displayMode]);
+
+  useEffect(() => {
+    if (externalCommand?.action === 'tips') {
+      setIsInfoModalOpen(true);
+    }
+  }, [externalCommand]);
 
   const activeScenes = useMemo(() => {
     let filtered = project.scenes
       .filter((s: Scene) => visiblePlotlines.includes(s.plotlineId))
       .sort((a: Scene, b: Scene) => a.position - b.position);
     
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (activeSearchQuery.trim()) {
+      const query = activeSearchQuery.toLowerCase();
       filtered = filtered.filter((s: Scene) => 
         s.title.toLowerCase().includes(query) || 
         s.content.toLowerCase().includes(query)
@@ -218,13 +255,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     }
 
     return filtered;
-  }, [project.scenes, visiblePlotlines, searchQuery]);
-
-  useEffect(() => {
-    if (activeScenes.length > 0 && !focusedSceneId && displayMode === 'focus') {
-      handleFocusScene(activeScenes[0].id);
-    }
-  }, [activeScenes, focusedSceneId, displayMode]);
+  }, [project.scenes, visiblePlotlines, activeSearchQuery]);
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
@@ -233,11 +264,12 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   }, [activeScenes]);
 
   const handlePullInfo = (info: string) => {
-    if (!focusedSceneId) return;
-    const scene = project.scenes.find((s: Scene) => s.id === focusedSceneId);
+    const targetSceneId = focusedSceneId || expandedSceneIds[expandedSceneIds.length - 1];
+    if (!targetSceneId) return;
+    const scene = project.scenes.find((s: Scene) => s.id === targetSceneId);
     if (!scene) return;
     
-    onUpdateScene(focusedSceneId, { content: scene.content + (scene.content ? "\n" : "") + info });
+    onUpdateScene(targetSceneId, { content: scene.content + (scene.content ? "\n" : "") + info });
     setBridgeType(null);
     setSelectedItemId(null);
   };
@@ -254,6 +286,10 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
         // But 'pull' usually means overwrite.
         onUpdateScene(updatedScenes[i].id, { chapterTitle: title });
     }
+  };
+
+  const isInteractiveElement = (target: EventTarget | null) => {
+    return target instanceof HTMLElement && Boolean(target.closest('button, input, textarea, select, a'));
   };
 
   const getCharacterName = (characterId: string) => {
@@ -361,32 +397,32 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             <span className="text-sm font-black tabular-nums">{totalWords.toLocaleString()} מילים</span>
           </div>
 
-          <div className="flex items-center gap-1 bg-black/10 p-1 rounded-lg">
+          <div className="hidden sm:flex items-center gap-1 bg-black/10 p-1 rounded-lg">
             <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
             <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
           </div>
 
-          <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
+          <div className="hidden sm:block w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
 
           <div className="flex items-center gap-2">
             {isSearchOpen ? (
-              <div className="flex items-center bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg px-3 py-1.5 shadow-sm animate-in fade-in slide-in-from-right-2">
+              <div className="hidden sm:flex items-center bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg px-3 py-1.5 shadow-sm animate-in fade-in slide-in-from-right-2">
                 <Search size={14} className="opacity-70 mr-2" />
                 <input 
                   autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={activeSearchQuery}
+                  onChange={(e) => updateSearchQuery(e.target.value)}
                   placeholder="חפש מילים..."
                   className="bg-transparent border-none focus:ring-0 text-xs text-[var(--theme-primary)] placeholder:text-[var(--theme-primary)]/40 w-32"
                 />
-                <button onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] ml-2">
+                <button onClick={() => { setIsSearchOpen(false); updateSearchQuery(''); }} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] ml-2">
                   <X size={14} />
                 </button>
               </div>
             ) : (
               <button 
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+                className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
                 title="חיפוש"
               >
                 <Search size={14} />
@@ -410,10 +446,10 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
               <BookOpen size={14} />
               <span>שלוף משאלון</span>
             </button>
-            <div className="w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
+            <div className="hidden sm:block w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
             <button 
               onClick={onExport}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="ייצוא כתב יד"
             >
               <Download size={14} />
@@ -421,7 +457,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             </button>
             <button 
               onClick={() => setIsInfoModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="מידע על כתיבה"
             >
               <Info size={14} />
@@ -434,7 +470,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
       <div className="space-y-4">
         {activeScenes.map((scene, idx) => {
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
-          const isExpanded = displayMode === 'full' || focusedSceneId === scene.id;
+          const isExpanded = displayMode === 'full' || expandedSceneIds.includes(scene.id);
           
           const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
 
@@ -453,7 +489,14 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 </div>
               )}
               
-              <article className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`} style={{ borderRightColor: plotline?.color }} onClick={() => { if (!isExpanded) handleFocusScene(scene.id); }}>
+              <article
+                className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
+                style={{ borderRightColor: plotline?.color }}
+                onClick={(event) => {
+                  if (displayMode === 'full' || isInteractiveElement(event.target)) return;
+                  toggleSceneExpanded(scene.id);
+                }}
+              >
                 {!isExpanded ? (
                   <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
                     <div className="flex items-center gap-4">
@@ -468,11 +511,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
                       {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
-                      {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
-                        <span title="מקושר למבנה העלילה">
-                          <Pin size={14} className="text-[var(--theme-accent)] rotate-45" />
-                        </span>
-                      )}
                     </div>
                     <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
                   </div>
@@ -492,11 +530,6 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                             placeholder="כותרת הסצנה..." 
                             onChange={(val) => onUpdateScene(scene.id, { title: val })} 
                           />
-                          {Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id) && (
-                            <span title="מקושר למבנה העלילה">
-                              <Pin size={20} className="text-[var(--theme-accent)] rotate-45" />
-                            </span>
-                          )}
                         </div>
                         {scene.summary && (
                           <p className="mt-1 max-w-2xl text-sm font-medium leading-relaxed text-[var(--theme-primary)]/45">

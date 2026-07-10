@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
-  Save, X, ChevronLeft, UserRound, UserRoundSearch, FileText, 
+  Save, X, ChevronLeft, ChevronDown, UserRound, UserRoundSearch, FileText, 
   Download, LayoutList, Globe, Home, Eye, PencilLine, ClipboardList,
   Search,
   Zap,
@@ -349,6 +349,75 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const currentCategory = activeCategory || categories[currentCategoryIndex] || categories[0];
 
   const Icon = activeTab === 'characters' ? User : activeTab === 'relationships' ? Users : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : activeTab === 'fantasyWorlds' ? Wand2 : FileText;
+  const addEntryLabel = isRelationshipsTab
+    ? 'הוסף מערכת יחסים'
+    : activeTab === 'characters'
+      ? 'הוסף דמות'
+      : activeTab === 'places'
+        ? 'הוסף מקום'
+        : activeTab === 'periods'
+          ? 'הוסף תקופה'
+          : activeTab === 'twists'
+            ? 'הוסף טוויסט'
+            : activeTab === 'fantasyWorlds'
+              ? 'הוסף עולם'
+              : 'הוסף פריט';
+  const entryMenuLabel = isRelationshipsTab
+    ? 'מערכות יחסים'
+    : activeTab === 'characters'
+      ? 'דמויות'
+      : activeTab === 'places'
+        ? 'מקומות'
+        : activeTab === 'periods'
+          ? 'תקופות'
+          : activeTab === 'twists'
+            ? 'טוויסטים'
+            : activeTab === 'fantasyWorlds'
+              ? 'עולמות'
+              : 'רקע';
+  const mobileEntrySelectValue = activeTab === 'backgrounds'
+    ? (selectedEntry?.role ? `background:${selectedEntry.role}` : '')
+    : (selectedEntryId || '');
+
+  const handleMobileEntrySelect = (value: string) => {
+    if (!value) {
+      handleEntrySelect(null);
+      return;
+    }
+
+    if (value === '__add__') {
+      if (isRelationshipsTab) {
+        addRelationship();
+      } else if (activeTab !== 'backgrounds') {
+        addEntry();
+      }
+      return;
+    }
+
+    if (activeTab === 'backgrounds' && value.startsWith('background:')) {
+      const typeId = value.replace('background:', '');
+      const type = BACKGROUND_TYPES.find(bgType => bgType.id === typeId);
+      if (!type) return;
+
+      let entry = backgrounds.find(e => e.role === type.id);
+      if (!entry) {
+        entry = {
+          id: `bg-${type.id}`,
+          name: type.label,
+          role: type.id,
+          data: {},
+          loreItems: [],
+          customFields: []
+        };
+        onUpdateBackgrounds([...backgrounds, entry]);
+      }
+      handleEntrySelect(entry.id);
+      setMode('edit');
+      return;
+    }
+
+    handleEntrySelect(value);
+  };
 
   const filteredQuestions = questionsConfig.filter(q => {
     const matchesCategory = mode === 'edit' ? q.category === currentCategory : (activeCategory ? q.category === activeCategory : true);
@@ -672,9 +741,24 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col p-6 gap-6 max-w-[1600px] mx-auto">
-      <div className="flex justify-center flex-shrink-0">
-        <div className="bg-[var(--theme-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg flex gap-1 border border-[var(--theme-border)]/50 overflow-x-auto max-w-full">
+    <div className="min-h-full lg:h-full flex flex-col p-4 sm:p-6 gap-4 sm:gap-6 max-w-[1600px] mx-auto">
+      <div className="hidden justify-center flex-shrink-0 sm:flex">
+        <label className="hidden">
+          <select
+            value={activeTab}
+            onChange={(e) => handleTabChange(e.target.value as QuestionnaireTabId)}
+            className="w-full appearance-none rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] py-3.5 pr-12 pl-10 text-sm font-bold text-[var(--theme-primary)] shadow-lg outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/15"
+            aria-label="שאלונים"
+          >
+            <option value={activeTab}>שאלונים</option>
+            {QUESTIONNAIRE_NAV_ITEMS.map(tab => (
+              <option key={tab.id} value={tab.id}>{tab.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={18} className="pointer-events-none absolute left-4 text-[var(--theme-primary)]/50" />
+        </label>
+
+        <div className="hidden bg-[var(--theme-card)]/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg sm:flex gap-1 border border-[var(--theme-border)]/50 overflow-x-auto max-w-full">
           {QUESTIONNAIRE_NAV_ITEMS.map(tab => (
             <button 
               key={tab.id}
@@ -688,8 +772,64 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 flex gap-6 min-h-0">
-        <div className="w-64 flex flex-col gap-4 flex-shrink-0">
+      <label className="relative flex w-full items-center lg:hidden">
+        <Icon size={18} className="pointer-events-none absolute right-4 text-[var(--theme-primary)]/60" />
+        <select
+          value={mobileEntrySelectValue}
+          onChange={(e) => handleMobileEntrySelect(e.target.value)}
+          className="w-full appearance-none rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] py-3.5 pr-12 pl-10 text-sm font-bold text-[var(--theme-primary)] shadow-sm outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/15"
+          aria-label={entryMenuLabel}
+        >
+          <option value="">{entryMenuLabel}</option>
+          {activeTab === 'backgrounds' ? (
+            BACKGROUND_TYPES.map(type => (
+              <option key={type.id} value={`background:${type.id}`}>{type.label}</option>
+            ))
+          ) : isRelationshipsTab ? (
+            relationships.map(rel => (
+              <option key={rel.id} value={rel.id}>{getRelationshipLabel(rel, characters)}</option>
+            ))
+          ) : (
+            entries.map(entry => (
+              <option key={entry.id} value={entry.id}>{entry.name}</option>
+            ))
+          )}
+          {activeTab !== 'backgrounds' && (
+            <option value="__add__">+ {addEntryLabel}</option>
+          )}
+        </select>
+        <ChevronDown size={18} className="pointer-events-none absolute left-4 text-[var(--theme-primary)]/50" />
+      </label>
+
+      {selectedEntry && categories.length > 0 && (
+        <label className="relative flex w-full items-center lg:hidden">
+          <LayoutList size={18} className="pointer-events-none absolute right-4 text-[var(--theme-primary)]/60" />
+          <select
+            value={mode === 'edit' ? String(currentCategoryIndex) : (activeCategory ? String(categories.indexOf(activeCategory)) : '')}
+            onChange={(e) => {
+              if (e.target.value === '') {
+                setActiveCategory(null);
+                return;
+              }
+
+              const nextIndex = Number(e.target.value);
+              setCurrentCategoryIndex(nextIndex);
+              setActiveCategory(mode === 'edit' ? null : categories[nextIndex]);
+            }}
+            className="w-full appearance-none rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] py-3.5 pr-12 pl-10 text-sm font-bold text-[var(--theme-primary)] shadow-sm outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/15"
+            aria-label="קטגוריות"
+          >
+            <option value={currentCategoryIndex}>קטגוריות</option>
+            {categories.map((cat, index) => (
+              <option key={cat} value={index}>{cat}</option>
+            ))}
+          </select>
+          <ChevronDown size={18} className="pointer-events-none absolute left-4 text-[var(--theme-primary)]/50" />
+        </label>
+      )}
+
+      <div className="flex-none flex flex-col lg:flex-1 lg:flex-row gap-6 lg:min-h-0">
+        <div className="hidden w-64 flex-col gap-4 flex-shrink-0 lg:flex">
           {activeTab === 'backgrounds' ? (
             <div className="flex flex-col gap-2">
               <div className="text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest px-2 mb-1">קטגוריות רקע</div>
@@ -853,7 +993,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         </div>
 
         {selectedEntry && mode === 'edit' && isCategoriesVisible && (
-          <div className="w-56 flex flex-col gap-2 flex-shrink-0 animate-in slide-in-from-right-4 duration-300">
+          <div className="hidden w-56 flex-col gap-2 flex-shrink-0 animate-in slide-in-from-right-4 duration-300 lg:flex">
              <div className="p-2 text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-2 px-4 flex items-center justify-between">
                 <span>קטגוריות שאלון</span>
                 <button onClick={() => setIsCategoriesVisible(false)} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"><X size={14} /></button>
@@ -883,7 +1023,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         )}
 
-        <div className="flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
+        <div className="flex-none lg:flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-visible lg:overflow-hidden flex flex-col min-w-0 transition-all duration-300">
           {selectedRelationship ? (
             <>
               <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
@@ -913,7 +1053,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
+              <div className="flex-none lg:flex-1 overflow-visible lg:overflow-y-auto p-4 sm:p-8 scroll-smooth">
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <label className="space-y-2">
@@ -957,19 +1097,145 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           ) : selectedEntry ? (
             <>
               <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
+                <div className="flex flex-col items-stretch gap-4">
+                  {mode === 'edit' && (
+                    <div className="flex items-center justify-start gap-2" dir="rtl">
+                      <div className="relative group/img shrink-0">
+                        <div className="w-20 h-20 rounded-2xl shadow-sm border border-[var(--theme-border)]/50 overflow-hidden bg-[var(--theme-card)] flex items-center justify-center relative">
+                          {selectedEntry.imageUrl ? (
+                            <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
+                          ) : (
+                            <Icon size={30} className="text-[var(--theme-primary)]/20" />
+                          )}
+                          <label
+                            className="absolute inset-0 flex items-center justify-center bg-[var(--theme-primary)]/40 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer text-[var(--theme-card)]"
+                            onClick={(e) => {
+                              if (isElectron) {
+                                e.preventDefault();
+                                handleImageUpload(null as any);
+                              }
+                            }}
+                            title="תמונה"
+                          >
+                            <Camera size={26} />
+                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                          </label>
+                        </div>
+                        {selectedEntry.imageUrl && (
+                          <button
+                            onClick={handleRemoveImage}
+                            className="absolute -top-2 -right-2 bg-[var(--theme-card)] text-red-500 p-1 rounded-full shadow-md border border-red-100 hover:bg-red-50 transition-all z-10"
+                            title="הסרת תמונה"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setMode('view')}
+                        className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                        title="תצוגת תעודת זהות"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        onClick={exportCurrentEntry}
+                        className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                        title="ייצוא נתונים"
+                      >
+                        <Download size={18} />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {isSearchActive && (
+                          <input
+                            type="text"
+                            placeholder="חפש שאלה..."
+                            value={questionSearchQuery}
+                            onChange={(e) => setQuestionSearchQuery(e.target.value)}
+                            className="bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none w-32 sm:w-40 animate-in slide-in-from-left-2"
+                            autoFocus
+                          />
+                        )}
+                        <button
+                          onClick={() => setIsSearchActive(!isSearchActive)}
+                          className={`p-2.5 rounded-xl transition-all shadow-sm border ${isSearchActive ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] border-[var(--theme-primary)]/30' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                          title="חיפוש שאלה"
+                        >
+                          <Search size={18} />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                        className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                        title="מחיקת פריט"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
+                  {mode === 'view' && (
+                    <div className="flex items-center justify-start gap-2" dir="rtl">
+                      <div className="w-20 h-20 rounded-2xl shadow-sm border border-[var(--theme-border)]/50 overflow-hidden bg-[var(--theme-card)] flex items-center justify-center shrink-0">
+                        {selectedEntry.imageUrl ? (
+                          <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon size={30} className="text-[var(--theme-primary)]/20" />
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setMode('edit')}
+                        className="p-2.5 bg-[var(--theme-primary)] border border-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl hover:opacity-90 transition-all shadow-sm"
+                        title="עריכת פרטים"
+                      >
+                        <PencilLine size={18} />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {isSearchActive && (
+                          <input
+                            type="text"
+                            placeholder="חפש שאלה..."
+                            value={questionSearchQuery}
+                            onChange={(e) => setQuestionSearchQuery(e.target.value)}
+                            className="bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[var(--theme-primary)]/20 outline-none w-32 sm:w-40 animate-in slide-in-from-left-2"
+                            autoFocus
+                          />
+                        )}
+                        <button
+                          onClick={() => setIsSearchActive(!isSearchActive)}
+                          className={`p-2.5 rounded-xl transition-all shadow-sm border ${isSearchActive ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] border-[var(--theme-primary)]/30' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                          title="חיפוש שאלה"
+                        >
+                          <Search size={18} />
+                        </button>
+                      </div>
+                      <button
+                        onClick={exportCurrentEntry}
+                        className="p-2.5 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 text-[var(--theme-primary)] rounded-xl hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                        title="ייצוא נתונים"
+                      >
+                        <Download size={18} />
+                      </button>
+                      <button
+                        onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                        className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
+                        title="מחיקת פריט"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
+                  <div className={`flex items-center gap-4 flex-1 ${mode === 'edit' ? 'w-full' : ''}`}>
                      {!isCategoriesVisible && mode === 'edit' && (
                        <button 
                         onClick={() => setIsCategoriesVisible(true)}
-                        className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50"
+                        className="hidden p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50 lg:block"
                         title="הצג קטגוריות"
                        >
                          <LayoutList size={20} />
                        </button>
                      )}
                      
-                      <div className="relative group/img">
+                      <div className={`relative group/img ${mode === 'edit' || mode === 'view' ? 'hidden' : ''}`}>
                         <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-[var(--theme-border)]/50 overflow-hidden bg-[var(--theme-card)] flex items-center justify-center relative">
                           {selectedEntry.imageUrl ? (
                             <img src={selectedEntry.imageUrl} className="w-full h-full object-cover" />
@@ -1014,12 +1280,12 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                               placeholder="שם..."
                             />
                             {activeTab === 'characters' && (
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-3 flex flex-nowrap gap-1.5 overflow-hidden">
                                 {CHARACTER_ROLES.map(role => (
                                   <button
                                     key={role.id}
                                     onClick={() => updateEntry({ role: role.id })}
-                                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                                    className={`min-w-0 flex-1 whitespace-normal break-words px-1.5 py-1 rounded-full text-[9px] sm:text-[10px] font-bold leading-tight transition-all border ${selectedEntry.role === role.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] shadow-sm' : 'bg-[var(--theme-card)] text-[var(--theme-primary)]/60 border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
                                   >
                                     {role.label}
                                   </button>
@@ -1042,13 +1308,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      </div>
                   </div>
                   
-                 <div className="flex flex-col items-end gap-3">
+                 <div className={`flex flex-col items-end gap-3 ${mode === 'edit' || mode === 'view' ? 'hidden' : ''}`}>
                   <button 
                     onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] hover:opacity-90' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                    className={`flex items-center justify-center gap-2 p-2.5 sm:px-6 sm:py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm border ${mode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] border-[var(--theme-primary)] hover:opacity-90' : 'bg-[var(--theme-card)] text-[var(--theme-primary)] border-[var(--theme-border)]/50 hover:bg-[var(--theme-secondary)]'}`}
+                    title={mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}
                   >
                     {mode === 'edit' ? <Eye size={18} /> : <PencilLine size={18} />}
-                    <span>{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
+                    <span className="hidden sm:inline">{mode === 'edit' ? 'תצוגת תעודת זהות' : 'עריכת פרטים'}</span>
                   </button>
                   <div className="flex items-center gap-2">
 
@@ -1095,7 +1362,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
+            <div className="flex-none lg:flex-1 overflow-visible lg:overflow-y-auto p-4 sm:p-8 scroll-smooth">
                 {mode === 'edit' ? (
                   <>
                     {currentCategory === "פיתוח דמות" ? (
