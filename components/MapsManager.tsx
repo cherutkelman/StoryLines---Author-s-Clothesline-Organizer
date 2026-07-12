@@ -4,7 +4,7 @@ import { QuestionnaireEntry, CharacterMapConnection, WorldMap, MindMap, Book } f
 import CharacterMap from './CharacterMap';
 import WorldMapEditor from './WorldMapEditor';
 import MindMapEditor from './MindMapEditor';
-import { MAP_NAV_ITEMS, type MapTabId } from './mapNavigation';
+import { type MapTabId } from './mapNavigation';
 
 interface MapsManagerProps {
   allBooks: Book[];
@@ -58,17 +58,26 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   }, [initialTab]);
 
   useEffect(() => {
-    if (selectedMapId) setCurrentMapId(selectedMapId);
+    setCurrentMapId(selectedMapId || null);
   }, [selectedMapId]);
 
   useEffect(() => {
-    if (selectedMindMapId) setCurrentMindMapId(selectedMindMapId);
+    setCurrentMindMapId(selectedMindMapId || null);
   }, [selectedMindMapId]);
 
-  const handleTabChange = (tab: MapTabId) => {
-    setActiveTab(tab);
-    onTabChange?.(tab);
-  };
+  useEffect(() => {
+    if (currentMapId && !maps.some(map => map.id === currentMapId)) {
+      setCurrentMapId(null);
+      onMapSelect?.(null);
+    }
+  }, [maps, currentMapId, onMapSelect]);
+
+  useEffect(() => {
+    if (currentMindMapId && !mindMaps.some(map => map.id === currentMindMapId)) {
+      setCurrentMindMapId(null);
+      onMindMapSelect?.(null);
+    }
+  }, [mindMaps, currentMindMapId, onMindMapSelect]);
 
   const addMap = () => {
     const newMap: WorldMap = {
@@ -198,23 +207,8 @@ const MapsManager: React.FC<MapsManagerProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-[var(--theme-bg)]">
-      <div className="flex-shrink-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-6 py-2 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-1 bg-[var(--theme-secondary)]/50 p-1 rounded-xl border border-[var(--theme-border)]/50 overflow-x-auto scrollbar-hide">
-          {MAP_NAV_ITEMS.map(item => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === item.id ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
-              >
-                <Icon size={14} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
+      {((activeTab === 'worldMaps' && currentMapId) || (activeTab === 'mindMaps' && currentMindMapId)) && (
+      <div className="flex-shrink-0 bg-[var(--theme-card)] border-b border-[var(--theme-border)] px-6 py-2 flex items-center justify-end shadow-sm z-10">
         {activeTab === 'worldMaps' && currentMapId && (
           <div className="flex items-center gap-3">
              <button 
@@ -253,6 +247,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
           </div>
         )}
       </div>
+      )}
 
       <div className="flex-1 relative overflow-hidden">
         {activeTab === 'characterDiagram' ? (
@@ -314,7 +309,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
                             <h4 className="font-bold text-[var(--theme-accent)] handwritten text-2xl truncate flex-1">{map.name}</h4>
                             <button 
                               onClick={(e) => deleteMap(map.id, e)}
-                              className="p-2 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                              className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -383,7 +378,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
                             <h4 className="font-bold text-[var(--theme-accent)] handwritten text-2xl truncate flex-1">{map.name}</h4>
                             <button 
                               onClick={(e) => deleteMindMap(map.id, e)}
-                              className="p-2 text-red-200 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                              className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                             >
                               <Trash2 size={16} />
                             </button>

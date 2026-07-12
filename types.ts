@@ -209,14 +209,15 @@ export interface CharacterMapConnection {
   toId: string;
   description: string;
   labelPosition?: number; // 0 to 1, default 0.5
+  labelOffset?: { x: number; y: number };
 }
 
 export interface MapElement {
   id: string;
-  type: 'icon' | 'text' | 'line';
+  type: 'icon' | 'text' | 'line' | 'image' | 'rect' | 'circle' | 'triangle';
   x: number;
   y: number;
-  iconType?: 'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'animal';
+  iconType?: 'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'animal' | 'fish' | 'horse' | 'snake' | 'cattle' | 'sheep' | 'eagle' | 'wildcat' | 'flower' | 'wave' | 'village' | 'camp' | 'temple' | 'hotel' | 'hospital' | 'factory' | 'park' | 'city' | 'car' | 'bus' | 'ambulance' | 'fire_truck' | 'truck' | 'tractor' | 'train' | 'plane' | 'ship' | 'desert' | 'beach' | 'rainbow' | 'fire' | 'field' | 'traffic_light' | 'barrier' | 'cat' | 'bird' | 'market';
   text?: string;
   points?: number[]; // For lines (road, river, pool)
   stroke?: string;
@@ -225,12 +226,32 @@ export interface MapElement {
   fontSize?: number;
   questionnaireId?: string;
   isPlace?: boolean;
+  imageUrl?: string;
+  width?: number;
+  height?: number;
+  radius?: number;
+  radiusX?: number;
+  radiusY?: number;
+  opacity?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  dash?: number[];
+  lineCap?: 'butt' | 'round' | 'square';
+  isPool?: boolean;
+  isEraser?: boolean;
+  erasers?: {
+    points: number[];
+    strokeWidth?: number;
+    lineCap?: 'butt' | 'round' | 'square';
+  }[];
 }
 
 export interface WorldMap {
   id: string;
   name: string;
   backgroundImage?: string; // Base64 uploaded image
+  backgroundColor?: string;
   elements: MapElement[];
 }
 

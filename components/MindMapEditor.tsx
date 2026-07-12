@@ -16,10 +16,11 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
-  const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const centeredMapIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -58,22 +59,31 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   }, [scale, stagePos]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const handleResize = () => {
-      if (containerRef.current) {
+      if (container) {
         setStageSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
+          width: container.offsetWidth,
+          height: container.offsetHeight
         });
       }
     };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
     window.addEventListener('resize', handleResize);
     handleResize();
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // Initialize root node if map is empty
   useEffect(() => {
-    if (map.nodes.length === 0) {
+    if (map.nodes.length === 0 && stageSize.width > 0 && stageSize.height > 0) {
       const rootNode: MindMapNode = {
         id: 'root',
         x: stageSize.width / 2,
@@ -84,7 +94,23 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
       };
       onUpdateMap({ nodes: [rootNode], edges: [] });
     }
-  }, [map.nodes.length, stageSize]);
+  }, [map.nodes.length, stageSize, onUpdateMap]);
+
+  useEffect(() => {
+    if (stageSize.width <= 0 || stageSize.height <= 0 || map.nodes.length === 0) return;
+    if (centeredMapIdRef.current === map.id) return;
+
+    const rootNode = map.nodes.find(node => node.isRoot) || map.nodes[0];
+    if (!rootNode) return;
+
+    setSelectedId(rootNode.id);
+    setScale(1);
+    setStagePos({
+      x: stageSize.width / 2 - rootNode.x,
+      y: stageSize.height / 2 - rootNode.y
+    });
+    centeredMapIdRef.current = map.id;
+  }, [map.id, map.nodes, stageSize]);
 
   const handleNodeDragEnd = (id: string, e: any) => {
     const updatedNodes: MindMapNode[] = map.nodes.map(node => 
@@ -98,10 +124,13 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
     if (!parent) return;
 
     const id = `node-${Date.now()}`;
+    const existingChildrenCount = map.edges.filter(edge => edge.fromId === parentId).length;
+    const angle = existingChildrenCount * 0.9 - 0.9;
+    const distance = 150;
     const newNode: MindMapNode = {
       id,
-      x: parent.x + 150,
-      y: parent.y + (Math.random() - 0.5) * 100,
+      x: parent.x + Math.cos(angle) * distance,
+      y: parent.y + Math.sin(angle) * distance,
       text: 'רעיון חדש',
       type: 'square'
     };
@@ -116,7 +145,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
       nodes: [...map.nodes, newNode],
       edges: [...map.edges, newEdge]
     });
-    setSelectedId(id);
+    setSelectedId(parentId);
   };
 
   const toggleNodeType = (id: string) => {
@@ -165,9 +194,26 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
 
   const zoomIn = () => setScale(prev => Math.min(prev + 0.1, 3));
   const zoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.5));
-  const resetZoom = () => { setScale(1); setStagePos({ x: 0, y: 0 }); };
+  const centerNode = (node: MindMapNode) => {
+    setScale(1);
+    setStagePos({
+      x: stageSize.width / 2 - node.x,
+      y: stageSize.height / 2 - node.y
+    });
+  };
+  const resetZoom = () => {
+    const rootNode = map.nodes.find(node => node.isRoot) || map.nodes[0];
+    if (rootNode) {
+      centerNode(rootNode);
+    } else {
+      setScale(1);
+      setStagePos({ x: 0, y: 0 });
+    }
+  };
 
   const selectedNode = map.nodes.find(n => n.id === selectedId);
+  const rootNode = map.nodes.find(n => n.isRoot) || map.nodes[0];
+  const activeNode = selectedNode || rootNode;
 
   return (
     <div className="h-full flex relative bg-[var(--theme-bg)]">
@@ -188,7 +234,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
             }
           }}
           onClick={(e) => {
-            if (e.target === stageRef.current) setSelectedId(null);
+            if (e.target === stageRef.current) setSelectedId(rootNode?.id || null);
           }}
         >
           <Layer>
@@ -215,7 +261,14 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                 y={node.y}
                 draggable
                 onDragEnd={(e) => handleNodeDragEnd(node.id, e)}
-                onClick={() => setSelectedId(node.id)}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  setSelectedId(node.id);
+                }}
+                onTap={(e) => {
+                  e.cancelBubble = true;
+                  setSelectedId(node.id);
+                }}
               >
                 {node.type === 'circle' ? (
                   <Circle
@@ -276,27 +329,26 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
           <button onClick={resetZoom} className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"><Maximize size={18} /></button>
         </div>
 
-        {/* Node Actions (when selected) */}
-        {selectedNode && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-[2rem] shadow-2xl p-4 flex items-center gap-4 z-10 animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-[var(--theme-primary)]/40 uppercase px-2">טקסט</label>
+        {/* Node Actions */}
+        {activeNode && (
+          <div className="absolute top-2 left-2 right-2 sm:top-auto sm:right-auto sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-2xl shadow-2xl p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 z-20 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex flex-col gap-1 min-w-0">
+              <label className="sr-only">טקסט</label>
               <input 
                 type="text"
-                value={selectedNode.text}
-                onChange={(e) => updateNodeText(selectedNode.id, e.target.value)}
-                className="bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-xl px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/20 w-48 text-[var(--theme-primary)]"
-                autoFocus
+                value={activeNode.text}
+                onChange={(e) => updateNodeText(activeNode.id, e.target.value)}
+                className="bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-xl px-3 py-1.5 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/20 w-full sm:w-48 text-[var(--theme-primary)]"
               />
             </div>
             
-            <div className="h-8 w-px bg-[var(--theme-border)]/50 mx-2" />
+            <div className="hidden sm:block h-8 w-px bg-[var(--theme-border)]/50 mx-2" />
             
-            <div className="flex items-center gap-2">
-              {selectedNode.type === 'circle' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeNode.type === 'circle' && (
                 <button 
-                  onClick={() => addNode(selectedNode.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-xs font-bold hover:opacity-90 transition-all"
+                  onClick={() => addNode(activeNode.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-xs font-bold hover:opacity-90 transition-all"
                 >
                   <Share2 size={14} />
                   <span>הוסף ענף</span>
@@ -304,17 +356,17 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
               )}
               
               <button 
-                onClick={() => toggleNodeType(selectedNode.id)}
-                className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"
-                title={selectedNode.type === 'circle' ? 'הפוך לריבוע' : 'הפוך לעיגול'}
+                onClick={() => toggleNodeType(activeNode.id)}
+                className="p-1.5 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-all"
+                title={activeNode.type === 'circle' ? 'הפוך לריבוע' : 'הפוך לעיגול'}
               >
                 <RefreshCw size={18} />
               </button>
 
-              {!selectedNode.isRoot && (
+              {!activeNode.isRoot && (
                 <button 
-                  onClick={() => deleteNode(selectedNode.id)}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  onClick={() => deleteNode(activeNode.id)}
+                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"
                   title="מחק"
                 >
                   <Trash2 size={18} />
@@ -322,7 +374,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
               )}
             </div>
 
-            <button onClick={() => setSelectedId(null)} className="p-2 text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]">
+            <button onClick={() => setSelectedId(rootNode?.id || null)} className="absolute top-1 left-1 sm:static p-1.5 text-[var(--theme-primary)]/30 hover:text-[var(--theme-primary)]">
               <X size={18} />
             </button>
           </div>

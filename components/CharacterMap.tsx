@@ -31,6 +31,23 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     contentHeight: number;
   } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const touchGestureRef = useRef<{
+    mode: 'pan' | 'pinch' | null;
+    lastX: number;
+    lastY: number;
+    startDistance: number;
+    startZoom: number;
+    startPan: { x: number; y: number };
+    startCenter: { x: number; y: number };
+  }>({
+    mode: null,
+    lastX: 0,
+    lastY: 0,
+    startDistance: 0,
+    startZoom: 1,
+    startPan: { x: 0, y: 0 },
+    startCenter: { x: 0, y: 0 }
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,18 +68,99 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
 
   const [localCharacters, setLocalCharacters] = useState<QuestionnaireEntry[]>(characters);
   const [localConnections, setLocalConnections] = useState<CharacterMapConnection[]>(connections);
+  const localCharactersRef = useRef<QuestionnaireEntry[]>(characters);
+  const localConnectionsRef = useRef<CharacterMapConnection[]>(connections);
+
+  const getTouchDistance = (touches: React.TouchList) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const getTouchCenter = (touches: React.TouchList) => ({
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  });
+
+  const getCanvasPoint = (clientX: number, clientY: number, scale = zoom, pan = panOffset) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (clientX - rect.left) / scale - pan.x,
+      y: (clientY - rect.top) / scale - pan.y
+    };
+  };
+
+  const moveNodeToPoint = (id: string, clientX: number, clientY: number) => {
+    const point = getCanvasPoint(clientX, clientY);
+    setLocalCharacters(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, x: point.x, y: point.y } : n);
+      localCharactersRef.current = next;
+      return next;
+    });
+  };
+
+  const getConnectionLabelPoint = (conn: CharacterMapConnection, fromNode: QuestionnaireEntry, toNode: QuestionnaireEntry) => {
+    const t = conn.labelPosition ?? 0.5;
+    const x1 = fromNode.x ?? 0;
+    const y1 = fromNode.y ?? 0;
+    const x2 = toNode.x ?? 0;
+    const y2 = toNode.y ?? 0;
+    const baseX = x1 + (x2 - x1) * t;
+    const baseY = y1 + (y2 - y1) * t;
+
+    return {
+      x: baseX + (conn.labelOffset?.x ?? 0),
+      y: baseY + (conn.labelOffset?.y ?? 0),
+      baseX,
+      baseY
+    };
+  };
+
+  const moveConnectionLabelToPoint = (id: string, clientX: number, clientY: number) => {
+    const point = getCanvasPoint(clientX, clientY);
+    setLocalConnections(prev => {
+      const next = prev.map(conn => {
+        if (conn.id !== id) return conn;
+        const fromNode = localCharactersRef.current.find(n => n.id === conn.fromId);
+        const toNode = localCharactersRef.current.find(n => n.id === conn.toId);
+        if (!fromNode || !toNode) return conn;
+        const labelPoint = getConnectionLabelPoint(conn, fromNode, toNode);
+
+        return {
+          ...conn,
+          labelOffset: {
+            x: point.x - labelPoint.baseX,
+            y: point.y - labelPoint.baseY
+          }
+        };
+      });
+      localConnectionsRef.current = next;
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!draggingNodeId && !draggingLabelId) {
       setLocalCharacters(characters);
+      localCharactersRef.current = characters;
     }
   }, [characters, draggingNodeId, draggingLabelId]);
 
   useEffect(() => {
+    localCharactersRef.current = localCharacters;
+  }, [localCharacters]);
+
+  useEffect(() => {
     if (!draggingNodeId && !draggingLabelId) {
       setLocalConnections(connections);
+      localConnectionsRef.current = connections;
     }
   }, [connections, draggingNodeId, draggingLabelId]);
+
+  useEffect(() => {
+    localConnectionsRef.current = localConnections;
+  }, [localConnections]);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (tool === 'move') {
@@ -83,8 +181,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     setSelectedNodeId(newNode.id);
   };
 
-  const handleNodeMouseDown = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const startNodeInteraction = (id: string) => {
     if (tool === 'link') {
       if (selectedNodeId && selectedNodeId !== id) {
         // Create connection
@@ -108,6 +205,60 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     }
   };
 
+  const handleNodeMouseDown = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    startNodeInteraction(id);
+  };
+
+  const handleNodeTouchStart = (e: React.TouchEvent, id: string) => {
+    if (isExporting) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, label')) return;
+    e.stopPropagation();
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    startNodeInteraction(id);
+  };
+
+  const handleNodeTouchMove = (e: React.TouchEvent, id: string) => {
+    if (isExporting || draggingNodeId !== id || tool !== 'move' || e.touches.length !== 1) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const touch = e.touches[0];
+    moveNodeToPoint(id, touch.clientX, touch.clientY);
+  };
+
+  const handleNodeTouchEnd = (e: React.TouchEvent, id: string) => {
+    if (draggingNodeId !== id) return;
+    e.stopPropagation();
+    onUpdateCharacters(localCharactersRef.current);
+    setDraggingNodeId(null);
+    touchGestureRef.current.mode = null;
+  };
+
+  const handleLabelTouchStart = (e: React.TouchEvent, id: string) => {
+    if (isExporting || e.touches.length !== 1) return;
+    e.stopPropagation();
+    e.preventDefault();
+    setDraggingLabelId(id);
+  };
+
+  const handleLabelTouchMove = (e: React.TouchEvent, id: string) => {
+    if (isExporting || draggingLabelId !== id || e.touches.length !== 1) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const touch = e.touches[0];
+    moveConnectionLabelToPoint(id, touch.clientX, touch.clientY);
+  };
+
+  const handleLabelTouchEnd = (e: React.TouchEvent, id: string) => {
+    if (draggingLabelId !== id) return;
+    e.stopPropagation();
+    onUpdateConnections(localConnectionsRef.current);
+    setDraggingLabelId(null);
+    touchGestureRef.current.mode = null;
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -123,42 +274,95 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     }
 
     if (draggingNodeId && tool === 'move') {
-      setLocalCharacters(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n));
+      setLocalCharacters(prev => {
+        const next = prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n);
+        localCharactersRef.current = next;
+        return next;
+      });
     } else if (draggingLabelId) {
-      const conn = localConnections.find(c => c.id === draggingLabelId);
-      if (!conn) return;
-      const from = localCharacters.find(n => n.id === conn.fromId);
-      const to = localCharacters.find(n => n.id === conn.toId);
-      if (!from || !to) return;
-
-      const x1 = from.x ?? 0;
-      const y1 = from.y ?? 0;
-      const x2 = to.x ?? 0;
-      const y2 = to.y ?? 0;
-
-      // Project point onto line segment
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq === 0) return;
-
-      let t = ((x - x1) * dx + (y - y1) * dy) / lenSq;
-      t = Math.max(0.1, Math.min(0.9, t)); // Keep it within bounds and not exactly on nodes
-
-      setLocalConnections(prev => prev.map(c => c.id === draggingLabelId ? { ...c, labelPosition: t } : c));
+      moveConnectionLabelToPoint(draggingLabelId, e.clientX, e.clientY);
     }
   };
 
   const handleMouseUp = () => {
     setIsPanning(false);
     if (draggingNodeId) {
-      onUpdateCharacters(localCharacters);
+      onUpdateCharacters(localCharactersRef.current);
     }
     if (draggingLabelId) {
-      onUpdateConnections(localConnections);
+      onUpdateConnections(localConnectionsRef.current);
     }
     setDraggingNodeId(null);
     setDraggingLabelId(null);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isExporting) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, label')) return;
+
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      touchGestureRef.current = {
+        mode: 'pinch',
+        lastX: 0,
+        lastY: 0,
+        startDistance: getTouchDistance(e.touches),
+        startZoom: zoom,
+        startPan: panOffset,
+        startCenter: getTouchCenter(e.touches)
+      };
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      e.preventDefault();
+      touchGestureRef.current = {
+        ...touchGestureRef.current,
+        mode: 'pan',
+        lastX: e.touches[0].clientX,
+        lastY: e.touches[0].clientY
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isExporting) return;
+    const gesture = touchGestureRef.current;
+
+    if (gesture.mode === 'pinch' && e.touches.length === 2) {
+      e.preventDefault();
+      const center = getTouchCenter(e.touches);
+      const distance = getTouchDistance(e.touches);
+      const nextZoom = Math.min(Math.max(0.2, gesture.startZoom * (distance / Math.max(gesture.startDistance, 1))), 3);
+      const anchor = getCanvasPoint(gesture.startCenter.x, gesture.startCenter.y, gesture.startZoom, gesture.startPan);
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      setZoom(nextZoom);
+      setPanOffset({
+        x: (center.x - rect.left) / nextZoom - anchor.x,
+        y: (center.y - rect.top) / nextZoom - anchor.y
+      });
+      return;
+    }
+
+    if (gesture.mode === 'pan' && e.touches.length === 1) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const dx = (touch.clientX - gesture.lastX) / zoom;
+      const dy = (touch.clientY - gesture.lastY) / zoom;
+      setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      touchGestureRef.current = {
+        ...gesture,
+        lastX: touch.clientX,
+        lastY: touch.clientY
+      };
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchGestureRef.current.mode = null;
   };
 
   const deleteNode = (id: string) => {
@@ -246,19 +450,17 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
       const toNode = localCharacters.find(n => n.id === conn.toId);
       if (!fromNode || !toNode) return;
 
-      const t = conn.labelPosition ?? 0.5;
       const x1 = fromNode.x ?? 0;
       const y1 = fromNode.y ?? 0;
       const x2 = toNode.x ?? 0;
       const y2 = toNode.y ?? 0;
-      const labelX = x1 + (x2 - x1) * t;
-      const labelY = y1 + (y2 - y1) * t;
+      const labelPoint = getConnectionLabelPoint(conn, fromNode, toNode);
 
       points.push({
-        minX: Math.min(x1, x2, labelX - labelHalfWidth),
-        minY: Math.min(y1, y2, labelY - labelHalfHeight),
-        maxX: Math.max(x1, x2, labelX + labelHalfWidth),
-        maxY: Math.max(y1, y2, labelY + labelHalfHeight)
+        minX: Math.min(x1, x2, labelPoint.x - labelHalfWidth),
+        minY: Math.min(y1, y2, labelPoint.y - labelHalfHeight),
+        maxX: Math.max(x1, x2, labelPoint.x + labelHalfWidth),
+        maxY: Math.max(y1, y2, labelPoint.y + labelHalfHeight)
       });
     });
 
@@ -333,7 +535,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
           <button 
             onClick={() => setTool('move')}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
+            className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
           >
             <Move size={18} />
             <span className="text-xs font-bold">הזזה</span>
@@ -345,8 +547,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             <LinkIcon size={18} />
             <span className="text-xs font-bold">קישור דמויות</span>
           </button>
-          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
-          <div className="flex items-center gap-1 bg-[var(--theme-secondary)] rounded-xl p-1 border border-[var(--theme-border)]/50">
+          <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
+          <div className="hidden md:flex items-center gap-1 bg-[var(--theme-secondary)] rounded-xl p-1 border border-[var(--theme-border)]/50">
             <button 
               onClick={() => setZoom(prev => Math.max(0.2, prev - 0.1))}
               className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-lg transition-all"
@@ -372,16 +574,16 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
               <RotateCcw size={14} />
             </button>
           </div>
-          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
+          <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={() => setTool('pan')}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
+            className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
             title="הזזת כל המפה"
           >
             <Grab size={18} />
             <span className="text-xs font-bold">הזזת מפה</span>
           </button>
-          <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
+          <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={addNode}
             className="p-3 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-xl hover:opacity-80 transition-all flex items-center gap-2"
@@ -407,8 +609,9 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
         className={isExporting ? "relative overflow-visible" : "flex-1 overflow-hidden relative"}
         style={isExporting && exportBounds ? {
           width: exportBounds.width,
-          height: exportBounds.height
-        } : undefined}
+          height: exportBounds.height,
+          touchAction: 'none'
+        } : { touchAction: 'none' }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
@@ -418,6 +621,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             setStartPanPos({ x: e.clientX, y: e.clientY });
           }
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onClick={handleCanvasClick}
         >
         <div 
@@ -437,18 +644,23 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             const fromNode = localCharacters.find(n => n.id === conn.fromId);
             const toNode = localCharacters.find(n => n.id === conn.toId);
             if (!fromNode || !toNode) return null;
+            const labelPoint = getConnectionLabelPoint(conn, fromNode, toNode);
+            const x1 = fromNode.x ?? 0;
+            const y1 = fromNode.y ?? 0;
+            const x2 = toNode.x ?? 0;
+            const y2 = toNode.y ?? 0;
+            const curvePath = `M ${x1} ${y1} C ${labelPoint.x} ${labelPoint.y}, ${labelPoint.x} ${labelPoint.y}, ${x2} ${y2}`;
 
             return (
               <g key={conn.id}>
-                <line 
-                  x1={fromNode.x ?? 0} 
-                  y1={fromNode.y ?? 0} 
-                  x2={toNode.x ?? 0} 
-                  y2={toNode.y ?? 0} 
+                <path
+                  d={curvePath}
+                  fill="none"
                   stroke="currentColor" 
                   className="text-[var(--theme-primary)]"
                   strokeWidth="2" 
                   strokeDasharray="5,5" 
+                  strokeLinecap="round"
                   opacity="0.3" 
                 />
               </g>
@@ -462,20 +674,13 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
           const toNode = localCharacters.find(n => n.id === conn.toId);
           if (!fromNode || !toNode) return null;
 
-          const t = conn.labelPosition ?? 0.5;
-          const x1 = fromNode.x ?? 0;
-          const y1 = fromNode.y ?? 0;
-          const x2 = toNode.x ?? 0;
-          const y2 = toNode.y ?? 0;
-
-          const labelX = x1 + (x2 - x1) * t;
-          const labelY = y1 + (y2 - y1) * t;
+          const labelPoint = getConnectionLabelPoint(conn, fromNode, toNode);
 
           return (
             <div 
               key={`${conn.id}-text`}
               className="absolute pointer-events-auto z-10 group"
-              style={{ left: labelX, top: labelY, transform: 'translate(-50%, -50%)' }}
+              style={{ left: labelPoint.x, top: labelPoint.y, transform: 'translate(-50%, -50%)' }}
             >
               <div className="relative flex flex-col items-center">
                 <div 
@@ -485,6 +690,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
                     e.stopPropagation();
                     setDraggingLabelId(conn.id);
                   }}
+                  onTouchStart={(e) => handleLabelTouchStart(e, conn.id)}
+                  onTouchMove={(e) => handleLabelTouchMove(e, conn.id)}
+                  onTouchEnd={(e) => handleLabelTouchEnd(e, conn.id)}
+                  onTouchCancel={(e) => handleLabelTouchEnd(e, conn.id)}
                 >
                   {!isExporting && <Move size={14} />}
                 </div>
@@ -528,10 +737,20 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-1.5 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
             style={{ left: node.x ?? 200, top: node.y ?? 200, transform: 'translate(-50%, -50%)' }}
             onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+            onTouchStart={(e) => handleNodeTouchStart(e, node.id)}
+            onTouchMove={(e) => handleNodeTouchMove(e, node.id)}
+            onTouchEnd={(e) => handleNodeTouchEnd(e, node.id)}
+            onTouchCancel={(e) => handleNodeTouchEnd(e, node.id)}
           >
             <div className={`w-16 h-16 rounded-full border-2 shadow-lg overflow-hidden bg-[var(--theme-card)] flex items-center justify-center transition-all ${selectedNodeId === node.id ? 'border-[var(--theme-accent)] ring-2 ring-[var(--theme-accent)]/20' : 'border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50'}`}>
               {node.imageUrl ? (
-                <img src={node.imageUrl} alt={node.name} className="w-full h-full object-cover" />
+                <img
+                  src={node.imageUrl}
+                  alt={node.name}
+                  draggable={false}
+                  onDragStart={(e) => e.preventDefault()}
+                  className="w-full h-full object-cover select-none"
+                />
               ) : (
                 <User size={32} className="text-[var(--theme-border)]" />
               )}
