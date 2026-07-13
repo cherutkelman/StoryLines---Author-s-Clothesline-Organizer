@@ -1,6 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Copy, Grid3X3, ImagePlus, Maximize2, Minimize2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { MapGallery as MapGalleryData } from '../types';
+import { auth, storage } from '../src/firebase';
+import { isWeb } from '../src/platform';
 
 interface MapGalleryProps {
   gallery?: MapGalleryData;
@@ -10,6 +13,8 @@ interface MapGalleryProps {
 const DEFAULT_CATEGORY_ID = 'gallery-cat-default';
 const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 8;
+const MAX_IMAGE_DIMENSION = 1600;
+const IMAGE_QUALITY = 0.82;
 
 const createDefaultGallery = (): MapGalleryData => ({
   categories: [{ id: DEFAULT_CATEGORY_ID, name: 'כללי' }],
@@ -45,9 +50,72 @@ const normalizeGallery = (gallery?: MapGalleryData): MapGalleryData => {
   };
 };
 
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+const readCompressedImage = async (file: File): Promise<{ blob: Blob; dataUrl: string }> => {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas 2D context is unavailable');
+
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY);
+    });
+
+    if (!blob) throw new Error('Image compression failed');
+    return {
+      blob,
+      dataUrl: await blobToDataUrl(blob),
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const uploadGalleryImage = async (file: File, imageId: string): Promise<string> => {
+  const { blob, dataUrl } = await readCompressedImage(file);
+  const userId = auth.currentUser?.uid;
+
+  if (!isWeb) return dataUrl;
+  if (!userId) throw new Error('Cannot upload gallery image without a signed-in user');
+
+  const imageRef = ref(storage, `users/${userId}/gallery/${imageId}.jpg`);
+  const metadata = {
+    contentType: 'image/jpeg',
+    customMetadata: {
+      originalName: file.name,
+    },
+  };
+
+  await uploadBytes(imageRef, blob, metadata);
+  return getDownloadURL(imageRef);
+};
+
 const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetCategoryId, setTargetCategoryId] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const normalized = useMemo(() => normalizeGallery(gallery), [gallery]);
   const activeCategoryId = normalized.activeCategoryId || normalized.categories[0].id;
   const activeCategory = normalized.categories.find(category => category.id === activeCategoryId) || normalized.categories[0];
@@ -64,37 +132,50 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
     onUpdateGallery({ ...normalized, ...updates });
   };
 
-  const handleUpload = async (files: FileList | null) => {
+  const handleCompressedUpload = async (files: FileList | null) => {
     if (!files?.length) return;
 
-    const uploadedImages = await Promise.all(
-      Array.from(files).map(file => new Promise<MapGalleryData['images'][number] | null>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-          resolve(dataUrl ? {
-            id: `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            categoryId: uploadCategory.id,
-            name: file.name.replace(/\.[^.]+$/, '') || 'תמונה חדשה',
-            dataUrl,
-            createdAt: Date.now(),
-          } : null);
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      }))
-    );
+    setIsUploading(true);
+    setUploadError(null);
 
-    const validImages = uploadedImages.filter((image): image is MapGalleryData['images'][number] => Boolean(image));
-    if (validImages.length > 0) {
-      updateGallery({
-        images: [...normalized.images, ...validImages],
-        activeCategoryId: activeCategory.id,
-        activeImageId: validImages[validImages.length - 1].id,
-      });
+    try {
+      const uploadedImages = await Promise.all(
+        Array.from(files).map(async (file) => {
+          try {
+            const id = `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            const dataUrl = await uploadGalleryImage(file, id);
+            return dataUrl ? {
+              id,
+              categoryId: uploadCategory.id,
+              name: file.name.replace(/\.[^.]+$/, '') || 'תמונה חדשה',
+              dataUrl,
+              createdAt: Date.now(),
+            } : null;
+          } catch (error) {
+            console.error('Failed to process gallery image', error);
+            return null;
+          }
+        })
+      );
+
+      const validImages = uploadedImages.filter((image): image is MapGalleryData['images'][number] => Boolean(image));
+      const failedCount = uploadedImages.length - validImages.length;
+
+      if (failedCount > 0) {
+        setUploadError('חלק מהתמונות לא הועלו. כדאי לנסות שוב בעוד רגע.');
+      }
+
+      if (validImages.length > 0) {
+        updateGallery({
+          images: [...normalized.images, ...validImages],
+          activeCategoryId: activeCategory.id,
+          activeImageId: validImages[validImages.length - 1].id,
+        });
+      }
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const addCategory = () => {
@@ -272,15 +353,21 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
               accept="image/*"
               multiple
               className="hidden"
-              onChange={(event) => handleUpload(event.target.files)}
+              onChange={(event) => handleCompressedUpload(event.target.files)}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] text-sm font-bold shadow-md hover:opacity-90 transition-all"
+              disabled={isUploading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] text-sm font-bold shadow-md hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ImagePlus size={18} />
               <span>העלה תמונות</span>
             </button>
+            {uploadError && (
+              <span className="text-xs font-bold text-red-500 max-w-48">
+                {uploadError}
+              </span>
+            )}
           </div>
         </div>
 
