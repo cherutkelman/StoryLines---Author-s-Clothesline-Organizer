@@ -1,10 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Copy, Grid3X3, ImagePlus, Maximize2, Minimize2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { MapGallery as MapGalleryData } from '../types';
-import { auth, storage } from '../src/firebase';
 import { compressImageFile } from '../src/image-utils';
-import { isWeb } from '../src/platform';
 
 interface MapGalleryProps {
   gallery?: MapGalleryData;
@@ -51,30 +48,6 @@ const normalizeGallery = (gallery?: MapGalleryData): MapGalleryData => {
   };
 };
 
-const uploadGalleryImage = async (file: File, imageId: string): Promise<string> => {
-  const { blob, dataUrl } = await compressImageFile(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
-  const userId = auth.currentUser?.uid;
-
-  if (!isWeb) return dataUrl;
-  if (!userId) throw new Error('Cannot upload gallery image without a signed-in user');
-
-  const imageRef = ref(storage, `users/${userId}/gallery/${imageId}.jpg`);
-  const metadata = {
-    contentType: 'image/jpeg',
-    customMetadata: {
-      originalName: file.name,
-    },
-  };
-
-  try {
-    await uploadBytes(imageRef, blob, metadata);
-    return getDownloadURL(imageRef);
-  } catch (error) {
-    console.warn('Gallery image storage upload failed; using compressed inline image fallback.', error);
-    return dataUrl;
-  }
-};
-
 const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetCategoryId, setTargetCategoryId] = useState<string>('');
@@ -107,7 +80,7 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
         Array.from(files).map(async (file) => {
           try {
             const id = `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-            const dataUrl = await uploadGalleryImage(file, id);
+            const { dataUrl } = await compressImageFile(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
             return dataUrl ? {
               id,
               categoryId: uploadCategory.id,

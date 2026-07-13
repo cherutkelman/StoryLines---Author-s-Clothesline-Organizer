@@ -11,6 +11,26 @@ const blobToDataUrl = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
+const loadImage = (url: string, timeoutMs = 8000): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    const timeoutId = window.setTimeout(() => {
+      image.onload = null;
+      image.onerror = null;
+      reject(new Error('Image load timed out'));
+    }, timeoutMs);
+
+    image.onload = () => {
+      window.clearTimeout(timeoutId);
+      resolve(image);
+    };
+    image.onerror = () => {
+      window.clearTimeout(timeoutId);
+      reject(new Error('Image load failed'));
+    };
+    image.src = url;
+  });
+
 export const compressImageFile = async (
   file: File,
   maxDimension = 1200,
@@ -19,9 +39,7 @@ export const compressImageFile = async (
   const objectUrl = URL.createObjectURL(file);
 
   try {
-    const image = new Image();
-    image.src = objectUrl;
-    await image.decode();
+    const image = await loadImage(objectUrl);
 
     const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
     const width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -44,6 +62,12 @@ export const compressImageFile = async (
     return {
       blob,
       dataUrl: await blobToDataUrl(blob),
+    };
+  } catch (error) {
+    console.warn('Image compression failed; using original file fallback.', error);
+    return {
+      blob: file,
+      dataUrl: await blobToDataUrl(file),
     };
   } finally {
     URL.revokeObjectURL(objectUrl);
