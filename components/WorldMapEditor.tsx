@@ -1,6 +1,6 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Stage, Layer, Rect, Circle, Ellipse, Line, Text, Image as KonvaImage, Group, Transformer, Label, Tag 
+  Stage, Layer, Rect, Circle, Ellipse, Line, Text, Image as KonvaImage, Group, Transformer, Label, Tag
 } from 'react-konva';
 import { 
   Home, Trees, Mountain, MapPin, Type as LucideType, 
@@ -12,7 +12,7 @@ import {
   Leaf, Construction, Truck, Brush, PaintBucket,
   ChevronUp, ChevronDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
-import { WorldMap, MapElement, QuestionnaireEntry } from '../types';
+import { WorldMap, MapElement, QuestionnaireEntry, PixelEraserStroke } from '../types';
 import useImage from 'use-image';
 
 interface WorldMapEditorProps {
@@ -22,6 +22,11 @@ interface WorldMapEditorProps {
 }
 
 const MAP_TEXT_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI", Arial, sans-serif';
+
+type WorldMapTool =
+  'select' | 'pan' | 'pencil' | 'road' | 'river' | 'pool' | 'railroad' | 'highway' |
+  'border' | 'text' | 'icon' | 'place' | 'brush' | 'area' | 'circle' | 'rect' |
+  'triangle' | 'line' | 'eraser' | 'fill';
 
 const ICON_COMPONENTS: Record<string, any> = {
   house: Home,
@@ -71,87 +76,139 @@ const ICON_COMPONENTS: Record<string, any> = {
   market: Construction
 };
 
-const MapImage = ({ el, tool, onDblClick, onDragStart, onDragMove, onDragEnd }: any) => {
-  const [image] = useImage(el.imageUrl || '');
-  if (!image) return null;
+const getDefaultMapIconSize = (iconType?: string) => {
+  if (iconType === 'mountain') return 40;
+  if (iconType === 'flower' || iconType === 'market') return 25;
+  return 30;
+};
 
-  const hasErasers = Array.isArray((el as any).erasers) && (el as any).erasers.length > 0;
-  console.log(
-  'MAPIMAGE RENDER',
-  'id=', el.id,
-  'hasErasers=', hasErasers,
-  'erasersCount=', Array.isArray((el as any).erasers) ? (el as any).erasers.length : 0
-);
+interface ErasableElementProps {
+  element: MapElement;
+  tool: WorldMapTool;
+  children: React.ReactNode;
+  onDragStart: (e: any) => void;
+  onDragMove: (e: any) => void;
+  onDragEnd: (e: any) => void;
+  onDblClick: (e: any) => void;
+}
 
-  if (hasErasers) {
-    return (
-        <Group
-        id={el.id}
-        ref={(node) => {
-          if (node) {
-            node.clearCache();
-            node.cache();
-          }
-        }}
-        x={el.x}
-        y={el.y}
-        rotation={el.rotation || 0}
-        scaleX={el.scaleX || 1}
-        scaleY={el.scaleY || 1}
-        draggable={tool === 'select'}
-        onDblClick={onDblClick}
-        onDragStart={onDragStart}
-        onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
-        name="image"
-      >
+const ErasableElement = ({
+  element,
+  tool,
+  children,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onDblClick
+}: ErasableElementProps) => {
+  const groupRef = useRef<any>(null);
 
-        <KonvaImage
-          image={image}
-          width={image.width}
-          height={image.height}
-          globalCompositeOperation="source-over"
-        />
-        {((el as any).erasers || []).map((eraser: any, index: number) => (
-          <Line
-            key={`${el.id}-eraser-${index}`}
-            points={eraser.points || []}
-            stroke="#000"
-            strokeWidth={eraser.strokeWidth || 12}
-            lineCap={eraser.lineCap || 'round'}
-            listening={false}
-            globalCompositeOperation="destination-out"
-          />
-        ))}
-      </Group>
-    );
-  }
-  
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    group.clearCache();
+    const rect = group.getClientRect({
+      skipTransform: true,
+      skipShadow: true
+    });
+
+    const padding = 50;
+    const width = Math.max(rect.width + padding * 2, 1);
+    const height = Math.max(rect.height + padding * 2, 1);
+    const cachePixelRatio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+
+    group.cache({
+      x: rect.x - padding,
+      y: rect.y - padding,
+      width,
+      height,
+      pixelRatio: cachePixelRatio
+    });
+    group.getLayer()?.batchDraw();
+  }, [
+    element.erasers,
+    element.points,
+    element.width,
+    element.height,
+    element.radius,
+    element.radiusX,
+    element.radiusY,
+    element.text,
+    element.fontSize,
+    element.iconSize,
+    element.fill,
+    element.stroke,
+    element.strokeWidth,
+    element.imageUrl,
+    element.iconType,
+    element.opacity
+  ]);
+
   return (
-    <KonvaImage
-      image={image}
-      id={el.id}
-      x={el.x}
-      y={el.y}
-      width={image.width}
-      height={image.height}
-      rotation={el.rotation || 0}
-      scaleX={el.scaleX || 1}
-      scaleY={el.scaleY || 1}
+    <Group
+      ref={groupRef}
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      rotation={element.rotation || 0}
+      scaleX={element.scaleX || 1}
+      scaleY={element.scaleY || 1}
       draggable={tool === 'select'}
       onDblClick={onDblClick}
       onDragStart={onDragStart}
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
-      name="image"
-    />
+      name="erasable-element"
+    >
+      {children}
+
+      {(element.erasers || []).map(stroke => (
+        <Line
+          key={stroke.id}
+          points={stroke.points}
+          stroke="#000000"
+          strokeWidth={stroke.strokeWidth}
+          opacity={1}
+          lineCap={stroke.lineCap || 'round'}
+          lineJoin="round"
+          globalCompositeOperation="destination-out"
+          listening={false}
+        />
+      ))}
+    </Group>
+  );
+};
+
+const MapImage = ({ el, tool, onDblClick, onDragStart, onDragMove, onDragEnd }: any) => {
+  const [image] = useImage(el.imageUrl || '');
+  if (!image) return null;
+  
+  return (
+    <ErasableElement
+      element={el}
+      tool={tool}
+      onDblClick={onDblClick}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+    >
+      <KonvaImage
+        image={image}
+        x={0}
+        y={0}
+        width={image.width}
+        height={image.height}
+        name="image"
+      />
+    </ErasableElement>
   );
 };
 
 const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpdateMap }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'select' | 'pan' | 'icons' | 'paint' | 'extras'>('select');
-  const [tool, setTool] = useState<'select' | 'pan' | 'pencil' | 'road' | 'river' | 'pool' | 'railroad' | 'highway' | 'border' | 'text' | 'icon' | 'place' | 'brush' | 'area' | 'circle' | 'rect' | 'triangle' | 'line' | 'eraser' | 'fill'>('select');
+  const [tool, setTool] = useState<WorldMapTool>('select');
   const [isShapeFilled, setIsShapeFilled] = useState(true);
   const [showPathTools, setShowPathTools] = useState(false);
   const [iconCategory, setIconCategory] = useState<'nature' | 'construction' | 'transportation' | 'animals'>('nature');
@@ -176,7 +233,10 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
   const stageRef = useRef<any>(null);
   const transformerRef = useRef<any>(null);
+  const uiLayerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeEraserElementIdRef = useRef<string | null>(null);
+  const activeEraserStrokeIdRef = useRef<string | null>(null);
 
   const getRelativePointerPosition = (stage: any) => {
     const pointer = stage.getPointerPosition();
@@ -187,17 +247,43 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
     };
   };
 
+  const resolveElementId = (target: any) => {
+    let node = target;
+
+    while (node) {
+      const id = node.id?.();
+      if (id && localElementsRef.current.some(el => el.id === id)) {
+        return id;
+      }
+      node = node.getParent?.();
+    }
+
+    return null;
+  };
+
   const getPointerOnElement = (elementId: string, stage: any) => {
     const node = stage.findOne('#' + elementId);
     const pointer = stage.getPointerPosition();
 
-    if (!node || !pointer) {
-      return { x: 0, y: 0 };
-    }
+    if (!node || !pointer) return null;
 
     const transform = node.getAbsoluteTransform().copy();
     transform.invert();
     return transform.point(pointer);
+  };
+
+  const getElementAdjustedStrokeWidth = (elementId: string, stage: any) => {
+    const node = stage.findOne('#' + elementId);
+    if (!node) return currentStrokeWidth;
+
+    const absoluteScale = node.getAbsoluteScale();
+    const stageScaleX = stage.scaleX() || 1;
+    const stageScaleY = stage.scaleY() || 1;
+    const elementScaleX = Math.abs(absoluteScale.x / stageScaleX) || 1;
+    const elementScaleY = Math.abs(absoluteScale.y / stageScaleY) || 1;
+    const elementScale = (elementScaleX + elementScaleY) / 2 || 1;
+
+    return currentStrokeWidth / elementScale;
   };
 
   const getIconFill = (icon: string) => {
@@ -270,18 +356,18 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const undo = () => {
     if (historyIndex > 0) {
       isUndoingRedoing.current = true;
-      const prevElements = history[historyIndex - 1];
+      const previous = history[historyIndex - 1];
       setHistoryIndex(historyIndex - 1);
-      onUpdateMap({ elements: prevElements });
+      onUpdateMap({ elements: previous });
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1) {
       isUndoingRedoing.current = true;
-      const nextElements = history[historyIndex + 1];
+      const next = history[historyIndex + 1];
       setHistoryIndex(historyIndex + 1);
-      onUpdateMap({ elements: nextElements });
+      onUpdateMap({ elements: next });
     }
   };
 
@@ -319,10 +405,14 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       return;
     }
 
-    if (map.elements !== history[historyIndex] && JSON.stringify(map.elements) !== JSON.stringify(history[historyIndex])) {
+    const currentSnapshot = map.elements;
+    const currentSerialized = JSON.stringify(currentSnapshot);
+    const historySerialized = JSON.stringify(history[historyIndex]);
+
+    if (currentSerialized !== historySerialized) {
       // Check if it's an undo/redo (in case it was triggered by parent or something else)
-      const isUndo = historyIndex > 0 && (map.elements === history[historyIndex - 1] || JSON.stringify(map.elements) === JSON.stringify(history[historyIndex - 1]));
-      const isRedo = historyIndex < history.length - 1 && (map.elements === history[historyIndex + 1] || JSON.stringify(map.elements) === JSON.stringify(history[historyIndex + 1]));
+      const isUndo = historyIndex > 0 && currentSerialized === JSON.stringify(history[historyIndex - 1]);
+      const isRedo = historyIndex < history.length - 1 && currentSerialized === JSON.stringify(history[historyIndex + 1]);
 
       if (isUndo) {
         setHistoryIndex(historyIndex - 1);
@@ -331,7 +421,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       } else {
         // New action
         const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push(map.elements);
+        newHistory.push(currentSnapshot);
         if (newHistory.length > 50) newHistory.shift();
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
@@ -368,6 +458,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       setIsDrawing(false);
       setLastPlacedPos(null);
     }
+    activeEraserElementIdRef.current = null;
+    activeEraserStrokeIdRef.current = null;
   };
 
   useEffect(() => {
@@ -393,6 +485,38 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   }, [selectedIds, map.elements]);
 
   const handleMouseDown = (e: any) => {
+    if (tool === 'eraser') {
+      e.evt?.preventDefault?.();
+      const stage = e.target.getStage();
+      const elementId = resolveElementId(e.target);
+      if (!elementId) return;
+
+      const point = getPointerOnElement(elementId, stage);
+      if (!point) return;
+
+      const newStroke: PixelEraserStroke = {
+        id: `eraser-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        points: [point.x, point.y, point.x, point.y],
+        strokeWidth: getElementAdjustedStrokeWidth(elementId, stage),
+        lineCap: 'round'
+      };
+
+      const updatedElements = localElementsRef.current.map(el =>
+        el.id === elementId
+          ? { ...el, erasers: [...(el.erasers || []), newStroke] }
+          : el
+      );
+
+      activeEraserElementIdRef.current = elementId;
+      activeEraserStrokeIdRef.current = newStroke.id;
+      localElementsRef.current = updatedElements;
+      setLocalElements(updatedElements);
+      setSelectedIds([]);
+      setSelectionRect(null);
+      setIsDrawing(true);
+      return;
+    }
+
     const stage = e.target.getStage();
     const pos = getRelativePointerPosition(stage);
 
@@ -412,7 +536,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         return;
       }
 
-      const id = e.target.id() || e.target.getParent()?.id();
+      const id = resolveElementId(e.target);
       const isElement = id && id.startsWith('el-');
       
       if (!isElement) {
@@ -437,59 +561,13 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
     const id = `el-${Date.now()}`;
 
-    if (tool === 'eraser' && selectedIds.length === 1) {
-      const selectedImage =
-        localElements.find(item => item.id === selectedIds[0] && item.type === 'image') ||
-        map.elements.find(item => item.id === selectedIds[0] && item.type === 'image');
-
-      console.log('ERASER DOWN CHECK', {
-        selectedIds,
-        foundImage: !!selectedImage,
-        selectedImageId: selectedImage?.id
-      });
-
-      if (selectedImage) {
-        const localPos = getPointerOnElement(selectedImage.id, stage);
-        setIsDrawing(true);
-        setLocalElements(prev => {
-          const source = prev.some(item => item.id === selectedImage.id) ? prev : map.elements;
-          const next = source.map(item => {
-            if (item.id !== selectedImage.id) return item;
-
-            return {
-              ...item,
-              erasers: [
-                ...(((item as any).erasers) || []),
-                {
-                  points: [
-                    localPos.x,
-                    localPos.y,
-                    localPos.x,
-                    localPos.y
-                  ],
-                  strokeWidth: currentStrokeWidth,
-                  lineCap: 'round'
-                }
-              ]
-            } as any;
-          });
-          localElementsRef.current = next;
-          return next;
-        });
-        return;
-      }
-
-      return;
-    }
-
-    if (['pencil', 'road', 'river', 'pool', 'railroad', 'highway', 'border', 'brush', 'area', 'circle', 'triangle', 'rect', 'line', 'eraser'].includes(tool)) {
+    if (['pencil', 'road', 'river', 'pool', 'railroad', 'highway', 'border', 'brush', 'area', 'circle', 'triangle', 'rect', 'line'].includes(tool)) {
       setIsDrawing(true);
       let stroke = currentColor;
       let strokeWidth = currentStrokeWidth;
       let dash: number[] | undefined = undefined;
       let fill: string | undefined = undefined;
       let closed = false;
-      let globalCompositeOperation: any = 'source-over';
 
       if (tool === 'road') {
         stroke = currentColor;
@@ -525,10 +603,6 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         strokeWidth = 2;
         fill = currentColor + '80'; // Semi-transparent fill
         closed = true;
-      } else if (tool === 'eraser') {
-        stroke = '#ffffff'; // Color doesn't matter much for destination-out
-        strokeWidth = currentStrokeWidth;
-        globalCompositeOperation = 'destination-out';
       } else if (tool === 'circle' || tool === 'rect' || tool === 'triangle' || tool === 'line') {
         stroke = currentColor;
         strokeWidth = currentStrokeWidth;
@@ -542,7 +616,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         type: tool === 'circle' ? 'circle' : tool === 'rect' ? 'rect' : tool === 'triangle' ? 'triangle' : 'line',
         x: pos.x,
         y: pos.y,
-        points: tool === 'line' || tool === 'pencil' || tool === 'brush' || tool === 'area' || tool === 'road' || tool === 'river' || tool === 'railroad' || tool === 'highway' || tool === 'border' || tool === 'eraser' || tool === 'triangle' ? [0, 0] : undefined,
+        points: tool === 'line' || tool === 'pencil' || tool === 'brush' || tool === 'area' || tool === 'road' || tool === 'river' || tool === 'railroad' || tool === 'highway' || tool === 'border' || tool === 'triangle' ? [0, 0] : undefined,
         radius: tool === 'circle' ? 0 : undefined,
         radiusX: tool === 'circle' ? 0 : undefined,
         radiusY: tool === 'circle' ? 0 : undefined,
@@ -553,9 +627,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         fill,
         opacity: brushOpacity,
         ...(dash && { dash } as any),
-        ...(closed && { closed } as any),
-        ...(globalCompositeOperation !== 'source-over' && { globalCompositeOperation } as any),
-        ...(tool === 'eraser' && { isEraser: true } as any)
+        ...(closed && { closed } as any)
       };
       setLocalElements([...localElements, newElement]);
       setSelectedIds([id]);
@@ -594,7 +666,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         iconType: selectedIcon,
         x: pos.x,
         y: pos.y,
-        fill: getIconFill(selectedIcon)
+        fill: getIconFill(selectedIcon),
+        iconSize: getDefaultMapIconSize(selectedIcon)
       };
 
       if (iconCategory === 'nature' || iconCategory === 'construction') {
@@ -613,61 +686,44 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
     const pos = getRelativePointerPosition(stage);
     setPreviewPos(pos);
 
+    if (tool === 'eraser' && isDrawing && activeEraserElementIdRef.current && activeEraserStrokeIdRef.current) {
+      e.evt?.preventDefault?.();
+      const elementId = activeEraserElementIdRef.current;
+      const strokeId = activeEraserStrokeIdRef.current;
+      const point = getPointerOnElement(elementId, stage);
+      if (!point) return;
+
+      const updatedElements = localElementsRef.current.map(el => {
+        if (el.id !== elementId) return el;
+
+        return {
+          ...el,
+          erasers: (el.erasers || []).map(stroke =>
+            stroke.id === strokeId
+              ? {
+                  ...stroke,
+                  points: [
+                    ...stroke.points,
+                    point.x,
+                    point.y
+                  ]
+                }
+              : stroke
+          )
+        };
+      });
+
+      localElementsRef.current = updatedElements;
+      setLocalElements(updatedElements);
+      return;
+    }
+
     if (selectionRect) {
       setSelectionRect({ ...selectionRect, x2: pos.x, y2: pos.y });
       return;
     }
 
     if (!isDrawing) return;
-    
-    if (tool === 'eraser' && selectedIds.length === 1) {
-      const selectedImage =
-        localElements.find(item => item.id === selectedIds[0] && item.type === 'image') ||
-        map.elements.find(item => item.id === selectedIds[0] && item.type === 'image');
-
-      console.log(
-  'ERASER MOVE CHECK',
-  'selectedIds=', selectedIds,
-  'lookingFor=', selectedIds[0],
-  'imageIds=', localElements.filter(el => el.type === 'image').map(el => el.id),
-  'foundImage=', !!selectedImage,
-  'selectedImageId=', selectedImage?.id
-);
-
-      if (selectedImage) {
-        const localPos = getPointerOnElement(selectedImage.id, stage);
-        setLocalElements(prev => {
-          const source = prev.some(item => item.id === selectedImage.id) ? prev : map.elements;
-          const next = source.map(item => {
-            if (item.id !== selectedImage.id) return item;
-
-            const erasers = [...(((item as any).erasers) || [])];
-            if (!erasers.length) return item;
-
-            const lastIndex = erasers.length - 1;
-            const lastEraser = erasers[lastIndex];
-
-            erasers[lastIndex] = {
-              ...lastEraser,
-              points: [
-                ...(lastEraser.points || []),
-                localPos.x,
-                localPos.y
-              ]
-            };
-
-            return {
-              ...item,
-              erasers
-            } as any;
-          });
-          localElementsRef.current = next;
-          return next;
-        });
-
-        return;
-      }
-    }
 
     if (tool === 'icon' && (iconCategory === 'nature' || iconCategory === 'construction') && lastPlacedPos) {
       const dx = pos.x - lastPlacedPos.x;
@@ -755,7 +811,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       };
 
       if (box.width > 5 || box.height > 5) {
-        const shapes = stage.find('.line, .group, .rect, .ellipse, .image');
+        const shapes = stage.find('.erasable-element');
         const selected = shapes.filter((shape: any) => {
           const id = shape.id();
           if (!id || !id.startsWith('el-')) return false;
@@ -779,15 +835,26 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       setSelectionRect(null);
     }
 
+    if (tool === 'eraser' && activeEraserElementIdRef.current) {
+      onUpdateMap({ elements: localElementsRef.current });
+      activeEraserElementIdRef.current = null;
+      activeEraserStrokeIdRef.current = null;
+      setIsDrawing(false);
+      setLastPlacedPos(null);
+      return;
+    }
+
     if (isDrawing) {
       onUpdateMap({ elements: localElementsRef.current });
     }
     setIsDrawing(false);
     setLastPlacedPos(null);
+    activeEraserElementIdRef.current = null;
+    activeEraserStrokeIdRef.current = null;
   };
 
   const handleDblClick = (e: any) => {
-    const id = e.target.id() || e.target.getParent()?.id();
+    const id = resolveElementId(e.target);
     if (id && id.startsWith('el-')) {
       setSelectedIds([id]);
     }
@@ -850,8 +917,11 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
   const deleteSelected = () => {
     if (selectedIds.length > 0) {
-      onUpdateMap({ elements: map.elements.filter(el => !selectedIds.includes(el.id)) });
+      const updatedElements = localElementsRef.current.filter(el => !selectedIds.includes(el.id));
+      setLocalElements(updatedElements);
+      localElementsRef.current = updatedElements;
       setSelectedIds([]);
+      onUpdateMap({ elements: updatedElements });
     }
   };
 
@@ -1092,14 +1162,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       // We don't actually need to reset if we provide the bounds correctly to toDataURL
       // But we need to make sure the bounds are in the stage's coordinate system (untransformed)
       
-      const uri = stageRef.current.toDataURL({
-        pixelRatio: 2,
-        backgroundColor: map.backgroundColor || '#fdf6e3',
-        x: minX * scale + stagePos.x,
-        y: minY * scale + stagePos.y,
-        width: (maxX - minX) * scale,
-        height: (maxY - minY) * scale
-      });
+      let uri = '';
+      uiLayerRef.current?.hide();
+      stageRef.current.batchDraw();
+      try {
+        uri = stageRef.current.toDataURL({
+          pixelRatio: 2,
+          x: minX * scale + stagePos.x,
+          y: minY * scale + stagePos.y,
+          width: (maxX - minX) * scale,
+          height: (maxY - minY) * scale
+        });
+      } finally {
+        uiLayerRef.current?.show();
+        stageRef.current.batchDraw();
+      }
       
       const link = document.createElement('a');
       link.download = `${map.name || 'map'}.png`;
@@ -1624,7 +1701,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         )}
 
         {/* Canvas */}
-        <div className="flex-1 bg-[#fdf6e3] cursor-crosshair overflow-hidden relative" ref={containerRef}>
+        <div
+          className="flex-1 cursor-crosshair overflow-hidden relative"
+          ref={containerRef}
+          style={{
+            backgroundColor: '#ffffff',
+            backgroundImage: `
+              linear-gradient(45deg, #d1d5db 25%, transparent 25%),
+              linear-gradient(-45deg, #d1d5db 25%, transparent 25%),
+              linear-gradient(45deg, transparent 75%, #d1d5db 75%),
+              linear-gradient(-45deg, transparent 75%, #d1d5db 75%)
+            `,
+            backgroundSize: '20px 20px',
+            backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+          }}
+        >
           <Stage
             id="stage"
             width={stageSize.width}
@@ -1636,6 +1727,9 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            onTouchStart={handleMouseDown}
+            onTouchMove={handleMouseMove}
+            onTouchEnd={handleMouseUp}
             onDblClick={handleDblClick}
             ref={stageRef}
             draggable={tool === 'pan'}
@@ -1654,6 +1748,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 height={10000}
                 fill={map.backgroundColor || '#fdf6e3'}
                 name="background"
+                listening={false}
               />
               {/* Background Image */}
               {bgImage && (
@@ -1671,105 +1766,97 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
               {localElements.map((el) => {
                 if (el.type === 'rect') {
                   return (
-                    <Rect
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      width={el.width}
-                      height={el.height}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth}
-                      fill={el.fill}
-                      opacity={el.opacity ?? 1}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name="rect"
-                    />
+                    >
+                      <Rect
+                        x={0}
+                        y={0}
+                        width={el.width}
+                        height={el.height}
+                        stroke={el.stroke}
+                        strokeWidth={el.strokeWidth}
+                        fill={el.fill}
+                        opacity={el.opacity ?? 1}
+                        name="rect"
+                      />
+                    </ErasableElement>
                   );
                 }
                 if (el.type === 'circle') {
                   return (
-                    <Ellipse
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      radiusX={el.radiusX || el.radius || 0}
-                      radiusY={el.radiusY || el.radius || 0}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth}
-                      fill={el.fill}
-                      opacity={el.opacity ?? 1}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name="ellipse"
-                    />
+                    >
+                      <Ellipse
+                        x={0}
+                        y={0}
+                        radiusX={el.radiusX || el.radius || 0}
+                        radiusY={el.radiusY || el.radius || 0}
+                        stroke={el.stroke}
+                        strokeWidth={el.strokeWidth}
+                        fill={el.fill}
+                        opacity={el.opacity ?? 1}
+                        name="ellipse"
+                      />
+                    </ErasableElement>
                   );
                 }
                 if (el.type === 'line' || el.type === 'triangle') {
                   const isEraserLine =
                     !!(el as any).isEraser ||
                     (el as any).globalCompositeOperation === 'destination-out';
+                  if (isEraserLine) return null;
                   return (
-                    <Line
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      points={el.points}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth}
-                      tension={el.type === 'triangle' ? 0 : 0.5}
-                      lineCap="round"
-                      lineJoin="round"
-                      dash={(el as any).dash}
-                      closed={(el as any).closed || el.type === 'triangle'}
-                      fill={el.fill || (el as any).fill}
-                      opacity={el.opacity ?? 1}
-                      globalCompositeOperation={(el as any).globalCompositeOperation || 'source-over'}
-                      isEraser={isEraserLine}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name={el.type}
-                      listening={!isEraserLine}
-                    />
+                    >
+                      <Line
+                        x={0}
+                        y={0}
+                        points={el.points}
+                        stroke={el.stroke}
+                        strokeWidth={el.strokeWidth}
+                        tension={el.type === 'triangle' ? 0 : 0.5}
+                        lineCap="round"
+                        lineJoin="round"
+                        dash={(el as any).dash}
+                        closed={(el as any).closed || el.type === 'triangle'}
+                        fill={el.fill || (el as any).fill}
+                        opacity={el.opacity ?? 1}
+                        name={el.type}
+                      />
+                    </ErasableElement>
                   );
                 }
                 if (el.type === 'text') {
                   return (
-                    <Group
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name="group"
                     >
                       <Label x={0} y={0}>
                         <Tag
@@ -1806,27 +1893,22 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       {el.isPlace && (
                         <Circle x={-10} y={(el.fontSize || 20) * 0.5 + 5} radius={4} fill="#8b4513" />
                       )}
-                    </Group>
+                    </ErasableElement>
                   );
                 }
               if (el.type === 'icon') {
+                const iconSize = el.iconSize || getDefaultMapIconSize(el.iconType);
                 // Simple shapes for icons for now
                 if ((el as any).isPool) {
                   return (
-                    <Group
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name="group"
                     >
                         <Circle
                           radius={30}
@@ -1842,87 +1924,81 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                           opacity={0.5}
                           tension={0.5}
                         />
-                      </Group>
+                      </ErasableElement>
                     );
                   }
                   
                   // For other icons, use a group with a shape
                   return (
-                    <Group
+                    <ErasableElement
                       key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      rotation={el.rotation}
-                      scaleX={el.scaleX}
-                      scaleY={el.scaleY}
-                      draggable={tool === 'select'}
+                      element={el}
+                      tool={tool}
                       onDblClick={handleDblClick}
                       onDragStart={handleDragStart}
                       onDragMove={handleDragMove}
                       onDragEnd={handleDragEnd}
-                      name="group"
                     >
-                      {el.iconType === 'fish' && <Text fontFamily={MAP_TEXT_FONT} text="🐟" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'horse' && <Text fontFamily={MAP_TEXT_FONT} text="🐎" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'snake' && <Text fontFamily={MAP_TEXT_FONT} text="🐍" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'cattle' && <Text fontFamily={MAP_TEXT_FONT} text="🐄" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'sheep' && <Text fontFamily={MAP_TEXT_FONT} text="🐑" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'eagle' && <Text fontFamily={MAP_TEXT_FONT} text="🦅" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'wildcat' && <Text fontFamily={MAP_TEXT_FONT} text="🐆" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'cat' && <Text fontFamily={MAP_TEXT_FONT} text="🐈" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'bird' && <Text fontFamily={MAP_TEXT_FONT} text="🐦" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'tree' && <Text fontFamily={MAP_TEXT_FONT} text="🌳" fontSize={30} x={-15} y={-15} />}
+                      {el.iconType === 'fish' && <Text fontFamily={MAP_TEXT_FONT} text="🐟" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'horse' && <Text fontFamily={MAP_TEXT_FONT} text="🐎" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'snake' && <Text fontFamily={MAP_TEXT_FONT} text="🐍" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'cattle' && <Text fontFamily={MAP_TEXT_FONT} text="🐄" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'sheep' && <Text fontFamily={MAP_TEXT_FONT} text="🐑" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'eagle' && <Text fontFamily={MAP_TEXT_FONT} text="🦅" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'wildcat' && <Text fontFamily={MAP_TEXT_FONT} text="🐆" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'cat' && <Text fontFamily={MAP_TEXT_FONT} text="🐈" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'bird' && <Text fontFamily={MAP_TEXT_FONT} text="🐦" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'tree' && <Text fontFamily={MAP_TEXT_FONT} text="🌳" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
                       {el.iconType === 'trees' && (
-                        <Group x={-15} y={-15}>
-                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={30} x={0} y={0} />
-                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={30} x={10} y={5} />
-                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={30} x={-10} y={5} />
+                        <Group x={-iconSize / 2} y={-iconSize / 2}>
+                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={iconSize} x={0} y={0} />
+                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={iconSize} x={iconSize / 3} y={iconSize / 6} />
+                          <Text fontFamily={MAP_TEXT_FONT} text="🌲" fontSize={iconSize} x={-iconSize / 3} y={iconSize / 6} />
                         </Group>
                       )}
-                      {el.iconType === 'mountain' && <Text fontFamily={MAP_TEXT_FONT} text="⛰️" fontSize={40} x={-20} y={-20} />}
-                      {el.iconType === 'flower' && <Text fontFamily={MAP_TEXT_FONT} text="🌹" fontSize={25} x={-12} y={-12} />}
-                      {el.iconType === 'wave' && <Text fontFamily={MAP_TEXT_FONT} text="🌊" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'desert' && <Text fontFamily={MAP_TEXT_FONT} text="🏜️" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'beach' && <Text fontFamily={MAP_TEXT_FONT} text="🏖️" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'rainbow' && <Text fontFamily={MAP_TEXT_FONT} text="🌈" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'fire' && <Text fontFamily={MAP_TEXT_FONT} text="🔥" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'field' && <Text fontFamily={MAP_TEXT_FONT} text="🌾" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'traffic_light' && <Text fontFamily={MAP_TEXT_FONT} text="🚦" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'barrier' && <Text fontFamily={MAP_TEXT_FONT} text="🚧" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'bridge' && <Text fontFamily={MAP_TEXT_FONT} text="🌉" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'village' && <Text fontFamily={MAP_TEXT_FONT} text="🏘️" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'camp' && <Text fontFamily={MAP_TEXT_FONT} text="⛺" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'temple' && <Text fontFamily={MAP_TEXT_FONT} text="🏛️" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'hotel' && <Text fontFamily={MAP_TEXT_FONT} text="🏨" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'hospital' && <Text fontFamily={MAP_TEXT_FONT} text="🏥" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'factory' && <Text fontFamily={MAP_TEXT_FONT} text="🏭" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'palace' && <Text fontFamily={MAP_TEXT_FONT} text="🏰" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'park' && <Text fontFamily={MAP_TEXT_FONT} text="🎡" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'city' && <Text fontFamily={MAP_TEXT_FONT} text="🏙️" fontSize={30} x={-15} y={-15} />}
+                      {el.iconType === 'mountain' && <Text fontFamily={MAP_TEXT_FONT} text="⛰️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'flower' && <Text fontFamily={MAP_TEXT_FONT} text="🌹" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'wave' && <Text fontFamily={MAP_TEXT_FONT} text="🌊" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'desert' && <Text fontFamily={MAP_TEXT_FONT} text="🏜️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'beach' && <Text fontFamily={MAP_TEXT_FONT} text="🏖️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'rainbow' && <Text fontFamily={MAP_TEXT_FONT} text="🌈" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'fire' && <Text fontFamily={MAP_TEXT_FONT} text="🔥" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'field' && <Text fontFamily={MAP_TEXT_FONT} text="🌾" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'traffic_light' && <Text fontFamily={MAP_TEXT_FONT} text="🚦" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'barrier' && <Text fontFamily={MAP_TEXT_FONT} text="🚧" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'bridge' && <Text fontFamily={MAP_TEXT_FONT} text="🌉" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'village' && <Text fontFamily={MAP_TEXT_FONT} text="🏘️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'camp' && <Text fontFamily={MAP_TEXT_FONT} text="⛺" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'temple' && <Text fontFamily={MAP_TEXT_FONT} text="🏛️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'hotel' && <Text fontFamily={MAP_TEXT_FONT} text="🏨" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'hospital' && <Text fontFamily={MAP_TEXT_FONT} text="🏥" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'factory' && <Text fontFamily={MAP_TEXT_FONT} text="🏭" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'palace' && <Text fontFamily={MAP_TEXT_FONT} text="🏰" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'park' && <Text fontFamily={MAP_TEXT_FONT} text="🎡" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'city' && <Text fontFamily={MAP_TEXT_FONT} text="🏙️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
                       {el.iconType === 'market' && (
-                        <Group x={-15} y={-15}>
-                          <Text fontFamily={MAP_TEXT_FONT} text="🍞" fontSize={25} x={-5} y={0} />
-                          <Text fontFamily={MAP_TEXT_FONT} text="☕" fontSize={25} x={10} y={0} />
+                        <Group x={-iconSize / 2} y={-iconSize / 2}>
+                          <Text fontFamily={MAP_TEXT_FONT} text="🍞" fontSize={iconSize} x={-iconSize / 2} y={0} />
+                          <Text fontFamily={MAP_TEXT_FONT} text="☕" fontSize={iconSize} x={iconSize / 4} y={0} />
                         </Group>
                       )}
-                      {el.iconType === 'car' && <Text fontFamily={MAP_TEXT_FONT} text="🚗" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'bus' && <Text fontFamily={MAP_TEXT_FONT} text="🚌" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'ambulance' && <Text fontFamily={MAP_TEXT_FONT} text="🚑" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'fire_truck' && <Text fontFamily={MAP_TEXT_FONT} text="🚒" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'truck' && <Text fontFamily={MAP_TEXT_FONT} text="🚛" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'tractor' && <Text fontFamily={MAP_TEXT_FONT} text="🚜" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'train' && <Text fontFamily={MAP_TEXT_FONT} text="🚂" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'plane' && <Text fontFamily={MAP_TEXT_FONT} text="✈️" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'ship' && <Text fontFamily={MAP_TEXT_FONT} text="🚢" fontSize={30} x={-15} y={-15} />}
-                      {el.iconType === 'house' && <Text fontFamily={MAP_TEXT_FONT} text="🏠" fontSize={30} x={-15} y={-15} />}
+                      {el.iconType === 'car' && <Text fontFamily={MAP_TEXT_FONT} text="🚗" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'bus' && <Text fontFamily={MAP_TEXT_FONT} text="🚌" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'ambulance' && <Text fontFamily={MAP_TEXT_FONT} text="🚑" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'fire_truck' && <Text fontFamily={MAP_TEXT_FONT} text="🚒" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'truck' && <Text fontFamily={MAP_TEXT_FONT} text="🚛" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'tractor' && <Text fontFamily={MAP_TEXT_FONT} text="🚜" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'train' && <Text fontFamily={MAP_TEXT_FONT} text="🚂" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'plane' && <Text fontFamily={MAP_TEXT_FONT} text="✈️" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'ship' && <Text fontFamily={MAP_TEXT_FONT} text="🚢" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
+                      {el.iconType === 'house' && <Text fontFamily={MAP_TEXT_FONT} text="🏠" fontSize={iconSize} x={-iconSize / 2} y={-iconSize / 2} />}
                       {el.iconType === 'valley' && (
                         <Group>
                           <Line points={[0, 0, 20, 30, 40, 0]} closed fill={el.fill || '#059669'} opacity={0.6} />
                           <Line points={[10, 0, 20, 15, 30, 0]} stroke="#4a4a4a" strokeWidth={1} tension={0.5} />
                         </Group>
                       )}
-                    </Group>
+                    </ErasableElement>
                   );
                 }
                 if (el.type === 'image') {
@@ -1940,7 +2016,9 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 }            
                 return null;
               })}
+            </Layer>
 
+            <Layer ref={uiLayerRef}>
               {/* Transformer */}
               {selectedIds.length > 0 && (
                 <Transformer
@@ -1956,6 +2034,25 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                     const updatedElements = map.elements.map(el => {
                       const node = stageRef.current.findOne('#' + el.id);
                       if (node && selectedIds.includes(el.id)) {
+                        if (el.type === 'icon') {
+                          const scaleX = node.scaleX();
+                          const scaleY = node.scaleY();
+                          const averageScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2 || 1;
+                          const iconSize = Math.max(8, (el.iconSize || getDefaultMapIconSize(el.iconType)) * averageScale);
+                          node.scaleX(1);
+                          node.scaleY(1);
+
+                          return {
+                            ...el,
+                            x: node.x(),
+                            y: node.y(),
+                            rotation: node.rotation(),
+                            scaleX: 1,
+                            scaleY: 1,
+                            iconSize,
+                          };
+                        }
+
                         return {
                           ...el,
                           x: node.x(),

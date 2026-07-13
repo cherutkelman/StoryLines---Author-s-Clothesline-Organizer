@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Map as MapIcon, Plus, Trash2, Edit2, ChevronRight, ChevronLeft, Share2, CopyPlus, X } from 'lucide-react';
-import { QuestionnaireEntry, CharacterMapConnection, WorldMap, MindMap, Book } from '../types';
+import { QuestionnaireEntry, CharacterMapConnection, WorldMap, MindMap, Book, MapGallery as MapGalleryData } from '../types';
 import CharacterMap from './CharacterMap';
 import WorldMapEditor from './WorldMapEditor';
 import MindMapEditor from './MindMapEditor';
-import { type MapTabId } from './mapNavigation';
+import MapGallery from './MapGallery';
+import { MAP_NAV_ITEMS, type MapTabId } from './mapNavigation';
 
 interface MapsManagerProps {
   allBooks: Book[];
@@ -14,10 +15,12 @@ interface MapsManagerProps {
   connections: CharacterMapConnection[];
   maps: WorldMap[];
   mindMaps: MindMap[];
+  mapGallery?: MapGalleryData;
   onUpdateCharacters: (chars: QuestionnaireEntry[]) => void;
   onUpdateConnections: (conns: CharacterMapConnection[]) => void;
   onUpdateMaps: (maps: WorldMap[]) => void;
   onUpdateMindMaps: (mindMaps: MindMap[]) => void;
+  onUpdateMapGallery: (gallery: MapGalleryData) => void;
   initialTab?: MapTabId;
   onTabChange?: (tab: MapTabId) => void;
   selectedMapId?: string | null;
@@ -34,10 +37,12 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   connections,
   maps,
   mindMaps = [],
+  mapGallery,
   onUpdateCharacters,
   onUpdateConnections,
   onUpdateMaps,
   onUpdateMindMaps,
+  onUpdateMapGallery,
   initialTab = 'characterDiagram',
   onTabChange,
   selectedMapId,
@@ -205,6 +210,11 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   const currentMap = maps.find(m => m.id === currentMapId);
   const currentMindMap = mindMaps.find(m => m.id === currentMindMapId);
 
+  const switchTab = (tab: MapTabId) => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  };
+
   return (
     <div className="h-full flex flex-col bg-[var(--theme-bg)]">
       {((activeTab === 'worldMaps' && currentMapId) || (activeTab === 'mindMaps' && currentMindMapId)) && (
@@ -250,6 +260,28 @@ const MapsManager: React.FC<MapsManagerProps> = ({
       )}
 
       <div className="flex-1 relative overflow-hidden">
+        <div className="hidden lg:flex absolute top-4 left-1/2 -translate-x-1/2 z-40 items-center gap-1 bg-[var(--theme-card)]/95 border border-[var(--theme-border)] rounded-2xl p-1.5 shadow-xl backdrop-blur-sm">
+          {MAP_NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => switchTab(item.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md'
+                    : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                }`}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {activeTab === 'characterDiagram' ? (
           <CharacterMap 
             characters={characters}
@@ -330,7 +362,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
               )
             )}
           </div>
-        ) : (
+        ) : activeTab === 'mindMaps' ? (
           <div className="h-full flex flex-col">
             {!currentMindMapId ? (
               <div className="flex-1 p-12 overflow-y-auto">
@@ -397,6 +429,13 @@ const MapsManager: React.FC<MapsManagerProps> = ({
                 />
               )
             )}
+          </div>
+        ) : (
+          <div className="h-full box-border lg:pt-24">
+            <MapGallery
+              gallery={mapGallery}
+              onUpdateGallery={onUpdateMapGallery}
+            />
           </div>
         )}
       </div>

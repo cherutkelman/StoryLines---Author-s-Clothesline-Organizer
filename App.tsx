@@ -57,7 +57,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -69,7 +69,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
   'characters', 'places', 'periods', 'twists', 'fantasyWorlds', 'backgrounds',
-  'characterMapConnections', 'maps', 'mindMaps'
+  'characterMapConnections', 'maps', 'mindMaps', 'mapGallery'
 ];
 
 type WebSaveStatus = 'saved' | 'saving' | 'error';
@@ -867,6 +867,10 @@ const App: React.FC = () => {
 
   const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
+  };
+
+  const updateMapGallery = (gallery: MapGallery) => {
+    updateActiveBook({ mapGallery: gallery });
   };
 
   const handleSync = async () => {
@@ -1841,10 +1845,12 @@ const App: React.FC = () => {
                       connections={activeBook.characterMapConnections || []}
                       maps={activeBook.maps || []}
                       mindMaps={activeBook.mindMaps || []}
+                      mapGallery={activeBook.mapGallery}
                       onUpdateCharacters={(chars) => updateEntries('characters', chars)}
                       onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
                       onUpdateMaps={(maps) => updateEntries('maps', maps)}
                       onUpdateMindMaps={(mindMaps) => updateEntries('mindMaps', mindMaps)}
+                      onUpdateMapGallery={updateMapGallery}
                       initialTab={activeUI.mapsActiveTab}
                       onTabChange={handleMapTabChange}
                       selectedMapId={activeUI.mapsSelectedMapId}

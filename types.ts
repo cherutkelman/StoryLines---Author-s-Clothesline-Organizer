@@ -224,6 +224,7 @@ export interface MapElement {
   strokeWidth?: number;
   fill?: string;
   fontSize?: number;
+  iconSize?: number;
   questionnaireId?: string;
   isPlace?: boolean;
   imageUrl?: string;
@@ -240,11 +241,14 @@ export interface MapElement {
   lineCap?: 'butt' | 'round' | 'square';
   isPool?: boolean;
   isEraser?: boolean;
-  erasers?: {
-    points: number[];
-    strokeWidth?: number;
-    lineCap?: 'butt' | 'round' | 'square';
-  }[];
+  erasers?: PixelEraserStroke[];
+}
+
+export interface PixelEraserStroke {
+  id: string;
+  points: number[];
+  strokeWidth: number;
+  lineCap?: 'butt' | 'round' | 'square';
 }
 
 export interface WorldMap {
@@ -277,6 +281,30 @@ export interface MindMap {
   edges: MindMapEdge[];
 }
 
+export type MapGalleryViewMode = 'grid' | 'slider';
+
+export interface MapGalleryCategory {
+  id: string;
+  name: string;
+}
+
+export interface MapGalleryImage {
+  id: string;
+  categoryId: string;
+  name: string;
+  dataUrl: string;
+  createdAt: number;
+}
+
+export interface MapGallery {
+  categories: MapGalleryCategory[];
+  images: MapGalleryImage[];
+  activeCategoryId?: string;
+  activeImageId?: string | null;
+  viewMode?: MapGalleryViewMode;
+  gridColumns?: number;
+}
+
 export interface Project {
   plotlines: Plotline[];
   scenes: Scene[];
@@ -290,6 +318,7 @@ export interface Project {
   characterMapConnections?: CharacterMapConnection[];
   maps?: WorldMap[];
   mindMaps?: MindMap[];
+  mapGallery?: MapGallery;
   chapterMarkers?: ChapterMarker[];
   plotStructure?: string;
   plotStructurePoints?: Record<string, { sceneId?: string; description?: string }>;
@@ -360,7 +389,7 @@ export interface BookUIState {
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;
   boardViewMode?: BoardViewMode;
-  mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps';
+  mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps' | 'gallery';
   mapsSelectedMapId?: string | null;
   mapsSelectedMindMapId?: string | null;
 }
