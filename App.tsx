@@ -63,8 +63,10 @@ import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
+import AuthDebugPanel from './components/AuthDebugPanel';
 import { MAP_NAV_ITEMS, type MapTabId } from './components/mapNavigation';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './components/questionnaireNavigation';
+import { logAuthDebugEvent, shortUid } from './src/authDebug';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -97,6 +99,15 @@ const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: stri
 
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const loginScreenLoggedRef = useRef(false);
+
+  useEffect(() => {
+    logAuthDebugEvent('App initialized', {
+      origin: window.location.origin,
+      mode: window.matchMedia('(max-width: 768px), (pointer: coarse)').matches ? 'mobile' : 'desktop',
+      firebaseConfigured: isFirebaseConfigured,
+    });
+  }, []);
   
   useEffect(() => {
     let isCancelled = false;
@@ -126,6 +137,10 @@ const App: React.FC = () => {
           uid: firebaseUser?.uid,
           email: firebaseUser?.email,
         });
+        logAuthDebugEvent('Auth state changed', {
+          hasUser: Boolean(firebaseUser),
+          uid: shortUid(firebaseUser?.uid),
+        });
 
         setIsLoading(true);
         setHasLoadedBooks(false);
@@ -134,6 +149,10 @@ const App: React.FC = () => {
         if (firebaseUser) {
           // Logged in
           console.log("App: User logged in, initializing cloud storage");
+          logAuthDebugEvent('User signed in', {
+            uid: shortUid(firebaseUser.uid),
+            hasUser: true,
+          });
           setUserId(firebaseUser.uid);
           setCurrentUserId(firebaseUser.uid);
 
@@ -142,12 +161,20 @@ const App: React.FC = () => {
 
           if (isWeb) {
             console.log("App: Web mode, loading books from Firestore only");
+            logAuthDebugEvent('Book loading started', {
+              source: 'firestore',
+              uid: shortUid(firebaseUser.uid),
+            });
             try {
               const cloudBooks = await loadBooks();
               if (isCancelled) return;
               setBooks(deduplicateBooks(cloudBooks));
               setHasLoadedBooks(true);
               setCloudError(null);
+              logAuthDebugEvent('Book loading succeeded', {
+                source: 'firestore',
+                count: cloudBooks.length,
+              });
             } catch (error: any) {
               if (isCancelled) return;
               console.error("App: Web cloud load failed", error);
@@ -155,6 +182,11 @@ const App: React.FC = () => {
               setHasLoadedBooks(true);
               setWebSaveStatus('error');
               setCloudError('טעינת הספרים מהענן נכשלה. נסה שוב בקרוב.');
+              logAuthDebugEvent('Book loading failed', {
+                source: 'firestore',
+                code: error?.code,
+                message: error?.message,
+              });
             }
           } else {
             // 1. Migrate legacy books in local storage to the new UID
@@ -162,6 +194,10 @@ const App: React.FC = () => {
 
             // 2. Perform initial sync to merge local and remote
             console.log("App: Performing initial sync...");
+            logAuthDebugEvent('Book loading started', {
+              source: 'initial-sync',
+              uid: shortUid(firebaseUser.uid),
+            });
             try {
               setIsSyncing(true);
               const { updatedBooks } = await syncService.sync();
@@ -170,6 +206,10 @@ const App: React.FC = () => {
               setBooks(deduplicateBooks(updatedBooks));
               setHasLoadedBooks(true);
               setCloudError(null);
+              logAuthDebugEvent('Book loading succeeded', {
+                source: 'initial-sync',
+                count: updatedBooks.length,
+              });
             } catch (error: any) {
               if (isCancelled) return;
               console.error("App: Initial sync failed", error);
@@ -181,12 +221,20 @@ const App: React.FC = () => {
               if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
                 setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
               }
+              logAuthDebugEvent('Book loading failed', {
+                source: 'initial-sync',
+                code: error?.code,
+                message: error?.message,
+              });
             } finally {
               if (!isCancelled) setIsSyncing(false);
             }
           }
         } else {
           console.log(isWeb ? "App: Web user logged out, requiring Firebase login" : "App: User logged out, switching to local storage");
+          logAuthDebugEvent('User signed out', {
+            web: isWeb,
+          });
           setUserId(null);
 
           if (isWeb) {
@@ -201,10 +249,17 @@ const App: React.FC = () => {
             setStorageMode('local');
             setStorageModeState('local');
 
+            logAuthDebugEvent('Book loading started', {
+              source: 'local',
+            });
             const loadedBooks = await loadBooks();
             if (isCancelled) return;
             setBooks(deduplicateBooks(loadedBooks));
             setHasLoadedBooks(true);
+            logAuthDebugEvent('Book loading succeeded', {
+              source: 'local',
+              count: loadedBooks.length,
+            });
           }
         }
 
@@ -1065,8 +1120,27 @@ const App: React.FC = () => {
     setRemoteBookData(null);
   };
 
+  const shouldShowLoginScreen = isWeb && isAuthReady && !user;
+
+  if (shouldShowLoginScreen && !loginScreenLoggedRef.current) {
+    loginScreenLoggedRef.current = true;
+    logAuthDebugEvent('Login screen displayed', {
+      isAuthReady,
+      hasUser: Boolean(user),
+    });
+  } else if (!shouldShowLoginScreen) {
+    loginScreenLoggedRef.current = false;
+  }
+
+  const renderWithAuthDebug = (content: React.ReactNode) => (
+    <>
+      {content}
+      <AuthDebugPanel />
+    </>
+  );
+
   if (!isFirebaseConfigured) {
-    return (
+    return renderWithAuthDebug(
       <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-text)] p-6">
         <div className="w-full max-w-2xl bg-[var(--theme-card)] border border-red-200 rounded-2xl shadow-xl p-8">
           <div className="flex items-start gap-4">
@@ -1091,7 +1165,7 @@ const App: React.FC = () => {
   }
 
   if (isLoading) {
-    return (
+    return renderWithAuthDebug(
       <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-primary)]">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--theme-primary)]"></div>
@@ -1101,8 +1175,8 @@ const App: React.FC = () => {
     );
   }
 
-  if (isWeb && isAuthReady && !user) {
-    return (
+  if (shouldShowLoginScreen) {
+    return renderWithAuthDebug(
       <div className="h-screen flex items-center justify-center bg-[var(--theme-bg)] text-[var(--theme-text)] p-6">
         <div className="w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-2xl shadow-xl p-8 text-center">
           <div className="mx-auto mb-5 w-14 h-14 rounded-2xl bg-[var(--theme-primary)] text-[var(--theme-card)] flex items-center justify-center">
@@ -1129,7 +1203,7 @@ const App: React.FC = () => {
     );
   }
 
-  return (
+  return renderWithAuthDebug(
     <div className="h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
       {cloudError && (
         <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between text-sm font-bold z-[100] sticky top-0 shadow-lg animate-in slide-in-from-top duration-500">

@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { browserLocalPersistence, getAuth, getRedirectResult, GoogleAuthProvider, setPersistence, signInWithCredential, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
+import { logAuthDebugEvent, shortUid } from './authDebug';
 import { isElectron, openDesktopOAuthUrl } from './platform';
 
 const REQUIRED_FIREBASE_ENV_VARS = [
@@ -46,10 +47,16 @@ const shouldUseRedirectAuth = () => {
 
 const ensureAuthPersistence = async () => {
   try {
+    logAuthDebugEvent('Persistence setup started');
     await setPersistence(auth, browserLocalPersistence);
     console.log('[AUTH] Persistence set to browserLocalPersistence');
+    logAuthDebugEvent('Persistence setup succeeded');
   } catch (error) {
     console.error('[AUTH] Persistence error:', error);
+    logAuthDebugEvent('Persistence error', {
+      code: (error as any)?.code,
+      message: (error as any)?.message,
+    });
     throw error;
   }
 };
@@ -167,15 +174,27 @@ export const signIn = async () => {
         reason: 'mobile-browser',
         userAgent: window.navigator.userAgent,
       });
+      logAuthDebugEvent('Google redirect started', {
+        origin: window.location.origin,
+        mode: 'mobile',
+      });
       await signInWithRedirect(auth, googleProvider);
       return null;
     } else {
       console.log('[AUTH] Web desktop mode - popup flow');
+      logAuthDebugEvent('Google popup started', {
+        origin: window.location.origin,
+        mode: 'desktop',
+      });
       result = await signInWithPopup(auth, googleProvider);
     }
     console.log('[AUTH] SUCCESS', {
       uid: result.user?.uid,
       email: result.user?.email,
+    });
+    logAuthDebugEvent('User signed in', {
+      uid: shortUid(result.user?.uid),
+      hasUser: Boolean(result.user),
     });
 
     return result;
@@ -184,6 +203,10 @@ export const signIn = async () => {
     console.error('[AUTH] code:', error?.code);
     console.error('[AUTH] message:', error?.message);
     console.error('[AUTH] full:', error);
+    logAuthDebugEvent('Redirect error', {
+      code: error?.code,
+      message: error?.message,
+    });
 
     throw error;
   }
@@ -195,6 +218,9 @@ export const completeRedirectSignIn = async () => {
   try {
     await ensureAuthPersistence();
     console.log('[AUTH] Checking redirect result...');
+    logAuthDebugEvent('Redirect check started', {
+      origin: window.location.origin,
+    });
 
     const result = await getRedirectResult(auth);
     if (result?.user) {
@@ -202,15 +228,27 @@ export const completeRedirectSignIn = async () => {
         uid: result.user.uid,
         email: result.user.email,
       });
+      logAuthDebugEvent('Redirect result received', {
+        uid: shortUid(result.user.uid),
+        hasUser: true,
+      });
     } else {
       console.log('[AUTH] Redirect result is null. Current user:', {
         uid: auth.currentUser?.uid,
         email: auth.currentUser?.email,
       });
+      logAuthDebugEvent('Redirect result empty', {
+        currentUser: Boolean(auth.currentUser),
+        uid: shortUid(auth.currentUser?.uid),
+      });
     }
     return result;
   } catch (error) {
     console.error('[Auth] Google redirect sign-in failed:', error);
+    logAuthDebugEvent('Redirect error', {
+      code: (error as any)?.code,
+      message: (error as any)?.message,
+    });
     throw error;
   }
 };
