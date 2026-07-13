@@ -15,6 +15,7 @@ import {
   Camera
 } from 'lucide-react';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
+import { compressImageFile } from '../src/image-utils';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './questionnaireNavigation';
 import RelationshipQuestionnaire from './RelationshipQuestionnaire';
 
@@ -457,15 +458,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     const file = e?.target?.files?.[0];
     if (file) {
       console.log('Renderer: File selected:', file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        console.log('Renderer: FileReader finished reading');
-        updateEntry({ imageUrl: reader.result as string });
-      };
-      reader.onerror = (err) => {
-        console.error('Renderer: FileReader error:', err);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const { dataUrl } = await compressImageFile(file, 900, 0.76);
+        updateEntry({ imageUrl: dataUrl });
+      } catch (error) {
+        console.error('Renderer: Image compression failed:', error);
+      } finally {
+        if (e?.target) e.target.value = '';
+      }
     } else {
       console.log('Renderer: No file selected in standard input');
     }

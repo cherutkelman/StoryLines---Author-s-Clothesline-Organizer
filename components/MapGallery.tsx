@@ -3,6 +3,7 @@ import { ArrowLeftRight, ChevronLeft, ChevronRight, Copy, Grid3X3, ImagePlus, Ma
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { MapGallery as MapGalleryData } from '../types';
 import { auth, storage } from '../src/firebase';
+import { compressImageFile } from '../src/image-utils';
 import { isWeb } from '../src/platform';
 
 interface MapGalleryProps {
@@ -13,8 +14,8 @@ interface MapGalleryProps {
 const DEFAULT_CATEGORY_ID = 'gallery-cat-default';
 const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 8;
-const MAX_IMAGE_DIMENSION = 1600;
-const IMAGE_QUALITY = 0.82;
+const MAX_IMAGE_DIMENSION = 1200;
+const IMAGE_QUALITY = 0.78;
 
 const createDefaultGallery = (): MapGalleryData => ({
   categories: [{ id: DEFAULT_CATEGORY_ID, name: 'כללי' }],
@@ -50,50 +51,8 @@ const normalizeGallery = (gallery?: MapGalleryData): MapGalleryData => {
   };
 };
 
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-
-const readCompressedImage = async (file: File): Promise<{ blob: Blob; dataUrl: string }> => {
-  const objectUrl = URL.createObjectURL(file);
-
-  try {
-    const image = new Image();
-    image.src = objectUrl;
-    await image.decode();
-
-    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
-    const width = Math.max(1, Math.round(image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Canvas 2D context is unavailable');
-
-    context.drawImage(image, 0, 0, width, height);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY);
-    });
-
-    if (!blob) throw new Error('Image compression failed');
-    return {
-      blob,
-      dataUrl: await blobToDataUrl(blob),
-    };
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
 const uploadGalleryImage = async (file: File, imageId: string): Promise<string> => {
-  const { blob, dataUrl } = await readCompressedImage(file);
+  const { blob, dataUrl } = await compressImageFile(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
   const userId = auth.currentUser?.uid;
 
   if (!isWeb) return dataUrl;
@@ -107,8 +66,13 @@ const uploadGalleryImage = async (file: File, imageId: string): Promise<string> 
     },
   };
 
-  await uploadBytes(imageRef, blob, metadata);
-  return getDownloadURL(imageRef);
+  try {
+    await uploadBytes(imageRef, blob, metadata);
+    return getDownloadURL(imageRef);
+  } catch (error) {
+    console.warn('Gallery image storage upload failed; using compressed inline image fallback.', error);
+    return dataUrl;
+  }
 };
 
 const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => {

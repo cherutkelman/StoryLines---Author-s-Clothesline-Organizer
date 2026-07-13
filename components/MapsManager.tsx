@@ -260,7 +260,7 @@ const MapsManager: React.FC<MapsManagerProps> = ({
       )}
 
       <div className="flex-1 relative overflow-hidden">
-        <div className="hidden lg:flex absolute top-4 left-1/2 -translate-x-1/2 z-40 items-center gap-1 bg-[var(--theme-card)]/95 border border-[var(--theme-border)] rounded-2xl p-1.5 shadow-xl backdrop-blur-sm">
+        <div className="hidden lg:flex absolute top-4 left-1/2 -translate-x-1/2 z-50 items-center gap-1 bg-[var(--theme-card)]/95 border border-[var(--theme-border)] rounded-2xl p-1.5 shadow-xl backdrop-blur-sm">
           {MAP_NAV_ITEMS.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;

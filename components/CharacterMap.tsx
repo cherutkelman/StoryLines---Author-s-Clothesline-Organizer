@@ -4,6 +4,7 @@ import { QuestionnaireEntry, CharacterMapConnection } from '../types';
 import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
+import { compressImageFile } from '../src/image-utils';
 
 interface CharacterMapProps {
   characters: QuestionnaireEntry[];
@@ -408,15 +409,14 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     const file = e?.target?.files?.[0];
     if (file) {
       console.log('Renderer: File selected:', file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        console.log('Renderer: FileReader finished reading');
-        updateNode(id, { imageUrl: reader.result as string });
-      };
-      reader.onerror = (err) => {
-        console.error('Renderer: FileReader error:', err);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const { dataUrl } = await compressImageFile(file, 900, 0.76);
+        updateNode(id, { imageUrl: dataUrl });
+      } catch (error) {
+        console.error('Renderer: Image compression failed:', error);
+      } finally {
+        if (e?.target) e.target.value = '';
+      }
     } else {
       console.log('Renderer: No file selected in standard input');
     }
@@ -532,7 +532,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     <div className="h-full flex flex-col relative select-none bg-[var(--theme-bg)]">
       {/* Tool Bar */}
       {!isExporting && (
-        <div className="character-map-toolbar absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
+        <div className="character-map-toolbar absolute top-6 lg:top-20 left-1/2 -translate-x-1/2 z-30 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
           <button 
             onClick={() => setTool('move')}
             className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
