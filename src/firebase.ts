@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, getRedirectResult, GoogleAuthProvider, signInWithCredential, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
+import { browserLocalPersistence, getAuth, getRedirectResult, GoogleAuthProvider, setPersistence, signInWithCredential, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getFirestore } from 'firebase/firestore';
 import { isElectron, openDesktopOAuthUrl } from './platform';
@@ -39,22 +39,19 @@ const shouldUseRedirectAuth = () => {
 
   const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(window.navigator.userAgent);
 
-  return isSmallScreen || isTouchDevice;
+  return isMobileUserAgent || isSmallScreen || isTouchDevice;
 };
 
-const isLocalNetworkHost = () => {
-  if (typeof window === 'undefined') return false;
-
-  const hostname = window.location.hostname;
-
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.startsWith('192.168.') ||
-    hostname.startsWith('10.') ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
-  );
+const ensureAuthPersistence = async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    console.log('[AUTH] Persistence set to browserLocalPersistence');
+  } catch (error) {
+    console.error('[AUTH] Persistence error:', error);
+    throw error;
+  }
 };
 
 type ExchangeGoogleOAuthCodeResponse = {
@@ -85,6 +82,7 @@ export const signIn = async () => {
   try {
     console.log('[AUTH] Starting Google sign-in');
     console.log('[AUTH] origin:', window.location.origin);
+    await ensureAuthPersistence();
     let result;
 
     if (isElectron) {
@@ -164,8 +162,11 @@ export const signIn = async () => {
         tokenData.accessToken || undefined
       );
       result = await signInWithCredential(auth, credential);
-    } else if (shouldUseRedirectAuth() && !isLocalNetworkHost()) {
-      console.log('[AUTH] Web mobile/touch mode - redirect flow');
+    } else if (shouldUseRedirectAuth()) {
+      console.log('[AUTH] Redirect started', {
+        reason: 'mobile-browser',
+        userAgent: window.navigator.userAgent,
+      });
       await signInWithRedirect(auth, googleProvider);
       return null;
     } else {
@@ -192,11 +193,12 @@ export const completeRedirectSignIn = async () => {
   if (isElectron) return null;
 
   try {
+    await ensureAuthPersistence();
     console.log('[AUTH] Checking redirect result...');
 
     const result = await getRedirectResult(auth);
     if (result?.user) {
-      console.log('[AUTH] Redirect sign-in completed', {
+      console.log('[AUTH] Redirect result received', {
         uid: result.user.uid,
         email: result.user.email,
       });

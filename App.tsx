@@ -97,16 +97,11 @@ const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: stri
 
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
-
-  useEffect(() => {
-    if (!isFirebaseConfigured) return;
-
-    completeRedirectSignIn().catch((error) => {
-      console.error('[Auth] Google redirect sign-in failed:', error);
-    });
-  }, []);
   
   useEffect(() => {
+    let isCancelled = false;
+    let unsubscribeAuth: (() => void) | undefined;
+
     if (!isFirebaseConfigured) {
       setIsAuthReady(true);
       setIsLoading(false);
@@ -114,107 +109,138 @@ const App: React.FC = () => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[AUTH STATE] changed:', {
-        uid: firebaseUser?.uid,
-        email: firebaseUser?.email,
-      });
-
+    const initializeAuth = async () => {
       setIsLoading(true);
-      setHasLoadedBooks(false);
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        // Logged in
-        console.log("App: User logged in, initializing cloud storage");
-        setUserId(firebaseUser.uid);
-        setCurrentUserId(firebaseUser.uid);
+      setIsAuthReady(false);
 
-        setStorageMode('cloud');
-        setStorageModeState('cloud');
-
-        if (isWeb) {
-          console.log("App: Web mode, loading books from Firestore only");
-          try {
-            const cloudBooks = await loadBooks();
-            setBooks(deduplicateBooks(cloudBooks));
-            setHasLoadedBooks(true);
-            setCloudError(null);
-          } catch (error: any) {
-            console.error("App: Web cloud load failed", error);
-            setBooks([]);
-            setHasLoadedBooks(true);
-            setWebSaveStatus('error');
-            setCloudError('טעינת הספרים מהענן נכשלה. נסה שוב בקרוב.');
-          }
-        } else {
-          // 1. Migrate legacy books in local storage to the new UID
-          await migrateLegacyBooks(firebaseUser.uid);
-
-          // 2. Perform initial sync to merge local and remote
-          console.log("App: Performing initial sync...");
-          try {
-            setIsSyncing(true);
-            const { updatedBooks } = await syncService.sync();
-            console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
-            setBooks(deduplicateBooks(updatedBooks));
-            setHasLoadedBooks(true);
-            setCloudError(null);
-          } catch (error: any) {
-            console.error("App: Initial sync failed", error);
-            const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
-            console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
-            setBooks(deduplicateBooks(localFallbackBooks));
-            setHasLoadedBooks(true);
-            if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
-              setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
-            }
-          } finally {
-            setIsSyncing(false);
-          }
-        }
-      } else {
-        console.log(isWeb ? "App: Web user logged out, requiring Firebase login" : "App: User logged out, switching to local storage");
-        setUserId(null);
-
-        if (isWeb) {
-          setCurrentUserId('');
-          setStorageMode('cloud');
-          setStorageModeState('cloud');
-          setBooks([]);
-          setActiveBookId('');
-          setHasLoadedBooks(true);
-        } else {
-          setCurrentUserId(getOrCreateUserId());
-          setStorageMode('local');
-          setStorageModeState('local');
-
-          const loadedBooks = await loadBooks();
-          setBooks(deduplicateBooks(loadedBooks));
-          setHasLoadedBooks(true);
-        }
+      try {
+        await completeRedirectSignIn();
+      } catch (error) {
+        console.error('[AUTH] Redirect startup handling failed:', error);
       }
 
-      const loadedUI = loadUIStates();
-      const globalUI = loadGlobalUIState();
-      
-      setUiStates(loadedUI);
-      setIsAuthReady(true);
-      setIsLoading(false);
+      if (isCancelled) return;
 
-      // Select active book after books are loaded/synced
-      setBooks(prev => {
-        if (prev.length > 0) {
-          const lastActiveId = globalUI.lastActiveBookId;
-          const bookToSelect = prev.find(b => b.id === lastActiveId) || prev[0];
-          setActiveBookId(bookToSelect.id);
+      unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+        console.log('[AUTH] Auth state changed', {
+          uid: firebaseUser?.uid,
+          email: firebaseUser?.email,
+        });
+
+        setIsLoading(true);
+        setHasLoadedBooks(false);
+        setUser(firebaseUser);
+        
+        if (firebaseUser) {
+          // Logged in
+          console.log("App: User logged in, initializing cloud storage");
+          setUserId(firebaseUser.uid);
+          setCurrentUserId(firebaseUser.uid);
+
+          setStorageMode('cloud');
+          setStorageModeState('cloud');
+
+          if (isWeb) {
+            console.log("App: Web mode, loading books from Firestore only");
+            try {
+              const cloudBooks = await loadBooks();
+              if (isCancelled) return;
+              setBooks(deduplicateBooks(cloudBooks));
+              setHasLoadedBooks(true);
+              setCloudError(null);
+            } catch (error: any) {
+              if (isCancelled) return;
+              console.error("App: Web cloud load failed", error);
+              setBooks([]);
+              setHasLoadedBooks(true);
+              setWebSaveStatus('error');
+              setCloudError('טעינת הספרים מהענן נכשלה. נסה שוב בקרוב.');
+            }
+          } else {
+            // 1. Migrate legacy books in local storage to the new UID
+            await migrateLegacyBooks(firebaseUser.uid);
+
+            // 2. Perform initial sync to merge local and remote
+            console.log("App: Performing initial sync...");
+            try {
+              setIsSyncing(true);
+              const { updatedBooks } = await syncService.sync();
+              if (isCancelled) return;
+              console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
+              setBooks(deduplicateBooks(updatedBooks));
+              setHasLoadedBooks(true);
+              setCloudError(null);
+            } catch (error: any) {
+              if (isCancelled) return;
+              console.error("App: Initial sync failed", error);
+              const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
+              if (isCancelled) return;
+              console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
+              setBooks(deduplicateBooks(localFallbackBooks));
+              setHasLoadedBooks(true);
+              if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
+                setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
+              }
+            } finally {
+              if (!isCancelled) setIsSyncing(false);
+            }
+          }
+        } else {
+          console.log(isWeb ? "App: Web user logged out, requiring Firebase login" : "App: User logged out, switching to local storage");
+          setUserId(null);
+
+          if (isWeb) {
+            setCurrentUserId('');
+            setStorageMode('cloud');
+            setStorageModeState('cloud');
+            setBooks([]);
+            setActiveBookId('');
+            setHasLoadedBooks(true);
+          } else {
+            setCurrentUserId(getOrCreateUserId());
+            setStorageMode('local');
+            setStorageModeState('local');
+
+            const loadedBooks = await loadBooks();
+            if (isCancelled) return;
+            setBooks(deduplicateBooks(loadedBooks));
+            setHasLoadedBooks(true);
+          }
         }
-        return prev;
-      });
-    });
 
+        if (isCancelled) return;
+
+        const loadedUI = loadUIStates();
+        const globalUI = loadGlobalUIState();
+        
+        setUiStates(loadedUI);
+        setIsAuthReady(true);
+        setIsLoading(false);
+
+        // Select active book after books are loaded/synced
+        setBooks(prev => {
+          if (prev.length > 0) {
+            const lastActiveId = globalUI.lastActiveBookId;
+            const bookToSelect = prev.find(b => b.id === lastActiveId) || prev[0];
+            setActiveBookId(bookToSelect.id);
+          }
+          return prev;
+        });
+
+        console.log('[AUTH] Auth state initialization finished', {
+          isLoggedIn: Boolean(firebaseUser),
+          uid: firebaseUser?.uid,
+        });
+      });
+    };
+
+    initializeAuth();
     syncService.subscribe(setSyncStatus);
-    return () => unsubscribe();
+
+    return () => {
+      isCancelled = true;
+      unsubscribeAuth?.();
+    };
   }, []);
 
   const [books, setBooks] = useState<Book[]>([]);
