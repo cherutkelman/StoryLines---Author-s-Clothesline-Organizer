@@ -31,6 +31,17 @@ const loadImage = (url: string, timeoutMs = 8000): Promise<HTMLImageElement> =>
     image.src = url;
   });
 
+const canvasToJpegBlob = (canvas: HTMLCanvasElement, quality: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error('Image compression failed'));
+      }
+    }, 'image/jpeg', quality);
+  });
+
 export const compressImageFile = async (
   file: File,
   maxDimension = 1200,
@@ -53,11 +64,7 @@ export const compressImageFile = async (
 
     context.drawImage(image, 0, 0, width, height);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', quality);
-    });
-
-    if (!blob) throw new Error('Image compression failed');
+    const blob = await canvasToJpegBlob(canvas, quality);
 
     return {
       blob,
@@ -71,5 +78,75 @@ export const compressImageFile = async (
     };
   } finally {
     URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const compressImageBlobToLimit = async (
+  source: Blob,
+  maxDataUrlLength = 120000
+): Promise<CompressedImage> => {
+  const objectUrl = URL.createObjectURL(source);
+
+  try {
+    const image = await loadImage(objectUrl);
+    const dimensions = [760, 640, 520, 420, 340, 280];
+    const qualities = [0.62, 0.52, 0.44, 0.36, 0.3];
+    let smallest: CompressedImage | null = null;
+
+    for (const maxDimension of dimensions) {
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas 2D context is unavailable');
+
+      context.drawImage(image, 0, 0, width, height);
+
+      for (const quality of qualities) {
+        const blob = await canvasToJpegBlob(canvas, quality);
+        const dataUrl = await blobToDataUrl(blob);
+        const compressed = { blob, dataUrl };
+
+        if (!smallest || dataUrl.length < smallest.dataUrl.length) {
+          smallest = compressed;
+        }
+
+        if (dataUrl.length <= maxDataUrlLength) {
+          return compressed;
+        }
+      }
+    }
+
+    if (smallest) return smallest;
+    throw new Error('Image compression did not produce an output');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+export const compressImageFileToLimit = (
+  file: File,
+  maxDataUrlLength = 120000
+): Promise<CompressedImage> => compressImageBlobToLimit(file, maxDataUrlLength);
+
+export const compressDataUrlToLimit = async (
+  dataUrl: string,
+  maxDataUrlLength = 120000
+): Promise<string> => {
+  if (!dataUrl.startsWith('data:image/') || dataUrl.length <= maxDataUrlLength) {
+    return dataUrl;
+  }
+
+  try {
+    const blob = await fetch(dataUrl).then(response => response.blob());
+    const compressed = await compressImageBlobToLimit(blob, maxDataUrlLength);
+    return compressed.dataUrl.length < dataUrl.length ? compressed.dataUrl : dataUrl;
+  } catch (error) {
+    console.warn('Existing gallery image recompression failed.', error);
+    return dataUrl;
   }
 };

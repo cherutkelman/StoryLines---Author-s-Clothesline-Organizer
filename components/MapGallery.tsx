@@ -1,7 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Copy, Grid3X3, ImagePlus, Maximize2, Minimize2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { MapGallery as MapGalleryData } from '../types';
-import { compressImageFile } from '../src/image-utils';
+import { compressDataUrlToLimit, compressImageFileToLimit } from '../src/image-utils';
+import { auth, storage } from '../src/firebase';
+import { isWeb } from '../src/platform';
 
 interface MapGalleryProps {
   gallery?: MapGalleryData;
@@ -11,8 +14,8 @@ interface MapGalleryProps {
 const DEFAULT_CATEGORY_ID = 'gallery-cat-default';
 const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 8;
-const MAX_IMAGE_DIMENSION = 1200;
-const IMAGE_QUALITY = 0.78;
+const MAX_GALLERY_IMAGE_DATA_URL_LENGTH = 70000;
+const MAX_GALLERY_DATA_URL_LENGTH = 450000;
 
 const createDefaultGallery = (): MapGalleryData => ({
   categories: [{ id: DEFAULT_CATEGORY_ID, name: 'כללי' }],
@@ -48,6 +51,41 @@ const normalizeGallery = (gallery?: MapGalleryData): MapGalleryData => {
   };
 };
 
+const uploadGalleryBlob = async (blob: Blob, imageId: string, originalName: string): Promise<string> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error('Cannot upload gallery image without a signed-in user');
+
+  const imageRef = ref(storage, `users/${userId}/gallery/${imageId}.jpg`);
+  await uploadBytes(imageRef, blob, {
+    contentType: 'image/jpeg',
+    customMetadata: {
+      originalName,
+    },
+  });
+
+  return getDownloadURL(imageRef);
+};
+
+const uploadGalleryFile = async (file: File, imageId: string): Promise<string> => {
+  const { blob, dataUrl } = await compressImageFileToLimit(file, MAX_GALLERY_IMAGE_DATA_URL_LENGTH);
+  if (!isWeb) return dataUrl;
+  return uploadGalleryBlob(blob, imageId, file.name);
+};
+
+const migrateInlineGalleryImage = async (image: MapGalleryData['images'][number]): Promise<MapGalleryData['images'][number]> => {
+  if (!isWeb || !image.dataUrl.startsWith('data:image/')) return image;
+
+  try {
+    const compressedDataUrl = await compressDataUrlToLimit(image.dataUrl, MAX_GALLERY_IMAGE_DATA_URL_LENGTH);
+    const blob = await fetch(compressedDataUrl).then(response => response.blob());
+    const storageUrl = await uploadGalleryBlob(blob, image.id, image.name);
+    return { ...image, dataUrl: storageUrl };
+  } catch (error) {
+    console.warn('Existing gallery image migration to Storage failed.', error);
+    return image;
+  }
+};
+
 const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetCategoryId, setTargetCategoryId] = useState<string>('');
@@ -76,11 +114,12 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
     setUploadError(null);
 
     try {
+      const selectedFiles = Array.from(files).slice(0, 1);
       const uploadedImages = await Promise.all(
-        Array.from(files).map(async (file) => {
+        selectedFiles.map(async (file) => {
           try {
             const id = `gallery-image-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-            const { dataUrl } = await compressImageFile(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
+            const dataUrl = await uploadGalleryFile(file, id);
             return dataUrl ? {
               id,
               categoryId: uploadCategory.id,
@@ -103,8 +142,19 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
       }
 
       if (validImages.length > 0) {
+        const existingImages = await Promise.all(
+          normalized.images.map(migrateInlineGalleryImage)
+        );
+        const nextImages = [...existingImages, ...validImages];
+        const totalImageSize = nextImages.reduce((sum, image) => sum + image.dataUrl.length, 0);
+
+        if (totalImageSize > MAX_GALLERY_DATA_URL_LENGTH) {
+          setUploadError('הגלריה כבר כבדה מדי לשמירה. כדאי למחוק תמונה ישנה או להקטין את כמות התמונות.');
+          return;
+        }
+
         updateGallery({
-          images: [...normalized.images, ...validImages],
+          images: nextImages,
           activeCategoryId: activeCategory.id,
           activeImageId: validImages[validImages.length - 1].id,
         });
@@ -288,7 +338,6 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              multiple
               className="hidden"
               onChange={(event) => handleCompressedUpload(event.target.files)}
             />
