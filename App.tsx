@@ -57,7 +57,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -67,6 +67,17 @@ import AuthDebugPanel from './components/AuthDebugPanel';
 import { MAP_NAV_ITEMS, type MapTabId } from './components/mapNavigation';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './components/questionnaireNavigation';
 import { logAuthDebugEvent, shortUid } from './src/authDebug';
+import {
+  SCENE_HISTORY_TYPING_CHANGE_THRESHOLD,
+  SCENE_HISTORY_TYPING_IDLE_MS,
+  calculateChangedCharacters,
+  copySceneVersionToNewScene,
+  createSceneVersion,
+  createSceneVersionFromScene,
+  restoreSceneVersion,
+} from './src/scene-history';
+import { sceneVersionStorage } from './src/scene-version-storage';
+import { logSceneHistoryDebug } from './src/scene-history-debug';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -96,6 +107,24 @@ const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: stri
   { id: 'plotlines', icon: LayoutGrid, label: 'קווים' },
   { id: 'chapters', icon: Rows, label: 'פרקים' },
 ];
+
+const normalizeLoadedBooksSceneHistory = async (loadedBooks: Book[]): Promise<Book[]> => {
+  const legacyBookIds = new Set(
+    loadedBooks
+      .filter(book => Array.isArray((book as Book & { sceneVersions?: SceneVersion[] }).sceneVersions))
+      .map(book => book.id)
+  );
+
+  if (legacyBookIds.size === 0) return deduplicateBooks(loadedBooks);
+
+  const migratedBooks = await sceneVersionStorage.migrateLegacySceneVersionsFromBooks(loadedBooks);
+  const now = Date.now();
+  return deduplicateBooks(migratedBooks.map(book =>
+    legacyBookIds.has(book.id)
+      ? { ...book, updatedAt: now, pendingSync: true }
+      : book
+  ));
+};
 
 const App: React.FC = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -166,9 +195,9 @@ const App: React.FC = () => {
               uid: shortUid(firebaseUser.uid),
             });
             try {
-              const cloudBooks = await loadBooks();
+              const cloudBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
               if (isCancelled) return;
-              setBooks(deduplicateBooks(cloudBooks));
+              setBooks(cloudBooks);
               setHasLoadedBooks(true);
               setCloudError(null);
               logAuthDebugEvent('Book loading succeeded', {
@@ -200,10 +229,11 @@ const App: React.FC = () => {
             });
             try {
               setIsSyncing(true);
-              const { updatedBooks } = await syncService.sync();
+              const syncResult = await syncService.sync();
+              const updatedBooks = await normalizeLoadedBooksSceneHistory(syncResult.updatedBooks);
               if (isCancelled) return;
               console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
-              setBooks(deduplicateBooks(updatedBooks));
+              setBooks(updatedBooks);
               setHasLoadedBooks(true);
               setCloudError(null);
               logAuthDebugEvent('Book loading succeeded', {
@@ -213,10 +243,10 @@ const App: React.FC = () => {
             } catch (error: any) {
               if (isCancelled) return;
               console.error("App: Initial sync failed", error);
-              const localFallbackBooks = await storageManager.getLocalProvider().loadBooks();
+              const localFallbackBooks = await normalizeLoadedBooksSceneHistory(await storageManager.getLocalProvider().loadBooks());
               if (isCancelled) return;
               console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
-              setBooks(deduplicateBooks(localFallbackBooks));
+              setBooks(localFallbackBooks);
               setHasLoadedBooks(true);
               if (error.message?.includes('resource-exhausted') || error.message?.includes('quota')) {
                 setCloudError('מכסת האחסון בענן הסתיימה להיום. השינויים נשמרים מקומית ויסונכרנו מחר.');
@@ -252,9 +282,9 @@ const App: React.FC = () => {
             logAuthDebugEvent('Book loading started', {
               source: 'local',
             });
-            const loadedBooks = await loadBooks();
+            const loadedBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
             if (isCancelled) return;
-            setBooks(deduplicateBooks(loadedBooks));
+            setBooks(loadedBooks);
             setHasLoadedBooks(true);
             logAuthDebugEvent('Book loading succeeded', {
               source: 'local',
@@ -344,6 +374,13 @@ const App: React.FC = () => {
   const [bulkTitles, setBulkTitles] = useState('');
   const [bulkPlotlineId, setBulkPlotlineId] = useState('');
   const [updateStatus, setUpdateStatus] = useState<'none' | 'available' | 'downloaded'>('none');
+  const sceneHistoryTypingTimersRef = useRef<Map<string, number>>(new Map());
+  const sceneHistoryChangedCharsRef = useRef<Map<string, number>>(new Map());
+  const sceneHistoryPreviousContentRef = useRef<Map<string, string>>(new Map());
+  const focusedEditorSceneIdRef = useRef<string | null>(null);
+  const [sceneVersionsByKey, setSceneVersionsByKey] = useState<Record<string, SceneVersion[]>>({});
+  const sceneVersionsByKeyRef = useRef<Record<string, SceneVersion[]>>({});
+  const loadingSceneVersionKeysRef = useRef<Set<string>>(new Set());
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -354,6 +391,17 @@ const App: React.FC = () => {
     uiStates[activeBookId] || (activeBook ? uiStates[activeBook.id] : {}) || {},
     [uiStates, activeBookId, activeBook]
   );
+
+  useEffect(() => {
+    focusedEditorSceneIdRef.current = activeUI.editorFocusedSceneId ?? null;
+  }, [activeUI.editorFocusedSceneId]);
+
+  useEffect(() => {
+    return () => {
+      sceneHistoryTypingTimersRef.current.forEach(timerId => window.clearTimeout(timerId));
+      sceneHistoryTypingTimersRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (activeUI.lastView) {
@@ -484,6 +532,306 @@ const App: React.FC = () => {
     setBooks(prev => updateBookAndSharedFields(prev, activeBookId, updates, SHARED_FIELDS));
   };
 
+  const getSceneHistoryKey = (bookId: string, sceneId: string) => `${bookId}:${sceneId}`;
+
+  const getCachedSceneVersions = (bookId: string, sceneId: string): SceneVersion[] | undefined => {
+    return sceneVersionsByKeyRef.current[getSceneHistoryKey(bookId, sceneId)];
+  };
+
+  const setCachedSceneVersions = (bookId: string, sceneId: string, versions: SceneVersion[]) => {
+    const key = getSceneHistoryKey(bookId, sceneId);
+    const sortedVersions = [...versions].sort((a, b) => b.createdAt - a.createdAt);
+    sceneVersionsByKeyRef.current = {
+      ...sceneVersionsByKeyRef.current,
+      [key]: sortedVersions,
+    };
+    setSceneVersionsByKey(sceneVersionsByKeyRef.current);
+  };
+
+  const loadSceneVersionsForScene = async (bookId: string, sceneId: string, forceReload = false): Promise<SceneVersion[]> => {
+    const key = getSceneHistoryKey(bookId, sceneId);
+    const cached = sceneVersionsByKeyRef.current[key];
+    if (cached && !forceReload) return cached;
+
+    if (loadingSceneVersionKeysRef.current.has(key)) {
+      return sceneVersionStorage.loadSceneVersions(bookId, sceneId);
+    }
+
+    loadingSceneVersionKeysRef.current.add(key);
+    try {
+      const versions = await sceneVersionStorage.loadSceneVersions(bookId, sceneId);
+      setCachedSceneVersions(bookId, sceneId, versions);
+      logSceneHistoryDebug('loadSceneVersions completed', {
+        bookId,
+        sceneId,
+        versionCount: versions.length,
+        versionIds: versions.map(version => version.id),
+        reasons: versions.map(version => version.reason),
+      });
+      return versions;
+    } finally {
+      loadingSceneVersionKeysRef.current.delete(key);
+    }
+  };
+
+  const clearSceneHistoryTypingTimer = (bookId: string, sceneId: string) => {
+    const key = getSceneHistoryKey(bookId, sceneId);
+    const timerId = sceneHistoryTypingTimersRef.current.get(key);
+    if (timerId !== undefined) {
+      window.clearTimeout(timerId);
+      sceneHistoryTypingTimersRef.current.delete(key);
+    }
+  };
+
+  const resetSceneHistoryTracking = (bookId: string, scene: Scene) => {
+    const key = getSceneHistoryKey(bookId, scene.id);
+    sceneHistoryChangedCharsRef.current.set(key, 0);
+    sceneHistoryPreviousContentRef.current.set(key, scene.content);
+    clearSceneHistoryTypingTimer(bookId, scene.id);
+  };
+
+  const createSceneVersionForBook = async (
+    bookId: string,
+    sceneId: string,
+    options: {
+      versionType: SceneVersion['versionType'];
+      reason: SceneVersion['reason'];
+      name?: string;
+      note?: string;
+      restoredFromVersionId?: string;
+    }
+  ) => {
+    const book = books.find(item => item.id === bookId);
+    if (!book) return null;
+    const scene = book.scenes.find(item => item.id === sceneId);
+    logSceneHistoryDebug('save handler started', {
+      bookId,
+      sceneId,
+      title: scene?.title ?? null,
+      reason: options.reason,
+      contentLength: scene?.content.length ?? 0,
+    });
+
+    const versions = await loadSceneVersionsForScene(bookId, sceneId);
+    const latest = versions[0];
+    logSceneHistoryDebug('before duplicate check', {
+      bookId,
+      sceneId,
+      foundPreviousVersion: Boolean(latest),
+      previousVersionId: latest?.id ?? null,
+      previousContentLength: latest?.content.length ?? null,
+      contentIsSame: scene ? latest?.content === scene.content : null,
+    });
+    const version = createSceneVersion({
+      project: book,
+      versions,
+      bookId,
+      sceneId,
+      userId: currentUserId || user?.uid,
+      ...options,
+      id: uuidv4(),
+    });
+
+    if (!version) return null;
+
+    await sceneVersionStorage.saveSceneVersion(version);
+    setCachedSceneVersions(bookId, sceneId, [version, ...versions]);
+    const reloadedVersions = await sceneVersionStorage.loadSceneVersions(bookId, sceneId);
+    logSceneHistoryDebug('after save reload', {
+      bookId,
+      sceneId,
+      versionCount: reloadedVersions.length,
+      versionIds: reloadedVersions.map(item => item.id),
+      reasons: reloadedVersions.map(item => item.reason),
+    });
+
+    if (scene) resetSceneHistoryTracking(bookId, scene);
+
+    return version;
+  };
+
+  const createSceneVersionFromSceneSnapshot = async (
+    bookId: string,
+    sceneSnapshot: Scene,
+    options: {
+      versionType: SceneVersion['versionType'];
+      reason: SceneVersion['reason'];
+      name?: string;
+      note?: string;
+      restoredFromVersionId?: string;
+    }
+  ) => {
+    logSceneHistoryDebug('save handler started', {
+      bookId,
+      sceneId: sceneSnapshot.id,
+      title: sceneSnapshot.title,
+      reason: options.reason,
+      contentLength: sceneSnapshot.content.length,
+    });
+    const versions = await loadSceneVersionsForScene(bookId, sceneSnapshot.id);
+    const latest = versions[0];
+    logSceneHistoryDebug('before duplicate check', {
+      bookId,
+      sceneId: sceneSnapshot.id,
+      foundPreviousVersion: Boolean(latest),
+      previousVersionId: latest?.id ?? null,
+      previousContentLength: latest?.content.length ?? null,
+      contentIsSame: latest?.content === sceneSnapshot.content,
+    });
+    const version = createSceneVersionFromScene({
+      scene: sceneSnapshot,
+      versions,
+      bookId,
+      userId: currentUserId || user?.uid,
+      ...options,
+      id: uuidv4(),
+    });
+
+    if (!version) return null;
+
+    await sceneVersionStorage.saveSceneVersion(version);
+    setCachedSceneVersions(bookId, sceneSnapshot.id, [version, ...versions]);
+    const reloadedVersions = await sceneVersionStorage.loadSceneVersions(bookId, sceneSnapshot.id);
+    logSceneHistoryDebug('after save reload', {
+      bookId,
+      sceneId: sceneSnapshot.id,
+      versionCount: reloadedVersions.length,
+      versionIds: reloadedVersions.map(item => item.id),
+      reasons: reloadedVersions.map(item => item.reason),
+    });
+    resetSceneHistoryTracking(bookId, sceneSnapshot);
+    return version;
+  };
+
+  const scheduleTypingPauseVersion = (bookId: string, sceneId: string) => {
+    clearSceneHistoryTypingTimer(bookId, sceneId);
+    const key = getSceneHistoryKey(bookId, sceneId);
+    const timerId = window.setTimeout(() => {
+      const changedChars = sceneHistoryChangedCharsRef.current.get(key) || 0;
+      if (changedChars >= SCENE_HISTORY_TYPING_CHANGE_THRESHOLD) {
+        void createSceneVersionForBook(bookId, sceneId, {
+          versionType: 'automatic',
+          reason: 'typing_pause',
+        });
+      }
+    }, SCENE_HISTORY_TYPING_IDLE_MS);
+
+    sceneHistoryTypingTimersRef.current.set(key, timerId);
+  };
+
+  const trackSceneContentChange = (book: Book, scene: Scene, nextContent: string) => {
+    const key = getSceneHistoryKey(book.id, scene.id);
+    const previousContent = sceneHistoryPreviousContentRef.current.get(key) ?? scene.content;
+    const changedChars = calculateChangedCharacters(previousContent, nextContent);
+
+    sceneHistoryPreviousContentRef.current.set(key, nextContent);
+    sceneHistoryChangedCharsRef.current.set(
+      key,
+      (sceneHistoryChangedCharsRef.current.get(key) || 0) + changedChars
+    );
+
+    scheduleTypingPauseVersion(book.id, scene.id);
+  };
+
+  const flushSceneHistory = (
+    sceneId: string | null | undefined,
+    reason: SceneVersion['reason'],
+    versionType: SceneVersion['versionType'] = 'automatic'
+  ) => {
+    if (!activeBook || !sceneId) return;
+    void createSceneVersionForBook(activeBook.id, sceneId, { versionType, reason });
+  };
+
+  const flushSceneHistorySnapshot = async (
+    sceneSnapshot: Scene | null | undefined,
+    reason: SceneVersion['reason'],
+    versionType: SceneVersion['versionType'] = 'automatic'
+  ) => {
+    if (!activeBook || !sceneSnapshot) return null;
+    return createSceneVersionFromSceneSnapshot(activeBook.id, sceneSnapshot, { versionType, reason });
+  };
+
+  const handleManualSceneVersion = (sceneId: string, name?: string, note?: string) => {
+    if (!activeBook) return;
+    void createSceneVersionForBook(activeBook.id, sceneId, {
+      versionType: 'manual',
+      reason: 'manual',
+      name,
+      note,
+    });
+  };
+
+  const handleRestoreSceneVersion = async (sceneId: string, versionId: string) => {
+    if (!activeBook) return;
+    const bookId = activeBook.id;
+    const versions = await loadSceneVersionsForScene(bookId, sceneId);
+    const { project: restoredProject, currentVersion } = restoreSceneVersion({
+      project: activeBook,
+      versions,
+      bookId,
+      sceneId,
+      versionId,
+      userId: currentUserId || user?.uid,
+      currentVersionId: uuidv4(),
+    });
+
+    if (restoredProject === activeBook && !currentVersion) return;
+
+    if (currentVersion) {
+      await sceneVersionStorage.saveSceneVersion(currentVersion);
+      setCachedSceneVersions(bookId, sceneId, [currentVersion, ...versions]);
+    }
+
+    let restoredScene: Scene | null = null;
+
+    setBooks(prev => prev.map(book => {
+      if (book.id !== bookId) return book;
+
+      restoredScene = restoredProject.scenes.find(scene => scene.id === sceneId) || null;
+      return {
+        ...book,
+        ...restoredProject,
+        updatedAt: Date.now(),
+        pendingSync: true,
+      };
+    }));
+
+    if (restoredScene) {
+      resetSceneHistoryTracking(bookId, restoredScene);
+    }
+  };
+
+  const handleCopySceneVersion = async (versionId: string) => {
+    if (!activeBook) return;
+    const bookId = activeBook.id;
+    const versionSceneId = Object.values(sceneVersionsByKey)
+      .flat()
+      .find(version => version.id === versionId)?.sceneId;
+    if (!versionSceneId) return;
+    const versions = await loadSceneVersionsForScene(bookId, versionSceneId);
+    const version = versions.find(item => item.id === versionId);
+    if (!version) return;
+
+    setBooks(prev => prev.map(book => {
+      if (book.id !== bookId) return book;
+      const nextProject = copySceneVersionToNewScene({
+        project: book,
+        version,
+        versionId,
+        newSceneId: `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      });
+
+      if (nextProject === book) return book;
+
+      return {
+        ...book,
+        ...nextProject,
+        updatedAt: Date.now(),
+        pendingSync: true,
+      };
+    }));
+  };
+
   const updateBookUiState = (updates: Partial<BookUIState>) => {
     if (!activeBookId) return;
     setUiStates(prev => ({
@@ -496,6 +844,9 @@ const App: React.FC = () => {
   };
 
   const handleViewChange = (view: AppView) => {
+    if (activeView === 'editor' && view !== 'editor') {
+      flushSceneHistory(focusedEditorSceneIdRef.current, 'page_navigation');
+    }
     setActiveView(view);
     updateBookUiState({ lastView: view });
   };
@@ -656,11 +1007,16 @@ const App: React.FC = () => {
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
-  if (!activeBook) return;
-  updateActiveBook({
-    scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
-  });
-};
+    if (!activeBook) return;
+    const scene = activeBook.scenes.find(s => s.id === id);
+    if (scene && updates.content !== undefined && updates.content !== scene.content) {
+      trackSceneContentChange(activeBook, scene, updates.content);
+    }
+
+    updateActiveBook({
+      scenes: activeBook.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
+    });
+  };
 
   const updateChapterTitle = (position: number, title: string) => {
     if (!activeBook) return;
@@ -734,30 +1090,44 @@ const App: React.FC = () => {
     });
   };
 
-  const deleteScene = (id: string) => {
+  const deleteScene = async (id: string) => {
     if (!activeBook) return;
     
     const sceneToDelete = activeBook.scenes.find(s => s.id === id);
     if (!sceneToDelete) return;
     const deletedPos = sceneToDelete.position;
 
-    const newScenes = activeBook.scenes
-      .filter(s => s.id !== id)
-      .sort((a, b) => a.position - b.position)
-      .map((s, idx) => ({ ...s, position: idx }));
-    
-    // Shift chapter markers that are after the deleted point
-    const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
-      if (m.position > deletedPos) {
-        return { ...m, position: m.position - 1 };
-      }
-      return m;
+    await createSceneVersionForBook(activeBook.id, id, {
+      versionType: 'before_delete',
+      reason: 'before_delete',
     });
 
-    updateActiveBook({ 
-      scenes: newScenes,
-      chapterMarkers: updatedMarkers
-    });
+    setBooks(prev => prev.map(book => {
+      if (book.id !== activeBook.id) return book;
+
+      const newScenes = book.scenes
+        .filter(s => s.id !== id)
+        .sort((a, b) => a.position - b.position)
+        .map((s, idx) => ({ ...s, position: idx }));
+      
+      // Shift chapter markers that are after the deleted point
+      const updatedMarkers = (book.chapterMarkers || []).map(m => {
+        if (m.position > deletedPos) {
+          return { ...m, position: m.position - 1 };
+        }
+        return m;
+      });
+
+      return {
+        ...book,
+        scenes: newScenes,
+        chapterMarkers: updatedMarkers,
+        updatedAt: Date.now(),
+        pendingSync: true,
+      };
+    }));
+
+    resetSceneHistoryTracking(activeBook.id, sceneToDelete);
   };
 
   const exportManuscript = () => {
@@ -967,8 +1337,9 @@ const App: React.FC = () => {
       const savedBooks = await saveBooks(currentBooks);
 
       if (isWeb) {
-        const cloudBooks = await loadBooks();
-        setBooks(deduplicateBooks(cloudBooks.length > 0 ? cloudBooks : savedBooks));
+        const cloudBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
+        const normalizedSavedBooks = await normalizeLoadedBooksSceneHistory(savedBooks);
+        setBooks(cloudBooks.length > 0 ? cloudBooks : normalizedSavedBooks);
         setLastCloudSaved(new Date());
         setCloudError(null);
         setWebSaveStatus('saved');
@@ -986,7 +1357,8 @@ const App: React.FC = () => {
       });
       
       console.log("[App] Calling syncService.sync()...");
-      const { updatedBooks } = await syncService.sync();
+      const syncResult = await syncService.sync();
+      const updatedBooks = await normalizeLoadedBooksSceneHistory(syncResult.updatedBooks);
       setLastCloudSaved(new Date());
       setCloudError(null);
       
@@ -1915,23 +2287,56 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
                    <Editor 
                     project={activeBook} 
+                    bookId={activeBook.id}
                     user={user}
                     visiblePlotlines={visiblePlotlines} 
                     onUpdateScene={updateScene} 
                     onDeleteScene={deleteScene}
                     onOpenBulkAdd={() => setIsBulkAddOpen(true)} 
                     initialFocusedSceneId={activeUI.editorFocusedSceneId}
-                    onFocusScene={(id) => updateBookUiState({ editorFocusedSceneId: id })}
+                    onFocusScene={async (id, previousSceneSnapshot) => {
+                      const previousSceneId = focusedEditorSceneIdRef.current;
+                      logSceneHistoryDebug('App editor focus change handler', {
+                        bookId: activeBook.id,
+                        oldSceneId: previousSceneId,
+                        newSceneId: id,
+                        oldSceneTitle: previousSceneSnapshot?.title ?? null,
+                        draftContentLength: previousSceneSnapshot?.content.length ?? null,
+                        sceneChangeCallbackInvoked: Boolean(previousSceneId && previousSceneId !== id),
+                      });
+                      if (previousSceneId && previousSceneId !== id) {
+                        if (previousSceneSnapshot?.id === previousSceneId) {
+                          await flushSceneHistorySnapshot(previousSceneSnapshot, 'scene_change');
+                        } else {
+                          await createSceneVersionForBook(activeBook.id, previousSceneId, {
+                            versionType: 'automatic',
+                            reason: 'scene_change',
+                          });
+                        }
+                      }
+                      focusedEditorSceneIdRef.current = id;
+                      updateBookUiState({ editorFocusedSceneId: id });
+                    }}
                     initialExpandedSceneIds={activeUI.editorExpandedSceneIds}
                     onExpandedScenesChange={(ids) => updateBookUiState({ editorExpandedSceneIds: ids })}
                     initialDisplayMode={activeUI.editorDisplayMode}
                     onDisplayModeChange={(mode) => updateBookUiState({ editorDisplayMode: mode })}
                     onExport={exportManuscript}
+                    sceneVersions={
+                      Object.entries(sceneVersionsByKey)
+                        .filter(([key]) => key.startsWith(`${activeBook.id}:`))
+                        .flatMap(([, versions]) => versions)
+                    }
+                    onLoadSceneVersions={(sceneId) => loadSceneVersionsForScene(activeBook.id, sceneId, true).then((versions) => versions.length)}
+                    onCreateManualSceneVersion={handleManualSceneVersion}
+                    onRestoreSceneVersion={handleRestoreSceneVersion}
+                    onCopySceneVersion={handleCopySceneVersion}
                     onUpdateChapterMarker={updateChapterMarker}
                     isLibrarySidebarCollapsed={isSidebarCollapsed}
                     externalSearchQuery={editorMobileSearchQuery}
                     onExternalSearchQueryChange={setEditorMobileSearchQuery}
                     externalCommand={editorExternalCommand}
+                    appActiveSceneId={activeUI.editorFocusedSceneId ?? null}
                   />
                 </div>
               )}

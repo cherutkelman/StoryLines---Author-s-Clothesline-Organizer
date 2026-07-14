@@ -194,8 +194,9 @@ export class FirestoreStorageProvider implements IStorageProvider {
       if (isOwner || isMember) {
         const bookRef = doc(db, path, book.id);
 
+        const { sceneVersions: _sceneVersions, ...bookWithoutSceneVersions } = book as Book & { sceneVersions?: unknown };
         const normalizedBook = {
-          ...book,
+          ...bookWithoutSceneVersions,
           memberIds: Array.isArray(book.members)
             ? book.members
                 .map(member => member?.userId)

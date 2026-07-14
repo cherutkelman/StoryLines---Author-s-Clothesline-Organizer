@@ -110,6 +110,25 @@ export interface Scene {
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
   chapterTitle?: string;
+  restoredFromVersionId?: string;
+}
+
+export type SceneVersionType = 'automatic' | 'manual' | 'before_delete' | 'restored';
+export type SceneVersionReason = 'typing_pause' | 'scene_change' | 'page_navigation' | 'before_delete' | 'manual' | 'restore';
+
+export interface SceneVersion {
+  id: string;
+  bookId: string;
+  sceneId: string;
+  sceneTitle: string;
+  content: string;
+  createdAt: number;
+  createdByUserId?: string;
+  versionType: SceneVersionType;
+  reason: SceneVersionReason;
+  name?: string;
+  note?: string;
+  restoredFromVersionId?: string;
 }
 
 export interface ChapterMarker {

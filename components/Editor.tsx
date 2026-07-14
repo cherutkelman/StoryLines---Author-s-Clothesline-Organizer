@@ -1,6 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Project, Scene, QuestionnaireEntry } from '../types';
+import { Project, Scene, QuestionnaireEntry, SceneVersion, SceneVersionReason } from '../types';
+import { diffText, resolveSceneHistorySceneId } from '../src/scene-history';
+import { logSceneHistoryDebug } from '../src/scene-history-debug';
 import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
   BookOpen, 
@@ -24,28 +26,40 @@ import {
   Flag,
   Info,
   FileText,
-  Users
+  Users,
+  History,
+  RotateCcw,
+  GitCompare,
+  ClipboardCopy,
+  Save
 } from 'lucide-react';
 
 interface EditorProps {
   project: Project;
+  bookId: string;
   user: any;
   visiblePlotlines: string[];
   onUpdateScene: (id: string, updates: Partial<Scene>) => void;
   onDeleteScene: (id: string) => void;
   onOpenBulkAdd: () => void;
   initialFocusedSceneId?: string | null;
-  onFocusScene?: (id: string | null) => void;
+  onFocusScene?: (id: string | null, previousSceneSnapshot?: Scene) => Promise<void> | void;
   initialExpandedSceneIds?: string[];
   onExpandedScenesChange?: (ids: string[]) => void;
   initialDisplayMode?: 'full' | 'focus';
   onDisplayModeChange?: (mode: 'full' | 'focus') => void;
   onExport?: () => void;
+  sceneVersions?: SceneVersion[];
+  onLoadSceneVersions?: (sceneId: string) => Promise<number> | number;
+  onCreateManualSceneVersion?: (sceneId: string, name?: string, note?: string) => void;
+  onRestoreSceneVersion?: (sceneId: string, versionId: string) => void;
+  onCopySceneVersion?: (versionId: string) => void;
   onUpdateChapterMarker?: (id: string, updates: any) => void;
   isLibrarySidebarCollapsed?: boolean;
   externalSearchQuery?: string;
   onExternalSearchQueryChange?: (value: string) => void;
   externalCommand?: { action: 'tips'; nonce: number } | null;
+  appActiveSceneId?: string | null;
 }
 
 const AutoExpandingTextarea: React.FC<{
@@ -56,7 +70,8 @@ const AutoExpandingTextarea: React.FC<{
   minRows?: number;
   focusOnRender?: boolean;
   onFocus?: () => void;
-}> = ({ value, onChange, placeholder, className, minRows = 5, focusOnRender = false, onFocus }) => {
+  onDraftChange?: (value: string) => void;
+}> = ({ value, onChange, placeholder, className, minRows = 5, focusOnRender = false, onFocus, onDraftChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localValue, setLocalValue] = useState(value);
 
@@ -147,6 +162,7 @@ const AutoExpandingTextarea: React.FC<{
       value={localValue}
       placeholder={placeholder}
       onChange={(e) => {
+        onDraftChange?.(e.target.value);
         preserveScroll(() => setLocalValue(e.target.value));
       }}
       onFocus={onFocus}
@@ -161,7 +177,8 @@ const DebouncedInput: React.FC<{
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
-}> = ({ value, onChange, placeholder, className }) => {
+  onDraftChange?: (value: string) => void;
+}> = ({ value, onChange, placeholder, className, onDraftChange }) => {
   const [localValue, setLocalValue] = useState(value);
 
   useEffect(() => {
@@ -179,12 +196,37 @@ const DebouncedInput: React.FC<{
       className={className}
       value={localValue}
       placeholder={placeholder}
-      onChange={(e) => setLocalValue(e.target.value)}
+      onChange={(e) => {
+        onDraftChange?.(e.target.value);
+        setLocalValue(e.target.value);
+      }}
     />
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand }) => {
+const getVersionReasonLabel = (reason: SceneVersionReason): string => {
+  const labels: Record<SceneVersionReason, string> = {
+    typing_pause: 'הפסקה בכתיבה',
+    scene_change: 'מעבר לסצנה אחרת',
+    page_navigation: 'מעבר למסך אחר',
+    before_delete: 'לפני מחיקה',
+    manual: 'שמירה ידנית',
+    restore: 'לפני שחזור',
+  };
+  return labels[reason];
+};
+
+const getVersionTypeLabel = (version: SceneVersion): string => {
+  if (version.versionType === 'manual') return 'ידנית';
+  if (version.versionType === 'before_delete') return 'לפני מחיקה';
+  if (version.versionType === 'restored') return 'שוחזרה';
+  return 'אוטומטית';
+};
+
+const formatVersionDate = (createdAt: number) => new Date(createdAt).toLocaleDateString('he-IL');
+const formatVersionTime = (createdAt: number) => new Date(createdAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
@@ -193,6 +235,16 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [historyMode, setHistoryMode] = useState<'view' | 'compare'>('view');
+  const [isManualVersionFormOpen, setIsManualVersionFormOpen] = useState(false);
+  const [manualVersionName, setManualVersionName] = useState('');
+  const [manualVersionNote, setManualVersionNote] = useState('');
+  const [displayedSceneId, setDisplayedSceneId] = useState<string | null>(initialFocusedSceneId || null);
+  const sceneContentDraftsRef = useRef<Record<string, string>>({});
+  const sceneTitleDraftsRef = useRef<Record<string, string>>({});
+  const lastInteractedSceneIdRef = useRef<string | null>(initialFocusedSceneId || null);
   const activeSearchQuery = externalSearchQuery ?? searchQuery;
   const updateSearchQuery = onExternalSearchQueryChange ?? setSearchQuery;
 
@@ -201,9 +253,38 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
     onDisplayModeChange?.(mode);
   };
 
-  const handleFocusScene = (id: string | null) => {
+  const getSceneSnapshot = (id: string | null): Scene | undefined => {
+    if (!id) return undefined;
+    const scene = project.scenes.find(item => item.id === id);
+    if (!scene) return undefined;
+
+    return {
+      ...scene,
+      title: sceneTitleDraftsRef.current[id] ?? scene.title,
+      content: sceneContentDraftsRef.current[id] ?? scene.content,
+    };
+  };
+
+  const isValidSceneId = (id: string | null | undefined): id is string => {
+    return Boolean(id && project.scenes.some(scene => scene.id === id));
+  };
+
+  const handleFocusScene = async (id: string | null) => {
+    if (isValidSceneId(id)) {
+      lastInteractedSceneIdRef.current = id;
+      setDisplayedSceneId(id);
+    }
+    if (id === focusedSceneId) return;
+    const previousSceneSnapshot = getSceneSnapshot(focusedSceneId);
     setFocusedSceneId(id);
-    onFocusScene?.(id);
+    logSceneHistoryDebug('scene focus requested', {
+      oldSceneId: previousSceneSnapshot?.id ?? null,
+      newSceneId: id,
+      oldSceneTitle: previousSceneSnapshot?.title ?? null,
+      draftContentLength: previousSceneSnapshot?.content.length ?? 0,
+      sceneChangeCallbackInvoked: Boolean(previousSceneSnapshot && previousSceneSnapshot.id !== id),
+    });
+    await onFocusScene?.(id, previousSceneSnapshot);
   };
 
   const handleExpandedScenesChange = (ids: string[]) => {
@@ -212,18 +293,65 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
   };
 
   const toggleSceneExpanded = (id: string) => {
+    lastInteractedSceneIdRef.current = id;
     const nextExpandedSceneIds = expandedSceneIds.includes(id)
       ? expandedSceneIds.filter(sceneId => sceneId !== id)
       : [...expandedSceneIds, id];
+    const nextFocusedSceneId = nextExpandedSceneIds.includes(id) ? id : (nextExpandedSceneIds[nextExpandedSceneIds.length - 1] || null);
 
     handleExpandedScenesChange(nextExpandedSceneIds);
-    handleFocusScene(nextExpandedSceneIds.includes(id) ? id : (nextExpandedSceneIds[nextExpandedSceneIds.length - 1] || null));
+    setDisplayedSceneId(nextFocusedSceneId);
+    void handleFocusScene(nextFocusedSceneId);
+  };
+
+  const openHistoryForScene = async (sceneId?: string | null) => {
+    if (!isValidSceneId(sceneId)) {
+      logSceneHistoryDebug('history panel blocked: no valid active scene', {
+        editorFocusedSceneId: focusedSceneId,
+        requestedSceneId: sceneId ?? null,
+      });
+      return;
+    }
+
+    await handleFocusScene(sceneId);
+    const loaded = await onLoadSceneVersions?.(sceneId);
+    if (!expandedSceneIds.includes(sceneId)) {
+      handleExpandedScenesChange([...expandedSceneIds, sceneId]);
+    }
+    logSceneHistoryDebug('history panel opened', {
+      appActiveSceneId,
+      editorFocusedSceneId: focusedSceneId,
+      displayedSceneId: sceneId,
+      panelSceneId: sceneId,
+      loadSceneVersionsSceneId: sceneId,
+      loadedVersionCount: loaded,
+    });
+    setIsHistoryOpen(true);
+    setHistoryMode('view');
+  };
+
+  const handleCreateManualVersion = () => {
+    if (!historyScene) return;
+    onCreateManualSceneVersion?.(historyScene.id, manualVersionName, manualVersionNote);
+    setManualVersionName('');
+    setManualVersionNote('');
+    setIsManualVersionFormOpen(false);
+  };
+
+  const handleRestoreVersion = () => {
+    if (!historyScene || !selectedVersion) return;
+    if (!confirm('לשחזר את תוכן הסצנה לגרסה שנבחרה? המצב הנוכחי יישמר קודם כהיסטוריה.')) return;
+    onRestoreSceneVersion?.(historyScene.id, selectedVersion.id);
   };
 
   useEffect(() => {
     if (initialFocusedSceneId === undefined || initialFocusedSceneId === focusedSceneId) return;
     setFocusedSceneId(initialFocusedSceneId);
-  }, [initialFocusedSceneId, focusedSceneId]);
+    if (isValidSceneId(initialFocusedSceneId)) {
+      setDisplayedSceneId(initialFocusedSceneId);
+      lastInteractedSceneIdRef.current = initialFocusedSceneId;
+    }
+  }, [initialFocusedSceneId]);
 
   useEffect(() => {
     if (!initialExpandedSceneIds) return;
@@ -256,6 +384,89 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
 
     return filtered;
   }, [project.scenes, visiblePlotlines, activeSearchQuery]);
+
+  const historySceneId = resolveSceneHistorySceneId(
+    {
+      displayedSceneId,
+      focusedSceneId,
+      expandedSceneIds: [...expandedSceneIds].reverse(),
+      editorFocusedSceneId: appActiveSceneId,
+      validSceneIds: activeScenes.map(scene => scene.id),
+    }
+  );
+  const historyScene = historySceneId ? project.scenes.find(scene => scene.id === historySceneId) : undefined;
+  const getHistorySceneIdForClick = (): string | null => {
+    return resolveSceneHistorySceneId(
+      {
+        displayedSceneId,
+        focusedSceneId,
+        expandedSceneIds: [...expandedSceneIds].reverse(),
+        editorFocusedSceneId: appActiveSceneId,
+        validSceneIds: activeScenes.map(scene => scene.id),
+      }
+    );
+  };
+  const resolvedHistorySceneId = getHistorySceneIdForClick();
+  const expandedSceneIdForDebug = [...expandedSceneIds].reverse().find(isValidSceneId) || null;
+  const handleHistoryButtonClick = () => {
+    const resolvedSceneId = getHistorySceneIdForClick();
+    logSceneHistoryDebug('history button clicked', {
+      displayedSceneId,
+      focusedSceneId,
+      expandedSceneId: expandedSceneIdForDebug,
+      editorFocusedSceneId: appActiveSceneId ?? null,
+      resolvedHistorySceneId: resolvedSceneId,
+    });
+
+    if (!resolvedSceneId) {
+      console.warn('[SceneHistoryDebug] history button clicked without a valid active scene', {
+        displayedSceneId,
+        focusedSceneId,
+        expandedSceneId: expandedSceneIdForDebug,
+        editorFocusedSceneId: appActiveSceneId ?? null,
+        resolvedHistorySceneId: resolvedSceneId,
+      });
+      return;
+    }
+
+    void openHistoryForScene(resolvedSceneId);
+  };
+  const historyVersions = useMemo(() => {
+    if (!historySceneId) return [];
+    return sceneVersions
+      .filter(version => version.sceneId === historySceneId)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [sceneVersions, historySceneId]);
+  const selectedVersion = historyVersions.find(version => version.id === selectedVersionId) || historyVersions[0];
+  const comparisonParts = useMemo(() => {
+    if (!selectedVersion || !historyScene) return [];
+    return diffText(selectedVersion.content, historyScene.content);
+  }, [selectedVersion, historyScene]);
+
+  useEffect(() => {
+    if (!selectedVersionId && historyVersions[0]) {
+      setSelectedVersionId(historyVersions[0].id);
+      return;
+    }
+
+    if (selectedVersionId && !historyVersions.some(version => version.id === selectedVersionId)) {
+      setSelectedVersionId(historyVersions[0]?.id || null);
+    }
+  }, [historyVersions, selectedVersionId]);
+
+  useEffect(() => {
+    if (!isHistoryOpen || !historySceneId) return;
+    void Promise.resolve(onLoadSceneVersions?.(historySceneId)).then((count) => {
+      logSceneHistoryDebug('history panel reload', {
+        appActiveSceneId,
+        editorFocusedSceneId: focusedSceneId,
+        displayedSceneId: historySceneId,
+        panelSceneId: historySceneId,
+        loadSceneVersionsSceneId: historySceneId,
+        loadedVersionCount: count,
+      });
+    });
+  }, [isHistoryOpen, historySceneId, onLoadSceneVersions]);
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
@@ -432,7 +643,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             
             <button 
               onClick={onOpenBulkAdd}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
               title="הוספת סצנות חדשות"
             >
               <Plus size={14} />
@@ -440,7 +651,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             </button>
             <button 
               onClick={() => setBridgeType('characters')} 
-              className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
               title="שליפת מידע מהשאלונים"
             >
               <BookOpen size={14} />
@@ -449,11 +660,20 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
             <div className="hidden sm:block w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
             <button 
               onClick={onExport}
-              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
+              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
               title="ייצוא כתב יד"
             >
               <Download size={14} />
               <span>ייצוא</span>
+            </button>
+            <button
+              onClick={handleHistoryButtonClick}
+              disabled={!resolvedHistorySceneId}
+              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
+              title="היסטוריית גרסאות"
+            >
+              <History size={14} />
+              <span>היסטוריית גרסאות</span>
             </button>
             <button 
               onClick={() => setIsInfoModalOpen(true)}
@@ -494,7 +714,7 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                 style={{ borderRightColor: plotline?.color }}
                 onClick={(event) => {
                   if (displayMode === 'full' || isInteractiveElement(event.target)) return;
-                  toggleSceneExpanded(scene.id);
+                  void toggleSceneExpanded(scene.id);
                 }}
               >
                 {!isExpanded ? (
@@ -528,7 +748,12 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                             className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten flex-1" 
                             value={scene.title} 
                             placeholder="כותרת הסצנה..." 
-                            onChange={(val) => onUpdateScene(scene.id, { title: val })} 
+                            onChange={(val) => onUpdateScene(scene.id, { title: val })}
+                            onDraftChange={(val) => {
+                              lastInteractedSceneIdRef.current = scene.id;
+                              setDisplayedSceneId(scene.id);
+                              sceneTitleDraftsRef.current[scene.id] = val;
+                            }}
                           />
                         </div>
                         {scene.summary && (
@@ -558,9 +783,23 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
                       value={scene.content}
                       placeholder="התחל לכתוב כאן..."
                       onChange={(val) => onUpdateScene(scene.id, { content: val })}
+                      onDraftChange={(val) => {
+                        lastInteractedSceneIdRef.current = scene.id;
+                        setDisplayedSceneId(scene.id);
+                        sceneContentDraftsRef.current[scene.id] = val;
+                        logSceneHistoryDebug('text draft changed', {
+                          bookId,
+                          sceneId: scene.id,
+                          title: sceneTitleDraftsRef.current[scene.id] ?? scene.title,
+                          oldContentLength: scene.content.length,
+                          newContentLength: val.length,
+                          draftUpdated: sceneContentDraftsRef.current[scene.id] === val,
+                          contentTail: val.slice(-30),
+                        });
+                      }}
                       minRows={5}
                       focusOnRender={focusedSceneId === scene.id}
-                      onFocus={() => handleFocusScene(scene.id)}
+                      onFocus={() => { void handleFocusScene(scene.id); }}
                     />
 
                 </div>
@@ -570,6 +809,222 @@ const Editor: React.FC<EditorProps> = ({ project, user, visiblePlotlines, onUpda
           );
         })}
       </div>
+
+      {isHistoryOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/35 backdrop-blur-sm" dir="rtl">
+          <button
+            className="absolute inset-0 cursor-default"
+            onClick={() => setIsHistoryOpen(false)}
+            aria-label="סגור היסטוריית גרסאות"
+          />
+          <aside className="relative h-full w-full max-w-5xl bg-[var(--theme-card)] shadow-2xl border-r border-[var(--theme-border)] flex flex-col">
+            <header className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] px-6 py-5 bg-[var(--theme-secondary)]/20">
+              <div className="min-w-0">
+                <h2 className="text-xl font-black text-[var(--theme-primary)]">היסטוריית גרסאות</h2>
+                <p className="truncate text-sm font-bold text-[var(--theme-primary)]/50">
+                  {historyScene?.title || 'סצנה ללא כותרת'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsManualVersionFormOpen(true)}
+                  disabled={!historyScene}
+                  className="flex items-center gap-2 rounded-lg bg-[var(--theme-primary)] px-4 py-2 text-xs font-bold text-[var(--theme-card)] transition-all hover:opacity-90 disabled:opacity-40"
+                >
+                  <Save size={14} />
+                  <span>שמור גרסה</span>
+                </button>
+                <button onClick={() => setIsHistoryOpen(false)} className="p-2 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]">
+                  <X size={24} />
+                </button>
+              </div>
+            </header>
+
+            {historyScene ? (
+              <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[320px_1fr]">
+                <section className="min-h-0 overflow-y-auto border-l border-[var(--theme-border)] bg-[var(--theme-secondary)]/10 p-4">
+                  <div className="mb-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-sm font-black text-[var(--theme-primary)]">הגרסה הנוכחית</span>
+                      <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-black text-green-700">פעילה</span>
+                    </div>
+                    <div className="text-xs font-bold text-[var(--theme-primary)]/45">
+                      {historyScene.content.length.toLocaleString()} תווים
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {historyVersions.map(version => {
+                      const isSelected = selectedVersion?.id === version.id;
+                      const isCurrentSource = historyScene.restoredFromVersionId === version.id;
+
+                      return (
+                        <button
+                          key={version.id}
+                          onClick={() => {
+                            setSelectedVersionId(version.id);
+                            setHistoryMode('view');
+                          }}
+                          className={`w-full rounded-lg border p-3 text-right transition-all ${
+                            isSelected
+                              ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-sm'
+                              : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-primary)] hover:border-[var(--theme-accent)]'
+                          }`}
+                        >
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-sm font-black">{formatVersionDate(version.createdAt)}</span>
+                            <span className={`rounded px-2 py-0.5 text-[10px] font-black ${isSelected ? 'bg-white/20' : 'bg-[var(--theme-secondary)]'}`}>
+                              {getVersionTypeLabel(version)}
+                            </span>
+                          </div>
+                          <div className={`text-xs font-bold ${isSelected ? 'text-[var(--theme-card)]/70' : 'text-[var(--theme-primary)]/50'}`}>
+                            {formatVersionTime(version.createdAt)} · {getVersionReasonLabel(version.reason)}
+                          </div>
+                          {version.name && (
+                            <div className={`mt-2 truncate text-xs font-black ${isSelected ? 'text-[var(--theme-card)]' : 'text-[var(--theme-primary)]'}`}>
+                              {version.name}
+                            </div>
+                          )}
+                          {isCurrentSource && (
+                            <div className={`mt-2 text-[10px] font-black ${isSelected ? 'text-[var(--theme-card)]/80' : 'text-green-700'}`}>
+                              מקור הגרסה הנוכחית
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {historyVersions.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-[var(--theme-border)] p-8 text-center text-sm font-bold text-[var(--theme-primary)]/35">
+                      עדיין אין גרסאות שמורות לסצנה הזו.
+                    </div>
+                  )}
+                </section>
+
+                <section className="min-h-0 overflow-y-auto p-6">
+                  {isManualVersionFormOpen && (
+                    <div className="mb-5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/15 p-4">
+                      <div className="mb-3 text-sm font-black text-[var(--theme-primary)]">שמירת גרסה ידנית</div>
+                      <div className="grid gap-3">
+                        <input
+                          value={manualVersionName}
+                          onChange={(event) => setManualVersionName(event.target.value)}
+                          placeholder="שם קצר לגרסה"
+                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-accent)]"
+                        />
+                        <textarea
+                          value={manualVersionNote}
+                          onChange={(event) => setManualVersionNote(event.target.value)}
+                          placeholder="הערה אופציונלית"
+                          rows={3}
+                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-accent)]"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleCreateManualVersion}
+                            className="rounded-lg bg-[var(--theme-primary)] px-4 py-2 text-xs font-bold text-[var(--theme-card)]"
+                          >
+                            שמור
+                          </button>
+                          <button
+                            onClick={() => setIsManualVersionFormOpen(false)}
+                            className="rounded-lg px-4 py-2 text-xs font-bold text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]"
+                          >
+                            ביטול
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVersion ? (
+                    <div className="space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
+                        <div>
+                          <div className="text-sm font-black text-[var(--theme-primary)]">
+                            {formatVersionDate(selectedVersion.createdAt)} · {formatVersionTime(selectedVersion.createdAt)}
+                          </div>
+                          <div className="text-xs font-bold text-[var(--theme-primary)]/50">
+                            {getVersionTypeLabel(selectedVersion)} · {getVersionReasonLabel(selectedVersion.reason)}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => setHistoryMode('view')}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${historyMode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
+                          >
+                            <FileText size={14} />
+                            <span>הצג</span>
+                          </button>
+                          <button
+                            onClick={() => setHistoryMode('compare')}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${historyMode === 'compare' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
+                          >
+                            <GitCompare size={14} />
+                            <span>השווה לנוכחי</span>
+                          </button>
+                          <button
+                            onClick={handleRestoreVersion}
+                            className="flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800"
+                          >
+                            <RotateCcw size={14} />
+                            <span>שחזר</span>
+                          </button>
+                          <button
+                            onClick={() => onCopySceneVersion?.(selectedVersion.id)}
+                            className="flex items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-3 py-2 text-xs font-bold text-[var(--theme-primary)]"
+                          >
+                            <ClipboardCopy size={14} />
+                            <span>צור עותק</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {selectedVersion.name && (
+                        <div className="rounded-lg bg-[var(--theme-secondary)]/30 p-3 text-sm font-bold text-[var(--theme-primary)]">
+                          {selectedVersion.name}
+                        </div>
+                      )}
+                      {selectedVersion.note && (
+                        <div className="rounded-lg bg-[var(--theme-secondary)]/20 p-3 text-sm leading-relaxed text-[var(--theme-primary)]/70">
+                          {selectedVersion.note}
+                        </div>
+                      )}
+
+                      {historyMode === 'view' ? (
+                        <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
+                          {selectedVersion.content || 'אין תוכן בגרסה הזו.'}
+                        </article>
+                      ) : (
+                        <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
+                          {comparisonParts.map((part, index) => {
+                            if (part.type === 'added') {
+                              return <ins key={index} className="bg-green-100 text-green-800 no-underline">{part.text}</ins>;
+                            }
+                            if (part.type === 'removed') {
+                              return <del key={index} className="bg-red-100 text-red-800">{part.text}</del>;
+                            }
+                            return <span key={index}>{part.text}</span>;
+                          })}
+                        </article>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--theme-border)] p-10 text-center text-sm font-bold text-[var(--theme-primary)]/35">
+                      בחרי גרסה מהרשימה או שמרי גרסה ידנית חדשה.
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-10 text-center text-sm font-bold text-[var(--theme-primary)]/35">
+                אין סצנה פעילה להצגת היסטוריה.
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
 
       {bridgeType && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">

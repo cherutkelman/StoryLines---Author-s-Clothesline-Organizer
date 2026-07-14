@@ -145,7 +145,7 @@ export class LocalStorageProvider implements IStorageProvider {
 
       // Ensure we don't save uiState even if it's accidentally present
       const booksToSave = books.map(b => {
-        const { uiState, lastModified, ...rest } = b as any;
+        const { uiState, lastModified, sceneVersions: _sceneVersions, ...rest } = b as any;
         // Safety check: ensure ownerId is set
         if (!rest.ownerId) {
           console.log(`[LocalStorageProvider] saveBooks: Setting missing ownerId for book "${b.title}" to ${currentUserId}`);

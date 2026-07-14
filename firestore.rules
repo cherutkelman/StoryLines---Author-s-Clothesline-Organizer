@@ -66,7 +66,40 @@ service cloud.firestore {
     }
 
     function isBookOwner(bookData) {
-      return isAuthenticated() && request.auth.uid == bookData.ownerId;
+      return isAuthenticated() &&
+             bookData.ownerId is string &&
+             request.auth.uid == bookData.ownerId;
+    }
+
+    function isBookMember(bookData) {
+      return isAuthenticated() &&
+             bookData.keys().hasAny(['memberIds']) &&
+             bookData.memberIds is list &&
+             bookData.memberIds.hasAny([request.auth.uid]);
+    }
+
+    function canAccessBook(bookData) {
+      return isBookOwner(bookData) || isBookMember(bookData);
+    }
+
+    function bookDocument(bookId) {
+      return get(/databases/$(database)/documents/books/$(bookId));
+    }
+
+    function canAccessBookById(bookId) {
+      return isAuthenticated() && canAccessBook(bookDocument(bookId).data);
+    }
+
+    function isValidSceneVersion(data, bookId, versionId) {
+      return data.id == versionId &&
+             data.id is string &&
+             data.bookId == bookId &&
+             data.sceneId is string &&
+             data.sceneTitle is string &&
+             data.content is string &&
+             data.createdAt is number &&
+             data.versionType in ['automatic', 'manual', 'before_delete', 'restored'] &&
+             data.reason in ['typing_pause', 'scene_change', 'page_navigation', 'before_delete', 'manual', 'restore'];
     }
 
     function isAdmin() {
@@ -102,17 +135,26 @@ service cloud.firestore {
     match /books/{bookId} {
       // StoryLines Web beta: books are owner-only.
       // Sharing/member/admin access is intentionally not enabled for this path.
-      allow read: if isBookOwner(resource.data);
+      allow read: if canAccessBook(resource.data);
 
       allow create: if isAuthenticated()
         && request.resource.data.ownerId == request.auth.uid
         && isValidBook(request.resource.data);
 
-      allow update: if isBookOwner(resource.data)
+      allow update: if canAccessBook(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
         && isValidBook(request.resource.data);
 
       allow delete: if isBookOwner(resource.data);
+    }
+
+    match /books/{bookId}/sceneVersions/{versionId} {
+      allow get, list: if canAccessBookById(bookId);
+
+      allow create, update: if canAccessBookById(bookId)
+        && isValidSceneVersion(request.resource.data, bookId, versionId);
+
+      allow delete: if canAccessBookById(bookId);
     }
 
     match /users/{userId} {
