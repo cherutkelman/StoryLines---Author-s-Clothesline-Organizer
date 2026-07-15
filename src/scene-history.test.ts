@@ -5,6 +5,8 @@ import {
   copySceneVersionToNewScene,
   createSceneVersion,
   createSceneVersionFromScene,
+  diffText,
+  hasTextDiffChanges,
   resolveSceneHistorySceneId,
   restoreSceneVersion,
   shouldCreateSceneVersion,
@@ -285,5 +287,9 @@ describe('scene history logic', () => {
       editorFocusedSceneId: 'scene-a',
       validSceneIds: ['prologue', 'scene-a', 'scene-b'],
     })).toBe('scene-a');
+  });
+
+  it('detects no comparison changes for identical scene version content', () => {
+    expect(hasTextDiffChanges(diffText('אין שינוי בטקסט', 'אין שינוי בטקסט'))).toBe(false);
   });
 });

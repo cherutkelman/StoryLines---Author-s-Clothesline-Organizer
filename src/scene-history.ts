@@ -317,3 +317,7 @@ export const diffText = (from: string, to: string): TextDiffPart[] => {
 
   return result;
 };
+
+export const hasTextDiffChanges = (parts: TextDiffPart[]): boolean => {
+  return parts.some(part => part.type !== 'same' && part.text.length > 0);
+};

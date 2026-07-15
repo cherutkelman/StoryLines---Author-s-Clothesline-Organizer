@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Project, Scene, QuestionnaireEntry, SceneVersion, SceneVersionReason } from '../types';
-import { diffText, resolveSceneHistorySceneId } from '../src/scene-history';
+import { diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
 import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
@@ -442,6 +442,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     if (!selectedVersion || !historyScene) return [];
     return diffText(selectedVersion.content, historyScene.content);
   }, [selectedVersion, historyScene]);
+  const hasComparisonChanges = hasTextDiffChanges(comparisonParts);
 
   useEffect(() => {
     if (!selectedVersionId && historyVersions[0]) {
@@ -980,6 +981,12 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                           </button>
                         </div>
                       </div>
+
+                      {historyMode === 'compare' && !hasComparisonChanges && (
+                        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/30 p-4 text-center text-sm font-black text-[var(--theme-primary)]">
+                          אין הבדלים בין הגרסאות.
+                        </div>
+                      )}
 
                       {selectedVersion.name && (
                         <div className="rounded-lg bg-[var(--theme-secondary)]/30 p-3 text-sm font-bold text-[var(--theme-primary)]">
