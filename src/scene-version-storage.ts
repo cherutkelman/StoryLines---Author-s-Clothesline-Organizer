@@ -1,10 +1,13 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 import type { Book, SceneVersion } from '../types';
@@ -12,18 +15,25 @@ import { db } from './firebase';
 import { isWeb } from './platform';
 import { storageManager } from '../storage';
 import { logSceneHistoryDebug } from './scene-history-debug';
+import { canDeleteSceneVersion, normalizeSceneVersionName } from './scene-history';
 
 const LOCAL_SCENE_VERSIONS_KEY = 'storylines_scene_versions_v1';
+export const getSceneVersionDocumentPath = (bookId: string, versionId: string) =>
+  ['books', bookId, 'sceneVersions', versionId] as const;
 
 export interface SceneVersionStorageProvider {
   saveSceneVersion(version: SceneVersion): Promise<void>;
   loadSceneVersions(bookId: string, sceneId: string): Promise<SceneVersion[]>;
+  renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void>;
+  deleteSceneVersion(bookId: string, versionId: string): Promise<void>;
   deleteSceneVersionsForScene(bookId: string, sceneId: string): Promise<void>;
   loadAllSceneVersionsForBook?(bookId: string): Promise<SceneVersion[]>;
 }
 
 const sortNewestFirst = (versions: SceneVersion[]) =>
   [...versions].sort((a, b) => b.createdAt - a.createdAt);
+
+const getStoredVersionKey = (version: SceneVersion) => `${version.bookId}:${version.id}`;
 
 export const stripLegacySceneVersionsFromBook = <T extends Book>(book: T): T => {
   const { sceneVersions: _sceneVersions, ...cleanBook } = book as T & { sceneVersions?: SceneVersion[] };
@@ -56,7 +66,7 @@ export class LocalSceneVersionStorageProvider implements SceneVersionStorageProv
       versionId: version.id,
     });
     const versions = this.loadAll();
-    const existingIndex = versions.findIndex(item => item.id === version.id);
+    const existingIndex = versions.findIndex(item => item.bookId === version.bookId && item.id === version.id);
     if (existingIndex >= 0) {
       versions[existingIndex] = version;
     } else {
@@ -72,8 +82,8 @@ export class LocalSceneVersionStorageProvider implements SceneVersionStorageProv
   }
 
   async saveSceneVersions(versionsToSave: SceneVersion[]): Promise<void> {
-    const map = new Map(this.loadAll().map(version => [version.id, version]));
-    versionsToSave.forEach(version => map.set(version.id, version));
+    const map = new Map(this.loadAll().map(version => [getStoredVersionKey(version), version]));
+    versionsToSave.forEach(version => map.set(getStoredVersionKey(version), version));
     this.saveAll(Array.from(map.values()));
   }
 
@@ -85,6 +95,38 @@ export class LocalSceneVersionStorageProvider implements SceneVersionStorageProv
 
   async loadAllSceneVersionsForBook(bookId: string): Promise<SceneVersion[]> {
     return sortNewestFirst(this.loadAll().filter(version => version.bookId === bookId));
+  }
+
+  async renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void> {
+    const normalizedName = normalizeSceneVersionName(name);
+    const versions = this.loadAll();
+    const versionIndex = versions.findIndex(item => item.bookId === bookId && item.id === versionId);
+    if (versionIndex < 0) {
+      throw new Error('Scene version was not found.');
+    }
+
+    versions[versionIndex] = {
+      ...versions[versionIndex],
+      name: normalizedName,
+    };
+
+    if (!normalizedName) {
+      delete versions[versionIndex].name;
+    }
+
+    this.saveAll(versions);
+  }
+
+  async deleteSceneVersion(bookId: string, versionId: string): Promise<void> {
+    const versions = this.loadAll();
+    const version = versions.find(item => item.bookId === bookId && item.id === versionId);
+    if (!version) {
+      throw new Error('Scene version was not found.');
+    }
+    if (!canDeleteSceneVersion(version)) {
+      throw new Error('This scene version cannot be deleted.');
+    }
+    this.saveAll(versions.filter(item => item.bookId !== bookId || item.id !== versionId));
   }
 
   async deleteSceneVersionsForScene(bookId: string, sceneId: string): Promise<void> {
@@ -137,6 +179,42 @@ export class FirestoreSceneVersionStorageProvider implements SceneVersionStorage
   async loadAllSceneVersionsForBook(bookId: string): Promise<SceneVersion[]> {
     const snap = await getDocs(this.getVersionsCollection(bookId));
     return sortNewestFirst(snap.docs.map(docSnap => docSnap.data() as SceneVersion));
+  }
+
+  async renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void> {
+    const normalizedName = normalizeSceneVersionName(name);
+    const versionRef = doc(db, ...getSceneVersionDocumentPath(bookId, versionId));
+    const snap = await getDoc(versionRef);
+    if (!snap.exists()) {
+      throw new Error('Scene version was not found.');
+    }
+
+    const version = snap.data() as SceneVersion;
+    if (version.bookId !== bookId || version.id !== versionId) {
+      throw new Error('Scene version does not match the requested book.');
+    }
+
+    await updateDoc(versionRef, {
+      name: normalizedName ?? deleteField(),
+    });
+  }
+
+  async deleteSceneVersion(bookId: string, versionId: string): Promise<void> {
+    const versionRef = doc(db, ...getSceneVersionDocumentPath(bookId, versionId));
+    const snap = await getDoc(versionRef);
+    if (!snap.exists()) {
+      throw new Error('Scene version was not found.');
+    }
+
+    const version = snap.data() as SceneVersion;
+    if (version.bookId !== bookId || version.id !== versionId) {
+      throw new Error('Scene version does not match the requested book.');
+    }
+    if (!canDeleteSceneVersion(version)) {
+      throw new Error('This scene version cannot be deleted.');
+    }
+
+    await deleteDoc(versionRef);
   }
 
   async deleteSceneVersionsForScene(bookId: string, sceneId: string): Promise<void> {
@@ -220,6 +298,44 @@ export class SceneVersionStorageService {
         console.warn('[SceneVersionStorageService] Remote scene version delete failed after local delete.', error);
       }
     }
+  }
+
+  async renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void> {
+    if (isWeb) {
+      await this.remoteProvider.renameSceneVersion(bookId, versionId, name);
+      return;
+    }
+
+    if (storageManager.getMode() === 'cloud') {
+      await this.remoteProvider.renameSceneVersion(bookId, versionId, name);
+      try {
+        await this.localProvider.renameSceneVersion(bookId, versionId, name);
+      } catch (error) {
+        console.warn('[SceneVersionStorageService] Local scene version cache rename failed after remote rename.', error);
+      }
+      return;
+    }
+
+    await this.localProvider.renameSceneVersion(bookId, versionId, name);
+  }
+
+  async deleteSceneVersion(bookId: string, versionId: string): Promise<void> {
+    if (isWeb) {
+      await this.remoteProvider.deleteSceneVersion(bookId, versionId);
+      return;
+    }
+
+    if (storageManager.getMode() === 'cloud') {
+      await this.remoteProvider.deleteSceneVersion(bookId, versionId);
+      try {
+        await this.localProvider.deleteSceneVersion(bookId, versionId);
+      } catch (error) {
+        console.warn('[SceneVersionStorageService] Local scene version cache delete failed after remote delete.', error);
+      }
+      return;
+    }
+
+    await this.localProvider.deleteSceneVersion(bookId, versionId);
   }
 
   async migrateLegacySceneVersionsFromBooks<T extends Book>(books: T[]): Promise<T[]> {

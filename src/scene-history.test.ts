@@ -2,15 +2,28 @@ import { describe, expect, it } from 'vitest';
 import type { Project } from '../types';
 import {
   calculateChangedCharacters,
+  canDeleteSceneVersion,
   copySceneVersionToNewScene,
   createSceneVersion,
   createSceneVersionFromScene,
   diffText,
   hasTextDiffChanges,
+  normalizeSceneVersionName,
   resolveSceneHistorySceneId,
   restoreSceneVersion,
   shouldCreateSceneVersion,
 } from './scene-history';
+
+const createVersionForDeletion = (versionType: 'automatic' | 'manual' | 'before_delete' | 'restored') => ({
+  id: `version-${versionType}`,
+  bookId: 'book-1',
+  sceneId: 's1',
+  sceneTitle: 'Scene',
+  content: 'content',
+  createdAt: 1,
+  versionType,
+  reason: 'manual' as const,
+});
 
 const createProject = (content = 'start'): Project => ({
   plotlines: [{ id: 'p1', name: 'Main', color: '#000' }],
@@ -149,6 +162,38 @@ describe('scene history logic', () => {
 
     expect(copied.scenes.find(scene => scene.id === 's1')?.content).toBe('current');
     expect(copied.scenes.find(scene => scene.id === 'copy')?.content).toBe('old');
+  });
+
+  it('inserts a copied version immediately after its source scene by default', () => {
+    const project: Project = {
+      plotlines: [{ id: 'p1', name: 'Main', color: '#000' }],
+      scenes: [
+        { id: 's1', plotlineId: 'p1', title: 'First', content: 'first', position: 0 },
+        { id: 's2', plotlineId: 'p1', title: 'Second', content: 'second', position: 1 },
+        { id: 's3', plotlineId: 'p1', title: 'Third', content: 'third', position: 2 },
+      ],
+    };
+    const version = createSceneVersion({
+      project,
+      versions: [],
+      bookId: 'book-1',
+      sceneId: 's2',
+      versionType: 'manual',
+      reason: 'manual',
+      now: 1,
+      id: 'v2',
+    });
+    expect(version).not.toBeNull();
+
+    const copied = copySceneVersionToNewScene({
+      project,
+      version: version!,
+      versionId: 'v2',
+      newSceneId: 'copy-s2',
+    });
+
+    expect(copied.scenes.map(scene => scene.id)).toEqual(['s1', 's2', 'copy-s2', 's3']);
+    expect(copied.scenes.map(scene => scene.position)).toEqual([0, 1, 2, 3]);
   });
 
   it('loads old projects without scene history safely', () => {
@@ -291,5 +336,20 @@ describe('scene history logic', () => {
 
   it('detects no comparison changes for identical scene version content', () => {
     expect(hasTextDiffChanges(diffText('אין שינוי בטקסט', 'אין שינוי בטקסט'))).toBe(false);
+  });
+
+  it('allows deleting automatic and manual scene versions only', () => {
+    expect(canDeleteSceneVersion(createVersionForDeletion('automatic'))).toBe(true);
+    expect(canDeleteSceneVersion(createVersionForDeletion('manual'))).toBe(true);
+    expect(canDeleteSceneVersion(createVersionForDeletion('before_delete'))).toBe(false);
+    expect(canDeleteSceneVersion(createVersionForDeletion('restored'))).toBe(false);
+    expect(canDeleteSceneVersion(null)).toBe(false);
+  });
+
+  it('normalizes scene version names before saving metadata', () => {
+    expect(normalizeSceneVersionName('  שם גרסה  ')).toBe('שם גרסה');
+    expect(normalizeSceneVersionName('   ')).toBeUndefined();
+    expect(() => normalizeSceneVersionName('<b>שם</b>')).toThrow('HTML');
+    expect(() => normalizeSceneVersionName('x'.repeat(121))).toThrow('120');
   });
 });

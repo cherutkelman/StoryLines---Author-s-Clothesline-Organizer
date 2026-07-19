@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Project, Scene, QuestionnaireEntry, SceneVersion, SceneVersionReason } from '../types';
-import { diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
+import { canDeleteSceneVersion, diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
 import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
@@ -20,6 +20,7 @@ import {
   ArrowRight,
   X,
   MapPin,
+  Pencil,
   Plus,
   Download,
   Trash2,
@@ -53,7 +54,9 @@ interface EditorProps {
   onLoadSceneVersions?: (sceneId: string) => Promise<number> | number;
   onCreateManualSceneVersion?: (sceneId: string, name?: string, note?: string) => void;
   onRestoreSceneVersion?: (sceneId: string, versionId: string) => void;
-  onCopySceneVersion?: (versionId: string) => void;
+  onCopySceneVersion?: (versionId: string) => Promise<void> | void;
+  onDeleteSceneVersion?: (versionId: string) => Promise<void> | void;
+  onRenameSceneVersion?: (versionId: string, name?: string) => Promise<void> | void;
   onUpdateChapterMarker?: (id: string, updates: any) => void;
   isLibrarySidebarCollapsed?: boolean;
   externalSearchQuery?: string;
@@ -226,7 +229,7 @@ const getVersionTypeLabel = (version: SceneVersion): string => {
 const formatVersionDate = (createdAt: number) => new Date(createdAt).toLocaleDateString('he-IL');
 const formatVersionTime = (createdAt: number) => new Date(createdAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
 
-const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
@@ -238,6 +241,14 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [historyMode, setHistoryMode] = useState<'view' | 'compare'>('view');
+  const [copiedVersionNoticeId, setCopiedVersionNoticeId] = useState<string | null>(null);
+  const [deleteCandidateVersionId, setDeleteCandidateVersionId] = useState<string | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
+  const [deleteVersionError, setDeleteVersionError] = useState<string | null>(null);
+  const [renameCandidateVersionId, setRenameCandidateVersionId] = useState<string | null>(null);
+  const [renameVersionName, setRenameVersionName] = useState('');
+  const [renamingVersionId, setRenamingVersionId] = useState<string | null>(null);
+  const [renameVersionError, setRenameVersionError] = useState<string | null>(null);
   const [isManualVersionFormOpen, setIsManualVersionFormOpen] = useState(false);
   const [manualVersionName, setManualVersionName] = useState('');
   const [manualVersionNote, setManualVersionNote] = useState('');
@@ -245,6 +256,8 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const sceneContentDraftsRef = useRef<Record<string, string>>({});
   const sceneTitleDraftsRef = useRef<Record<string, string>>({});
   const lastInteractedSceneIdRef = useRef<string | null>(initialFocusedSceneId || null);
+  const deleteInFlightVersionIdRef = useRef<string | null>(null);
+  const renameInFlightVersionIdRef = useRef<string | null>(null);
   const activeSearchQuery = externalSearchQuery ?? searchQuery;
   const updateSearchQuery = onExternalSearchQueryChange ?? setSearchQuery;
 
@@ -344,6 +357,92 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     onRestoreSceneVersion?.(historyScene.id, selectedVersion.id);
   };
 
+  const handleCopyVersion = async () => {
+    if (!selectedVersion) return;
+    await onCopySceneVersion?.(selectedVersion.id);
+    setCopiedVersionNoticeId(selectedVersion.id);
+  };
+
+  const openDeleteVersionConfirmation = () => {
+    if (!selectedVersion || !canDeleteSceneVersion(selectedVersion)) {
+      setDeleteVersionError('לא ניתן למחוק את הגרסה הזו.');
+      return;
+    }
+    setDeleteVersionError(null);
+    setCopiedVersionNoticeId(null);
+    setDeleteCandidateVersionId(selectedVersion.id);
+  };
+
+  const closeDeleteVersionConfirmation = () => {
+    if (deletingVersionId) return;
+    setDeleteCandidateVersionId(null);
+  };
+
+  const confirmDeleteVersion = async () => {
+    if (!deleteCandidateVersion || !canDeleteSceneVersion(deleteCandidateVersion) || deleteInFlightVersionIdRef.current) return;
+    deleteInFlightVersionIdRef.current = deleteCandidateVersion.id;
+    setDeletingVersionId(deleteCandidateVersion.id);
+    setDeleteVersionError(null);
+
+    try {
+      await onDeleteSceneVersion?.(deleteCandidateVersion.id);
+      if (selectedVersionId === deleteCandidateVersion.id) {
+        setSelectedVersionId(null);
+        setHistoryMode('view');
+      }
+      setDeleteCandidateVersionId(null);
+    } catch (error) {
+      setDeleteVersionError(error instanceof Error ? error.message : 'מחיקת הגרסה נכשלה. נסי שוב.');
+    } finally {
+      deleteInFlightVersionIdRef.current = null;
+      setDeletingVersionId(null);
+    }
+  };
+
+  const openRenameVersionDialog = () => {
+    if (!selectedVersion) {
+      setRenameVersionError('לא נמצאה גרסה לשינוי שם.');
+      return;
+    }
+    setRenameVersionError(null);
+    setCopiedVersionNoticeId(null);
+    setRenameVersionName(selectedVersion.name ?? '');
+    setRenameCandidateVersionId(selectedVersion.id);
+  };
+
+  const closeRenameVersionDialog = () => {
+    if (renamingVersionId) return;
+    setRenameCandidateVersionId(null);
+    setRenameVersionError(null);
+  };
+
+  const confirmRenameVersion = async () => {
+    if (!renameCandidateVersion || renameInFlightVersionIdRef.current) return;
+    const nextName = renameVersionName.trim();
+    if (/[<>]/.test(nextName)) {
+      setRenameVersionError('שם הגרסה לא יכול להכיל HTML.');
+      return;
+    }
+    if (nextName.length > 120) {
+      setRenameVersionError('שם הגרסה יכול להכיל עד 120 תווים.');
+      return;
+    }
+
+    renameInFlightVersionIdRef.current = renameCandidateVersion.id;
+    setRenamingVersionId(renameCandidateVersion.id);
+    setRenameVersionError(null);
+
+    try {
+      await onRenameSceneVersion?.(renameCandidateVersion.id, nextName || undefined);
+      setRenameCandidateVersionId(null);
+    } catch (error) {
+      setRenameVersionError(error instanceof Error ? error.message : 'שינוי שם הגרסה נכשל. נסי שוב.');
+    } finally {
+      renameInFlightVersionIdRef.current = null;
+      setRenamingVersionId(null);
+    }
+  };
+
   useEffect(() => {
     if (initialFocusedSceneId === undefined || initialFocusedSceneId === focusedSceneId) return;
     setFocusedSceneId(initialFocusedSceneId);
@@ -368,6 +467,32 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       setIsInfoModalOpen(true);
     }
   }, [externalCommand]);
+
+  useEffect(() => {
+    if (!deleteCandidateVersionId) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeDeleteVersionConfirmation();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [deleteCandidateVersionId, deletingVersionId]);
+
+  useEffect(() => {
+    if (!renameCandidateVersionId) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeRenameVersionDialog();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [renameCandidateVersionId, renamingVersionId]);
 
   const activeScenes = useMemo(() => {
     let filtered = project.scenes
@@ -438,6 +563,13 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [sceneVersions, historySceneId]);
   const selectedVersion = historyVersions.find(version => version.id === selectedVersionId) || historyVersions[0];
+  const selectedVersionCanBeDeleted = canDeleteSceneVersion(selectedVersion);
+  const deleteCandidateVersion = deleteCandidateVersionId
+    ? historyVersions.find(version => version.id === deleteCandidateVersionId)
+    : undefined;
+  const renameCandidateVersion = renameCandidateVersionId
+    ? historyVersions.find(version => version.id === renameCandidateVersionId)
+    : undefined;
   const comparisonParts = useMemo(() => {
     if (!selectedVersion || !historyScene) return [];
     return diffText(selectedVersion.content, historyScene.content);
@@ -454,6 +586,13 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       setSelectedVersionId(historyVersions[0]?.id || null);
     }
   }, [historyVersions, selectedVersionId]);
+
+  useEffect(() => {
+    setDeleteVersionError(null);
+    setDeleteCandidateVersionId(null);
+    setRenameVersionError(null);
+    setRenameCandidateVersionId(null);
+  }, [selectedVersionId, historySceneId]);
 
   useEffect(() => {
     if (!isHistoryOpen || !historySceneId) return;
@@ -959,7 +1098,10 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                             <span>הצג</span>
                           </button>
                           <button
-                            onClick={() => setHistoryMode('compare')}
+                            onClick={() => {
+                              setCopiedVersionNoticeId(null);
+                              setHistoryMode('compare');
+                            }}
                             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${historyMode === 'compare' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                           >
                             <GitCompare size={14} />
@@ -973,18 +1115,56 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                             <span>שחזר</span>
                           </button>
                           <button
-                            onClick={() => onCopySceneVersion?.(selectedVersion.id)}
+                            onClick={() => { void handleCopyVersion(); }}
                             className="flex items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-3 py-2 text-xs font-bold text-[var(--theme-primary)]"
                           >
                             <ClipboardCopy size={14} />
                             <span>צור עותק</span>
                           </button>
+                          {historyMode === 'view' && (
+                            <button
+                              onClick={openRenameVersionDialog}
+                              disabled={Boolean(renamingVersionId)}
+                              className="flex items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-3 py-2 text-xs font-bold text-[var(--theme-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <Pencil size={14} />
+                              <span>שנה שם</span>
+                            </button>
+                          )}
+                          {historyMode === 'view' && selectedVersionCanBeDeleted && (
+                            <button
+                              onClick={openDeleteVersionConfirmation}
+                              disabled={Boolean(deletingVersionId)}
+                              className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <Trash2 size={14} />
+                              <span>מחק גרסה</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
                       {historyMode === 'compare' && !hasComparisonChanges && (
                         <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/30 p-4 text-center text-sm font-black text-[var(--theme-primary)]">
                           אין הבדלים בין הגרסאות.
+                        </div>
+                      )}
+
+                      {historyMode === 'view' && copiedVersionNoticeId === selectedVersion.id && (
+                        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/30 p-4 text-center text-sm font-black text-[var(--theme-primary)]">
+                          נוצר עותק.
+                        </div>
+                      )}
+
+                      {deleteVersionError && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm font-black text-red-700">
+                          {deleteVersionError}
+                        </div>
+                      )}
+
+                      {renameVersionError && !renameCandidateVersion && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm font-black text-red-700">
+                          {renameVersionError}
                         </div>
                       )}
 
@@ -1030,6 +1210,94 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
               </div>
             )}
           </aside>
+        </div>
+      )}
+
+      {deleteCandidateVersion && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+          onClick={closeDeleteVersionConfirmation}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-scene-version-title"
+          >
+            <h3 id="delete-scene-version-title" className="text-xl font-black text-[var(--theme-primary)]">
+              מחיקת גרסה
+            </h3>
+            <p className="mt-3 text-sm font-medium leading-relaxed text-[var(--theme-primary)]/70">
+              הגרסה תימחק לצמיתות ולא יהיה ניתן לשחזר אותה. הסצנה הנוכחית ושאר הגרסאות לא יושפעו.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                onClick={closeDeleteVersionConfirmation}
+                disabled={Boolean(deletingVersionId)}
+                className="rounded-lg px-4 py-2 text-xs font-bold text-[var(--theme-primary)]/65 hover:bg-[var(--theme-secondary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={() => { void confirmDeleteVersion(); }}
+                disabled={Boolean(deletingVersionId)}
+                className="rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingVersionId ? 'מוחק...' : 'מחק גרסה'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {renameCandidateVersion && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+          onClick={closeRenameVersionDialog}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-scene-version-title"
+          >
+            <h3 id="rename-scene-version-title" className="text-xl font-black text-[var(--theme-primary)]">
+              שנה שם
+            </h3>
+            <label className="mt-4 block text-xs font-black text-[var(--theme-primary)]/60">
+              שם הגרסה
+            </label>
+            <input
+              value={renameVersionName}
+              onChange={(event) => setRenameVersionName(event.target.value)}
+              maxLength={120}
+              className="mt-2 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm font-bold text-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-accent)]"
+              autoFocus
+            />
+            {renameVersionError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+                {renameVersionError}
+              </div>
+            )}
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                onClick={closeRenameVersionDialog}
+                disabled={Boolean(renamingVersionId)}
+                className="rounded-lg px-4 py-2 text-xs font-bold text-[var(--theme-primary)]/65 hover:bg-[var(--theme-secondary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={() => { void confirmRenameVersion(); }}
+                disabled={Boolean(renamingVersionId)}
+                className="rounded-lg bg-[var(--theme-primary)] px-4 py-2 text-xs font-bold text-[var(--theme-card)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {renamingVersionId ? 'שומר...' : 'שמור'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

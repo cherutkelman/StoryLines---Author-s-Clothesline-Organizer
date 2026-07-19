@@ -51,6 +51,9 @@ export interface SceneHistoryCopyInput {
   position?: number;
 }
 
+export const DELETABLE_SCENE_VERSION_TYPES: SceneVersionType[] = ['automatic', 'manual'];
+export const SCENE_VERSION_NAME_MAX_LENGTH = 120;
+
 export interface TextDiffPart {
   type: 'same' | 'added' | 'removed';
   text: string;
@@ -88,6 +91,22 @@ export const getSceneVersions = (versions: SceneVersion[], sceneId: string): Sce
 
 export const getLatestSceneVersion = (versions: SceneVersion[], sceneId: string): SceneVersion | undefined => {
   return getSceneVersions(versions, sceneId)[0];
+};
+
+export const canDeleteSceneVersion = (version: SceneVersion | null | undefined): version is SceneVersion => {
+  return Boolean(version && DELETABLE_SCENE_VERSION_TYPES.includes(version.versionType));
+};
+
+export const normalizeSceneVersionName = (name?: string): string | undefined => {
+  const trimmed = name?.trim() ?? '';
+  if (!trimmed) return undefined;
+  if (trimmed.length > SCENE_VERSION_NAME_MAX_LENGTH) {
+    throw new Error(`Scene version name must be ${SCENE_VERSION_NAME_MAX_LENGTH} characters or fewer.`);
+  }
+  if (/[<>]/.test(trimmed)) {
+    throw new Error('Scene version name cannot contain HTML.');
+  }
+  return trimmed;
 };
 
 export const getSceneHistoryBaselineContent = (versions: SceneVersion[], scene: Scene): string => {
@@ -240,7 +259,7 @@ export const copySceneVersionToNewScene = ({
   const sourceScene = version ? project.scenes.find(item => item.id === version.sceneId) : undefined;
   if (!sourceScene || version.id !== versionId) return project;
 
-  const insertPosition = position ?? project.scenes.length;
+  const insertPosition = position ?? sourceScene.position + 1;
   const newScene: Scene = {
     ...sourceScene,
     id: newSceneId,

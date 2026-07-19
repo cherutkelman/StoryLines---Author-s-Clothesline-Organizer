@@ -71,6 +71,7 @@ import {
   SCENE_HISTORY_TYPING_CHANGE_THRESHOLD,
   SCENE_HISTORY_TYPING_IDLE_MS,
   calculateChangedCharacters,
+  canDeleteSceneVersion,
   copySceneVersionToNewScene,
   createSceneVersion,
   createSceneVersionFromScene,
@@ -830,6 +831,57 @@ const App: React.FC = () => {
         pendingSync: true,
       };
     }));
+  };
+
+  const handleDeleteSceneVersion = async (versionId: string) => {
+    if (!activeBook) throw new Error('לא נמצא ספר פעיל.');
+    const bookId = activeBook.id;
+    const cachedVersion = Object.values(sceneVersionsByKeyRef.current)
+      .flat()
+      .find(version => version.bookId === bookId && version.id === versionId);
+    if (!cachedVersion) {
+      throw new Error('הגרסה לא נמצאה. ייתכן שכבר נמחקה.');
+    }
+
+    const versions = await loadSceneVersionsForScene(bookId, cachedVersion.sceneId, true);
+    const version = versions.find(item => item.id === versionId);
+    if (!version) {
+      throw new Error('הגרסה לא נמצאה. ייתכן שכבר נמחקה.');
+    }
+    if (!canDeleteSceneVersion(version)) {
+      throw new Error('לא ניתן למחוק את סוג הגרסה הזה.');
+    }
+
+    await sceneVersionStorage.deleteSceneVersion(bookId, versionId);
+    setCachedSceneVersions(bookId, version.sceneId, versions.filter(item => item.id !== versionId));
+  };
+
+  const handleRenameSceneVersion = async (versionId: string, name?: string) => {
+    if (!activeBook) throw new Error('לא נמצא ספר פעיל.');
+    const bookId = activeBook.id;
+    const cachedVersion = Object.values(sceneVersionsByKeyRef.current)
+      .flat()
+      .find(version => version.bookId === bookId && version.id === versionId);
+    if (!cachedVersion) {
+      throw new Error('הגרסה לא נמצאה. ייתכן שכבר נמחקה.');
+    }
+
+    const versions = await loadSceneVersionsForScene(bookId, cachedVersion.sceneId, true);
+    const version = versions.find(item => item.id === versionId);
+    if (!version) {
+      throw new Error('הגרסה לא נמצאה. ייתכן שכבר נמחקה.');
+    }
+
+    await sceneVersionStorage.renameSceneVersion(bookId, versionId, name);
+    const updatedVersions = versions.map(item =>
+      item.id === versionId
+        ? {
+            ...item,
+            name: name?.trim() || undefined,
+          }
+        : item
+    );
+    setCachedSceneVersions(bookId, version.sceneId, updatedVersions);
   };
 
   const updateBookUiState = (updates: Partial<BookUIState>) => {
@@ -2331,6 +2383,8 @@ const App: React.FC = () => {
                     onCreateManualSceneVersion={handleManualSceneVersion}
                     onRestoreSceneVersion={handleRestoreSceneVersion}
                     onCopySceneVersion={handleCopySceneVersion}
+                    onDeleteSceneVersion={handleDeleteSceneVersion}
+                    onRenameSceneVersion={handleRenameSceneVersion}
                     onUpdateChapterMarker={updateChapterMarker}
                     isLibrarySidebarCollapsed={isSidebarCollapsed}
                     externalSearchQuery={editorMobileSearchQuery}

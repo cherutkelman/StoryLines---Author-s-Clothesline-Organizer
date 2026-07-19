@@ -102,6 +102,17 @@ service cloud.firestore {
              data.reason in ['typing_pause', 'scene_change', 'page_navigation', 'before_delete', 'manual', 'restore'];
     }
 
+    function isValidSceneVersionName(data) {
+      return !data.keys().hasAny(['name']) ||
+             (data.name is string && data.name.size() <= 120);
+    }
+
+    function isSceneVersionNameOnlyUpdate(bookId, versionId) {
+      return isValidSceneVersion(request.resource.data, bookId, versionId) &&
+             isValidSceneVersionName(request.resource.data) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
@@ -151,10 +162,17 @@ service cloud.firestore {
     match /books/{bookId}/sceneVersions/{versionId} {
       allow get, list: if canAccessBookById(bookId);
 
-      allow create, update: if canAccessBookById(bookId)
-        && isValidSceneVersion(request.resource.data, bookId, versionId);
+      allow create: if canAccessBookById(bookId)
+        && isValidSceneVersion(request.resource.data, bookId, versionId)
+        && isValidSceneVersionName(request.resource.data);
 
-      allow delete: if canAccessBookById(bookId);
+      allow update: if canAccessBookById(bookId)
+        && isSceneVersionNameOnlyUpdate(bookId, versionId);
+
+      allow delete: if canAccessBookById(bookId)
+        && resource.data.bookId == bookId
+        && resource.data.id == versionId
+        && resource.data.versionType in ['automatic', 'manual'];
     }
 
     match /users/{userId} {
