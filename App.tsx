@@ -57,7 +57,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -78,6 +78,8 @@ import {
   restoreSceneVersion,
 } from './src/scene-history';
 import { sceneVersionStorage } from './src/scene-version-storage';
+import { createAutomaticBoardVersionOnExit, createBoardSnapshot } from './src/board-history';
+import { boardVersionStorage } from './src/board-version-storage';
 import { logSceneHistoryDebug } from './src/scene-history-debug';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -382,6 +384,7 @@ const App: React.FC = () => {
   const [sceneVersionsByKey, setSceneVersionsByKey] = useState<Record<string, SceneVersion[]>>({});
   const sceneVersionsByKeyRef = useRef<Record<string, SceneVersion[]>>({});
   const loadingSceneVersionKeysRef = useRef<Set<string>>(new Set());
+  const boardSnapshotBaselineRef = useRef<{ bookId: string; snapshot: BoardSnapshot } | null>(null);
 
   const activeBook = useMemo(() => 
     books.find(b => b.id === activeBookId) || books[0], 
@@ -416,6 +419,23 @@ const App: React.FC = () => {
       if (!bulkPlotlineId) setBulkPlotlineId(activeBook.plotlines[0]?.id || '');
     }
   }, [activeBook?.id]);
+
+  useEffect(() => {
+    if (activeView !== 'board' || !activeBook) return;
+    const baseline = boardSnapshotBaselineRef.current;
+    if (baseline?.bookId === activeBook.id) return;
+    const snapshot = createBoardSnapshot(activeBook);
+    boardSnapshotBaselineRef.current = {
+      bookId: activeBook.id,
+      snapshot,
+    };
+    console.debug('[BoardHistory] Baseline created', {
+      bookId: activeBook.id,
+      sceneCount: snapshot.scenes.length,
+      plotlineCount: snapshot.plotlines.length,
+      chapterMarkerCount: snapshot.chapterMarkers?.length ?? 0,
+    });
+  }, [activeView, activeBook?.id]);
 
   useEffect(() => {
     if (books.length > 0 && activeBookId && !books.find(b => b.id === activeBookId)) {
@@ -895,9 +915,56 @@ const App: React.FC = () => {
     }));
   };
 
+  const flushBoardHistoryOnExit = (book: Book | null) => {
+    const baseline = boardSnapshotBaselineRef.current;
+    if (!book || !baseline || baseline.bookId !== book.id) {
+      console.debug('[BoardHistory] Board exit skipped', {
+        bookId: book?.id ?? null,
+        baselineBookId: baseline?.bookId ?? null,
+        hasBaseline: Boolean(baseline),
+      });
+      return;
+    }
+
+    boardSnapshotBaselineRef.current = null;
+    const version = createAutomaticBoardVersionOnExit(book, baseline.snapshot, undefined, uuidv4());
+    console.debug('[BoardHistory] Board exit checked for changes', {
+      bookId: book.id,
+      hasChanges: Boolean(version),
+    });
+    if (!version) {
+      console.debug('[BoardHistory] Automatic version skipped: no board changes', {
+        bookId: book.id,
+      });
+      return;
+    }
+
+    console.debug('[BoardHistory] Automatic version created', {
+      bookId: book.id,
+      versionId: version.id,
+      reason: version.reason,
+      versionType: version.versionType,
+      sceneCount: version.snapshot.scenes.length,
+      plotlineCount: version.snapshot.plotlines.length,
+      chapterMarkerCount: version.snapshot.chapterMarkers?.length ?? 0,
+    });
+
+    void boardVersionStorage.saveBoardVersion(version).then(() => {
+      console.debug('[BoardHistory] Automatic version saved', {
+        bookId: book.id,
+        versionId: version.id,
+      });
+    }).catch(error => {
+      console.warn('[BoardVersionHistory] Failed to save automatic board version on exit.', error);
+    });
+  };
+
   const handleViewChange = (view: AppView) => {
     if (activeView === 'editor' && view !== 'editor') {
       flushSceneHistory(focusedEditorSceneIdRef.current, 'page_navigation');
+    }
+    if (activeView === 'board' && view !== 'board') {
+      flushBoardHistoryOnExit(activeBook);
     }
     setActiveView(view);
     updateBookUiState({ lastView: view });

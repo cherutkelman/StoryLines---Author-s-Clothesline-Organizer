@@ -113,6 +113,18 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
     }
 
+    function isValidBoardVersion(data, bookId, versionId) {
+      return data.id == versionId &&
+             data.id is string &&
+             data.bookId == bookId &&
+             data.createdAt is number &&
+             data.versionType in ['automatic', 'manual'] &&
+             data.reason in ['board_exit', 'manual'] &&
+             data.snapshot is map &&
+             (!data.keys().hasAny(['manualName']) ||
+              (data.manualName is string && data.manualName.size() <= 120));
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
@@ -173,6 +185,17 @@ service cloud.firestore {
         && resource.data.bookId == bookId
         && resource.data.id == versionId
         && resource.data.versionType in ['automatic', 'manual'];
+    }
+
+    match /books/{bookId}/boardVersions/{versionId} {
+      allow get, list: if canAccessBookById(bookId);
+
+      allow create, update: if canAccessBookById(bookId)
+        && isValidBoardVersion(request.resource.data, bookId, versionId);
+
+      allow delete: if canAccessBookById(bookId)
+        && resource.data.bookId == bookId
+        && resource.data.id == versionId;
     }
 
     match /users/{userId} {

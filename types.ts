@@ -131,6 +131,22 @@ export interface SceneVersion {
   restoredFromVersionId?: string;
 }
 
+export type BoardVersionType = 'automatic' | 'manual';
+export type BoardVersionReason = 'board_exit' | 'manual';
+export type BoardSnapshot = Omit<Project, 'scenes'> & {
+  scenes: Array<Omit<Scene, 'content'>>;
+};
+
+export interface BoardVersion {
+  id: string;
+  bookId: string;
+  createdAt: number;
+  versionType: BoardVersionType;
+  manualName?: string;
+  reason: BoardVersionReason;
+  snapshot: BoardSnapshot;
+}
+
 export interface ChapterMarker {
   id: string;
   position: number;

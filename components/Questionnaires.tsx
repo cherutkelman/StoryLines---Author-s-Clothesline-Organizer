@@ -273,7 +273,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(initialSelectedEntryId || null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [questionSearchQuery, setQuestionSearchQuery] = useState('');
-  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
+  const [isCategoriesVisible, setIsCategoriesVisible] = useState(false);
   const [mode, setMode] = useState<'edit' | 'view'>('view');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
@@ -288,6 +288,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     setCurrentCategoryIndex(0);
     setQuestionSearchQuery('');
     setIsSearchActive(false);
+    setIsCategoriesVisible(false);
     setMode('view');
     onEntrySelect?.(null);
   }, [initialTab, activeTab, onEntrySelect]);
@@ -299,6 +300,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     setCurrentCategoryIndex(0);
     setQuestionSearchQuery('');
     setIsSearchActive(false);
+    setIsCategoriesVisible(false);
     setMode('view');
     onTabChange?.(tab);
     onEntrySelect?.(null);
@@ -310,6 +312,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     setCurrentCategoryIndex(0);
     setQuestionSearchQuery('');
     setIsSearchActive(false);
+    setIsCategoriesVisible(false);
     onEntrySelect?.(id);
   };
 
@@ -1023,7 +1026,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         )}
 
-        <div className="flex-none lg:flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-visible lg:overflow-hidden flex flex-col min-w-0 transition-all duration-300">
+        <div className="flex-none lg:flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-visible lg:overflow-y-auto flex flex-col min-w-0 transition-all duration-300 scroll-smooth">
           {selectedRelationship ? (
             <>
               <div className="p-8 border-b border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/10 flex-shrink-0">
@@ -1053,7 +1056,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                 </div>
               </div>
 
-              <div className="flex-none lg:flex-1 overflow-visible lg:overflow-y-auto p-4 sm:p-8 scroll-smooth">
+              <div className="flex-none overflow-visible p-4 sm:p-8">
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <label className="space-y-2">
@@ -1225,16 +1228,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     </div>
                   )}
                   <div className={`flex items-center gap-4 flex-1 ${mode === 'edit' ? 'w-full' : ''}`}>
-                     {!isCategoriesVisible && mode === 'edit' && (
-                       <button 
-                        onClick={() => setIsCategoriesVisible(true)}
-                        className="hidden p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50 lg:block"
-                        title="הצג קטגוריות"
-                       >
-                         <LayoutList size={20} />
-                       </button>
-                     )}
-                     
                       <div className={`relative group/img ${mode === 'edit' || mode === 'view' ? 'hidden' : ''}`}>
                         <div className="w-16 h-16 rounded-2xl shadow-md border-2 border-[var(--theme-border)]/50 overflow-hidden bg-[var(--theme-card)] flex items-center justify-center relative">
                           {selectedEntry.imageUrl ? (
@@ -1273,12 +1266,23 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                      <div className="flex-1">
                         {mode === 'edit' ? (
                           <>
-                            <input 
+                            <div className="flex flex-row-reverse items-center gap-2" dir="rtl">
+                            <input
                               value={selectedEntry.name}
                               onChange={(e) => updateEntry({ name: e.target.value })}
-                              className="text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
+                              className="min-w-0 flex-1 text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
                               placeholder="שם..."
                             />
+                              {!isCategoriesVisible && (
+                                <button
+                                  onClick={() => setIsCategoriesVisible(true)}
+                                  className="hidden shrink-0 p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50 lg:block"
+                                  title="הצג קטגוריות"
+                                >
+                                  <PanelLeftOpen size={20} />
+                                </button>
+                              )}
+                            </div>
                             {activeTab === 'characters' && (
                               <div className="mt-3 flex flex-nowrap gap-1.5 overflow-hidden">
                                 {CHARACTER_ROLES.map(role => (
@@ -1362,7 +1366,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
               </div>
             </div>
 
-            <div className="flex-none lg:flex-1 overflow-visible lg:overflow-y-auto p-4 sm:p-8 scroll-smooth">
+            <div className="flex-none overflow-visible p-4 sm:p-8">
                 {mode === 'edit' ? (
                   <>
                     {currentCategory === "פיתוח דמות" ? (
