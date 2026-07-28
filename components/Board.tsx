@@ -1,7 +1,8 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Scene, Project, ChapterMarker, BoardViewMode } from '../types';
 import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown, Square, Triangle, Circle, Diamond, Hexagon } from 'lucide-react';
+import { getBoardSequenceColumns } from '../src/book-sequence';
 
 const TrapezoidIcon: React.FC<{ size?: number; className?: string }> = ({ size = 11, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -15,6 +16,7 @@ interface BoardProps {
   visiblePlotlines: string[];
   onAddScene: (plotlineId: string, position: number) => void;
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
+  onMoveSceneInSequence?: (sceneId: string, targetSequenceIndex: number, targetPlotlineId: string) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
   onBulkAdd: (plotlineId: string) => void;
   onDeleteScene: (id: string) => void;
@@ -28,6 +30,10 @@ interface BoardProps {
   onAddChapterMarker: (position: number) => void;
   onUpdateChapterMarker: (id: string, updates: Partial<ChapterMarker>) => void;
   onDeleteChapterMarker: (id: string) => void;
+  onAddChapterDivider?: (sequenceIndex: number) => void;
+  onRenameChapter?: (chapterId: string, title: string) => void;
+  onDeleteChapter?: (chapterId: string) => void;
+  onMoveChapterDivider?: (chapterId: string, targetSequenceIndex: number) => void;
 }
 
 const Board: React.FC<BoardProps> = ({ 
@@ -36,6 +42,7 @@ const Board: React.FC<BoardProps> = ({
   visiblePlotlines, 
   onAddScene, 
   onMoveScene, 
+  onMoveSceneInSequence,
   updateScene, 
   onBulkAdd, 
   onDeleteScene, 
@@ -48,9 +55,13 @@ const Board: React.FC<BoardProps> = ({
   onUpdateChapterTitle,
   onAddChapterMarker,
   onUpdateChapterMarker,
-  onDeleteChapterMarker
+  onDeleteChapterMarker,
+  onAddChapterDivider,
+  onRenameChapter,
+  onDeleteChapter,
+  onMoveChapterDivider
 }) => {
-  const dragItem = useRef<{ sceneId: string } | null>(null);
+  const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
@@ -74,13 +85,51 @@ const Board: React.FC<BoardProps> = ({
   };
 
   const handleDragStart = (sceneId: string) => {
-    dragItem.current = { sceneId };
+    dragItem.current = { type: 'scene', sceneId };
+  };
+
+  const handleChapterDragStart = (chapterId: string) => {
+    dragItem.current = { type: 'chapter-divider', chapterId };
   };
 
   const handleDrop = (e: React.DragEvent, targetGlobalIndex: number, targetPlotlineId: string) => {
     e.preventDefault();
-    if (dragItem.current) {
+    if (dragItem.current?.type === 'scene') {
       onMoveScene(dragItem.current.sceneId, targetGlobalIndex, targetPlotlineId);
+    }
+    dragItem.current = null;
+  };
+
+  const getSceneSequenceIndex = (sceneId: string): number | null => {
+    const index = boardColumns.findIndex(column => column.type === 'scene' && column.scene.id === sceneId);
+    return index === -1 ? null : index;
+  };
+
+  const handleSceneSequenceDrop = (e: React.DragEvent, targetSequenceIndex: number, targetPlotlineId: string) => {
+    e.preventDefault();
+    if (dragItem.current?.type === 'scene') {
+      onMoveSceneInSequence?.(dragItem.current.sceneId, targetSequenceIndex, targetPlotlineId);
+    } else if (dragItem.current?.type === 'chapter-divider') {
+      onMoveChapterDivider?.(dragItem.current.chapterId, targetSequenceIndex);
+    }
+    dragItem.current = null;
+  };
+
+  const handleSceneRowDrop = (e: React.DragEvent, targetPlotlineId: string) => {
+    e.preventDefault();
+    if (dragItem.current?.type === 'scene') {
+      const currentSequenceIndex = getSceneSequenceIndex(dragItem.current.sceneId);
+      if (currentSequenceIndex !== null) {
+        onMoveSceneInSequence?.(dragItem.current.sceneId, currentSequenceIndex, targetPlotlineId);
+      }
+    }
+    dragItem.current = null;
+  };
+
+  const handleChapterDividerDrop = (e: React.DragEvent, targetSequenceIndex: number) => {
+    e.preventDefault();
+    if (dragItem.current?.type === 'chapter-divider') {
+      onMoveChapterDivider?.(dragItem.current.chapterId, targetSequenceIndex);
     }
     dragItem.current = null;
   };
@@ -203,6 +252,7 @@ const Board: React.FC<BoardProps> = ({
   const columnCount = Math.max(project.scenes.length + 1, 10); 
 
   const activePlotlines = project.plotlines.filter(p => visiblePlotlines.includes(p.id));
+  const boardColumns = useMemo(() => getBoardSequenceColumns(project), [project]);
 
   const sortedMarkers = [...(project.chapterMarkers || [])].sort((a, b) => a.position - b.position);
   const chapters: { id: string; title: string; scenes: Scene[]; isEditable?: boolean }[] = [];
@@ -418,8 +468,77 @@ const Board: React.FC<BoardProps> = ({
           <div className="relative">
             {viewMode === 'plotlines' ? (
               <>
+                <div className="relative flex items-end px-8 mb-1 lg:mb-3 min-h-20">
+                  <div className="invisible pointer-events-none flex h-20 shrink-0 items-center pr-12 pl-16 -mr-32">
+                    <div className="min-w-[160px]" />
+                  </div>
+                  {boardColumns.map((column, index) => (
+                    <React.Fragment key={`chapter-title-fragment-${column.id}`}>
+                      <div
+                        className="group/add-chapter relative flex h-24 w-8 flex-shrink-0 items-end justify-center"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleChapterDividerDrop(e, index)}
+                      >
+                        {onAddChapterDivider && (
+                          <button
+                            onClick={() => onAddChapterDivider(index)}
+                            className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
+                          >
+                            + {'\u05e4\u05e8\u05e7'}
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        className="relative flex h-20 flex-shrink-0 items-end justify-center"
+                        style={{ width: `${column.width}px` }}
+                      >
+                        {column.type === 'chapter-divider' && (
+                          <div
+                            draggable
+                            onDragStart={() => handleChapterDragStart(column.chapterMarker.id)}
+                            className="absolute bottom-0 left-1/2 z-20 flex w-[112px] -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--theme-primary)]/20 bg-[var(--theme-card)] px-2.5 py-2 text-[var(--theme-primary)] shadow-xl cursor-grab active:cursor-grabbing"
+                          >
+                            <div className="flex h-6 w-3 flex-shrink-0 items-center justify-center rounded-full text-[var(--theme-primary)]/35">
+                              <div className="h-4 w-1 rounded-full bg-current" />
+                            </div>
+                            <input
+                              className="min-w-0 flex-1 bg-transparent p-0 text-center text-xs font-black text-[var(--theme-primary)] handwritten border-none focus:ring-0"
+                              value={column.chapterMarker.title}
+                              onChange={(e) => onRenameChapter?.(column.chapterMarker.id, e.target.value)}
+                            />
+                            <button
+                              onClick={() => {
+                                if (window.confirm('\u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05d4\u05e4\u05e8\u05e7? \u05d4\u05e1\u05e6\u05e0\u05d5\u05ea \u05dc\u05d0 \u05d9\u05d9\u05de\u05d7\u05e7\u05d5.')) {
+                                  onDeleteChapter?.(column.chapterMarker.id);
+                                }
+                              }}
+                              className="rounded-full p-1 text-[var(--theme-primary)]/35 transition-all hover:bg-red-50 hover:text-red-500"
+                              title={'\u05de\u05d7\u05e7 \u05e4\u05e8\u05e7'}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </React.Fragment>
+                  ))}
+                  <div
+                    className="group/add-chapter relative flex h-24 w-8 flex-shrink-0 items-end justify-center"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleChapterDividerDrop(e, boardColumns.length)}
+                  >
+                    {onAddChapterDivider && (
+                      <button
+                        onClick={() => onAddChapterDivider(boardColumns.length)}
+                        className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
+                      >
+                        + {'\u05e4\u05e8\u05e7'}
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {/* Chapter Markers Layer */}
-                <div className="absolute inset-0 pointer-events-none z-20">
+                <div className="hidden">
                   {project.chapterMarkers?.map(marker => (
                     <div 
                       key={marker.id}
@@ -453,7 +572,7 @@ const Board: React.FC<BoardProps> = ({
                 </div>
 
                 {/* Add Marker Row */}
-                <div className="relative flex gap-12 px-8 mb-8 lg:mb-20 h-10 items-center">
+                <div className="hidden">
                   <div className="absolute left-8 right-8 top-1/2 h-px -translate-y-1/2 bg-gray-300/80" />
                   {Array.from({ length: columnCount }).map((_, i) => {
                     const hasMarker = project.chapterMarkers?.some(m => m.position === i);
@@ -497,32 +616,33 @@ const Board: React.FC<BoardProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-12 px-8 w-full">
-                      {Array.from({ length: columnCount }).map((_, colIdx) => {
-                        const sceneInThisSlot = project.scenes.find(s => s.position === colIdx && s.plotlineId === plotline.id);
+                    <div className="flex items-center px-8 w-full">
+                      {boardColumns.map((column, index) => {
+                        const sceneInThisSlot = column.type === 'scene' && column.scene.plotlineId === plotline.id
+                          ? column.scene
+                          : null;
                         const isLinkedToPlotStructure = sceneInThisSlot && Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
-                        const hasChapterMarker = project.chapterMarkers?.some(m => m.position === colIdx);
                         
                         return (
-                          <div 
-                            key={`${plotline.id}-${colIdx}`}
+                          <React.Fragment key={`${plotline.id}-${column.id}-fragment`}>
+                          <div
+                            className="h-44 w-8 flex-shrink-0"
                             onDragOver={handleDragOver}
-                            onDrop={(e) => handleDrop(e, colIdx, plotline.id)}
-                            className="w-44 h-44 flex-shrink-0 flex items-center justify-center relative group group/slot"
+                            onDrop={(e) => handleSceneSequenceDrop(e, index, plotline.id)}
+                          />
+                          <div
+                            key={`${plotline.id}-${column.id}`}
+                            onDragOver={column.type === 'scene' ? handleDragOver : undefined}
+                            onDrop={column.type === 'scene' ? (e) => handleSceneRowDrop(e, plotline.id) : undefined}
+                            className="h-44 flex-shrink-0 flex items-center justify-center relative group group/slot"
+                            style={{ width: `${column.width}px` }}
                           >
-                            {!hasChapterMarker && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onAddChapterMarker(colIdx);
-                                }}
-                                className="absolute -top-10 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/90 px-3 py-1.5 text-[var(--theme-primary)]/35 opacity-0 shadow-md backdrop-blur-sm transition-all hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)] group-hover/slot:opacity-100"
-                              >
-                                <Flag size={14} />
-                                <span className="text-[10px] font-bold">הוסף פרק</span>
-                              </button>
-                            )}
-                            {sceneInThisSlot ? (
+                            {column.type === 'chapter-divider' ? (
+                              <>
+                                <div className="absolute inset-y-[-3rem] left-1/2 w-0 -translate-x-1/2 border-r-2 border-dashed border-[var(--theme-primary)]/30" />
+                                <div className="relative z-10 h-16 w-8 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-md" />
+                              </>
+                            ) : sceneInThisSlot ? (
                               <div
                                 draggable
                                 onDragStart={() => handleDragStart(sceneInThisSlot.id)}
@@ -576,15 +696,21 @@ const Board: React.FC<BoardProps> = ({
                               </div>
                             ) : (
                               <button 
-                                onClick={() => onAddScene(plotline.id, colIdx)}
+                                onClick={() => onAddScene(plotline.id, column.sceneOrderIndex)}
                                 className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover/slot:opacity-100 group-hover/plotline:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
                               >
                                 <Plus size={20} />
                               </button>
                             )}
                           </div>
+                          </React.Fragment>
                         );
                       })}
+                      <div
+                        className="h-44 w-8 flex-shrink-0"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleSceneSequenceDrop(e, boardColumns.length, plotline.id)}
+                      />
                     </div>
                   </div>
                 ))}

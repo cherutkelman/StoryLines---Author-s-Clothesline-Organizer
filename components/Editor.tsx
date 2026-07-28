@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 're
 import { Project, Scene, QuestionnaireEntry, SceneVersion, SceneVersionReason } from '../types';
 import { canDeleteSceneVersion, diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
+import { getBookSequenceDisplayItems } from '../src/book-sequence';
 import { relationshipQuestionSections } from './relationshipQuestions';
 import { 
   BookOpen, 
@@ -494,21 +495,27 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     return () => window.removeEventListener('keydown', handleEscape);
   }, [renameCandidateVersionId, renamingVersionId]);
 
-  const activeScenes = useMemo(() => {
-    let filtered = project.scenes
-      .filter((s: Scene) => visiblePlotlines.includes(s.plotlineId))
-      .sort((a: Scene, b: Scene) => a.position - b.position);
-    
-    if (activeSearchQuery.trim()) {
-      const query = activeSearchQuery.toLowerCase();
-      filtered = filtered.filter((s: Scene) => 
-        s.title.toLowerCase().includes(query) || 
-        s.content.toLowerCase().includes(query)
-      );
-    }
+  const activeSequenceItems = useMemo(() => {
+    const query = activeSearchQuery.trim().toLowerCase();
 
-    return filtered;
-  }, [project.scenes, visiblePlotlines, activeSearchQuery]);
+    return getBookSequenceDisplayItems(project).filter((item) => {
+      if (item.type === 'chapter-divider') return !query;
+
+      const scene = item.scene;
+      if (!visiblePlotlines.includes(scene.plotlineId)) return false;
+      if (!query) return true;
+
+      return scene.title.toLowerCase().includes(query) ||
+        scene.content.toLowerCase().includes(query);
+    });
+  }, [project, visiblePlotlines, activeSearchQuery]);
+
+  const activeScenes = useMemo(
+    () => activeSequenceItems
+      .filter((item): item is Extract<typeof item, { type: 'scene' }> => item.type === 'scene')
+      .map(item => item.scene),
+    [activeSequenceItems]
+  );
 
   const historySceneId = resolveSceneHistorySceneId(
     {
@@ -828,27 +835,26 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       </div>
 
       <div className="space-y-4">
-        {activeScenes.map((scene, idx) => {
+        {activeSequenceItems.map((item, idx) => {
+          if (item.type === 'chapter-divider') {
+            return (
+              <div key={item.id} className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
+                <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
+                  <Flag size={20} />
+                </div>
+                <div className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest">
+                  {item.chapterMarker.title}
+                </div>
+              </div>
+            );
+          }
+
+          const scene = item.scene;
           const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
           const isExpanded = displayMode === 'full' || expandedSceneIds.includes(scene.id);
-          
-          const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
 
           return (
             <React.Fragment key={scene.id}>
-              {chapterMarker && (
-                <div className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
-                  <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
-                    <Flag size={20} />
-                  </div>
-                  <DebouncedInput 
-                    className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest bg-transparent border-none focus:ring-0 p-0 w-full"
-                    value={chapterMarker.title}
-                    onChange={(val) => onUpdateChapterMarker?.(chapterMarker.id, { title: val })}
-                  />
-                </div>
-              )}
-              
               <article
                 className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
                 style={{ borderRightColor: plotline?.color }}
