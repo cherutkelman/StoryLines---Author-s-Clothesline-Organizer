@@ -81,6 +81,13 @@ import { sceneVersionStorage } from './src/scene-version-storage';
 import { createAutomaticBoardVersionOnExit, createBoardSnapshot } from './src/board-history';
 import { boardVersionStorage } from './src/board-version-storage';
 import { logSceneHistoryDebug } from './src/scene-history-debug';
+import {
+  addChapterDividerToBookSequence,
+  deleteChapterDividerFromBookSequence,
+  moveChapterDividerInBookSequence,
+  moveSceneInBookSequence,
+  renameChapterInBookSequence,
+} from './src/book-sequence';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -1168,6 +1175,35 @@ const App: React.FC = () => {
     updateActiveBook({
       chapterMarkers: (activeBook.chapterMarkers || []).filter(m => m.id !== id)
     });
+  };
+
+  const addChapterDivider = (sequenceIndex: number) => {
+    if (!activeBook) return;
+    const chapterId = `cm-${Date.now()}`;
+    const updates = addChapterDividerToBookSequence(activeBook, sequenceIndex, chapterId);
+    updateActiveBook(updates);
+  };
+
+  const renameChapter = (chapterId: string, title: string) => {
+    if (!activeBook) return;
+    updateActiveBook(renameChapterInBookSequence(activeBook, chapterId, title));
+  };
+
+  const deleteChapter = (chapterId: string) => {
+    if (!activeBook) return;
+    updateActiveBook(deleteChapterDividerFromBookSequence(activeBook, chapterId));
+  };
+
+  const moveChapterDivider = (chapterId: string, targetSequenceIndex: number) => {
+    if (!activeBook) return;
+    updateActiveBook(moveChapterDividerInBookSequence(activeBook, chapterId, targetSequenceIndex));
+  };
+
+  const moveSceneInSequence = (sceneId: string, targetSequenceIndex: number, targetPlotlineId: string) => {
+    if (!activeBook) return;
+    const updates = moveSceneInBookSequence(activeBook, sceneId, targetSequenceIndex, targetPlotlineId);
+    if (!updates) return;
+    updateActiveBook(updates);
   };
 
   const moveScene = (id: string, targetGlobalIndex: number, targetPlotlineId: string) => {
@@ -2383,6 +2419,7 @@ const App: React.FC = () => {
                     visiblePlotlines={visiblePlotlines}
                     onAddScene={addScene}
                     onMoveScene={moveScene} 
+                    onMoveSceneInSequence={moveSceneInSequence}
                     updateScene={updateScene} 
                     onDeleteScene={deleteScene}
                     onUpdateSummary={(summary) => updateActiveBook({ summary })}
@@ -2399,6 +2436,10 @@ const App: React.FC = () => {
                     onAddChapterMarker={addChapterMarker}
                     onUpdateChapterMarker={updateChapterMarker}
                     onDeleteChapterMarker={deleteChapterMarker}
+                    onAddChapterDivider={addChapterDivider}
+                    onRenameChapter={renameChapter}
+                    onDeleteChapter={deleteChapter}
+                    onMoveChapterDivider={moveChapterDivider}
                   />
                 </div>
               )}

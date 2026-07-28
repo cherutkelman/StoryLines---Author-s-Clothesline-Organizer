@@ -153,6 +153,18 @@ export interface ChapterMarker {
   title: string;
 }
 
+export type BookSequenceItem =
+  | {
+      id: string;
+      type: 'scene';
+      sceneId: string;
+    }
+  | {
+      id: string;
+      type: 'chapter-divider';
+      chapterId: string;
+    };
+
 export interface Plotline {
   id: string;
   name: string;
@@ -355,6 +367,7 @@ export interface Project {
   mindMaps?: MindMap[];
   mapGallery?: MapGallery;
   chapterMarkers?: ChapterMarker[];
+  bookSequence?: BookSequenceItem[];
   plotStructure?: string;
   plotStructurePoints?: Record<string, { sceneId?: string; description?: string }>;
   customPlotPoints?: { id: string; label: string; x: number; y: number }[];
