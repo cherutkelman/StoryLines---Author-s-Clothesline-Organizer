@@ -4,6 +4,7 @@ import {
   BOOK_SEQUENCE_CHAPTER_DIVIDER_WIDTH,
   BOOK_SEQUENCE_SCENE_COLUMN_WIDTH,
   addChapterDividerToBookSequence,
+  addSceneToBookSequence,
   createBookSequenceFromLegacyBook,
   deleteChapterDividerFromBookSequence,
   getBoardSequenceColumns,
@@ -711,5 +712,147 @@ describe('book sequence', () => {
     expect(moveSceneInBookSequence(source, 'missing', 0, 'p1')).toBeNull();
     expect(moveSceneInBookSequence(source, 's1', 0, 'missing')).toBeNull();
     expect(source.bookSequence).toBeUndefined();
+  });
+
+  it('adds a scene to an empty book', () => {
+    const source = project([]);
+    const result = addSceneToBookSequence(source, scene('s1', 0), 0);
+
+    expect(result?.bookSequence).toEqual([{ id: 'scene:s1', type: 'scene', sceneId: 's1' }]);
+    expect(result?.scenes.map(item => item.id)).toEqual(['s1']);
+  });
+
+  it('adds a scene when there is only one plotline and existing columns are occupied', () => {
+    const source = project([scene('s1', 0), scene('s2', 1)]);
+    const result = addSceneToBookSequence(source, scene('s3', 0), 1);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s3', 'scene:s2']);
+  });
+
+  it('adds a scene at the beginning of the sequence', () => {
+    const source = project([scene('s1', 0), scene('s2', 1)]);
+    const result = addSceneToBookSequence(source, scene('s0', 0), 0);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s0', 'scene:s1', 'scene:s2']);
+    expect(result?.scenes.map(item => `${item.id}:${item.position}`)).toEqual(['s0:0', 's1:1', 's2:2']);
+  });
+
+  it('adds a scene in the middle of the sequence', () => {
+    const source = project([scene('s1', 0), scene('s2', 1)]);
+    const result = addSceneToBookSequence(source, scene('s-mid', 0), 1);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s-mid', 'scene:s2']);
+  });
+
+  it('adds a scene at the end of the sequence', () => {
+    const source = project([scene('s1', 0), scene('s2', 1)]);
+    const result = addSceneToBookSequence(source, scene('s3', 0), 99);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s2', 'scene:s3']);
+  });
+
+  it('adds a scene before a chapter divider', () => {
+    const source = project(
+      [scene('s1', 0), scene('s2', 1)],
+      [chapter('c1', 1)],
+      [
+        { id: 'scene:s1', type: 'scene', sceneId: 's1' },
+        { id: 'chapter:c1', type: 'chapter-divider', chapterId: 'c1' },
+        { id: 'scene:s2', type: 'scene', sceneId: 's2' },
+      ]
+    );
+    const result = addSceneToBookSequence(source, scene('s-new', 0), 1);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s-new', 'chapter:c1', 'scene:s2']);
+    expect(result?.chapterMarkers[0]).toMatchObject({ id: 'c1', position: 2 });
+  });
+
+  it('adds a scene after a chapter divider', () => {
+    const source = project(
+      [scene('s1', 0), scene('s2', 1)],
+      [chapter('c1', 1)],
+      [
+        { id: 'scene:s1', type: 'scene', sceneId: 's1' },
+        { id: 'chapter:c1', type: 'chapter-divider', chapterId: 'c1' },
+        { id: 'scene:s2', type: 'scene', sceneId: 's2' },
+      ]
+    );
+    const result = addSceneToBookSequence(source, scene('s-new', 0), 2);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'chapter:c1', 'scene:s-new', 'scene:s2']);
+    expect(result?.chapterMarkers[0]).toMatchObject({ id: 'c1', position: 1 });
+  });
+
+  it('adds a scene between two chapter dividers', () => {
+    const source = project(
+      [scene('s1', 0)],
+      [chapter('c1', 1), chapter('c2', 1)],
+      [
+        { id: 'scene:s1', type: 'scene', sceneId: 's1' },
+        { id: 'chapter:c1', type: 'chapter-divider', chapterId: 'c1' },
+        { id: 'chapter:c2', type: 'chapter-divider', chapterId: 'c2' },
+      ]
+    );
+    const result = addSceneToBookSequence(source, scene('s-new', 0), 2);
+
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'chapter:c1', 'scene:s-new', 'chapter:c2']);
+    expect(result?.chapterMarkers.map(marker => `${marker.id}:${marker.position}`)).toEqual(['c1:1', 'c2:2']);
+  });
+
+  it('adds a scene to a different plotline', () => {
+    const source = project([scene('s1', 0, 'p1')]);
+    source.plotlines.push({ id: 'p2', name: 'Second', color: '#654321' });
+    const result = addSceneToBookSequence(source, scene('s2', 0, 'p2'), 1);
+
+    expect(result?.scenes.find(item => item.id === 's2')?.plotlineId).toBe('p2');
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s2']);
+  });
+
+  it('creates bookSequence for a legacy book only after an explicit scene add', () => {
+    const source = project([scene('s1', 0)]);
+    const result = addSceneToBookSequence(source, scene('s2', 0), 1);
+
+    expect(source.bookSequence).toBeUndefined();
+    expect(result?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s2']);
+  });
+
+  it('adds the scene only once to scenes and bookSequence', () => {
+    const result = addSceneToBookSequence(project([scene('s1', 0)]), scene('s2', 0), 1);
+
+    expect(result?.scenes.filter(item => item.id === 's2')).toHaveLength(1);
+    expect(result?.bookSequence.filter(item => item.type === 'scene' && item.sceneId === 's2')).toHaveLength(1);
+  });
+
+  it('keeps editor order aligned after adding a scene', () => {
+    const source = project([scene('s1', 0), scene('s2', 1)]);
+    const result = addSceneToBookSequence(source, scene('s-new', 0), 1);
+
+    expect(result && getOrderedSceneIds({ ...source, scenes: result.scenes, bookSequence: result.bookSequence })).toEqual(['s1', 's-new', 's2']);
+  });
+
+  it('updates Scene.position and ChapterMarker.position after adding a scene', () => {
+    const source = project(
+      [scene('s1', 0), scene('s2', 1)],
+      [chapter('c1', 1)],
+      [
+        { id: 'scene:s1', type: 'scene', sceneId: 's1' },
+        { id: 'chapter:c1', type: 'chapter-divider', chapterId: 'c1' },
+        { id: 'scene:s2', type: 'scene', sceneId: 's2' },
+      ]
+    );
+    const result = addSceneToBookSequence(source, scene('s-new', 0), 1);
+
+    expect(result?.scenes.map(item => `${item.id}:${item.position}`)).toEqual(['s1:0', 's-new:1', 's2:2']);
+    expect(result?.chapterMarkers[0]).toMatchObject({ id: 'c1', position: 2 });
+  });
+
+  it('supports bulk-style repeated scene adds while keeping sequence canonical', () => {
+    const source = project([scene('s1', 0)]);
+    const first = addSceneToBookSequence(source, scene('s2', 0), 1);
+    expect(first).not.toBeNull();
+    const second = first && addSceneToBookSequence({ ...source, ...first }, scene('s3', 0), first.bookSequence.length);
+
+    expect(second?.bookSequence.map(item => item.id)).toEqual(['scene:s1', 'scene:s2', 'scene:s3']);
+    expect(second?.scenes.map(item => `${item.id}:${item.position}`)).toEqual(['s1:0', 's2:1', 's3:2']);
   });
 });

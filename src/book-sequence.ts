@@ -64,6 +64,12 @@ export type BookSequenceSceneMoveUpdate = {
   chapterMarkers: ChapterMarker[];
 };
 
+export type BookSequenceSceneAddUpdate = {
+  bookSequence: BookSequenceItem[];
+  scenes: Scene[];
+  chapterMarkers: ChapterMarker[];
+};
+
 const isValidPosition = (position: unknown): position is number =>
   typeof position === 'number' &&
   Number.isFinite(position) &&
@@ -423,6 +429,31 @@ export const moveSceneInBookSequence = (
     ),
     nextSequence
   );
+
+  return {
+    bookSequence: nextSequence,
+    scenes: nextScenes,
+    chapterMarkers: normalizeChapterMarkerPositionsForSequence(book.chapterMarkers || [], nextSequence),
+  };
+};
+
+export const addSceneToBookSequence = (
+  book: BookSequenceUpdateSource,
+  scene: Scene,
+  targetSequenceIndex: number
+): BookSequenceSceneAddUpdate | null => {
+  if (book.scenes.some(item => item.id === scene.id)) return null;
+  if (!book.plotlines.some(plotline => plotline.id === scene.plotlineId)) return null;
+
+  const sequence = normalizeBookSequence(book);
+  const insertIndex = Math.max(0, Math.min(targetSequenceIndex, sequence.length));
+  const sceneItem = toSceneItem(scene.id);
+  const nextSequence = [
+    ...sequence.slice(0, insertIndex),
+    sceneItem,
+    ...sequence.slice(insertIndex),
+  ];
+  const nextScenes = normalizeScenePositionsForSequence([...book.scenes, scene], nextSequence);
 
   return {
     bookSequence: nextSequence,
