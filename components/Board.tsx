@@ -15,6 +15,7 @@ interface BoardProps {
   title: string;
   visiblePlotlines: string[];
   onAddScene: (plotlineId: string, position: number) => void;
+  onAddSceneInSequence?: (plotlineId: string, targetSequenceIndex: number) => void;
   onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
   onMoveSceneInSequence?: (sceneId: string, targetSequenceIndex: number, targetPlotlineId: string) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
@@ -41,6 +42,7 @@ const Board: React.FC<BoardProps> = ({
   title, 
   visiblePlotlines, 
   onAddScene, 
+  onAddSceneInSequence,
   onMoveScene, 
   onMoveSceneInSequence,
   updateScene, 
@@ -626,10 +628,24 @@ const Board: React.FC<BoardProps> = ({
                         return (
                           <React.Fragment key={`${plotline.id}-${column.id}-fragment`}>
                           <div
-                            className="h-44 w-8 flex-shrink-0"
+                            className="group/add-scene relative flex h-44 w-10 flex-shrink-0 items-center justify-center"
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleSceneSequenceDrop(e, index, plotline.id)}
-                          />
+                          >
+                            {onAddSceneInSequence && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAddSceneInSequence(plotline.id, index);
+                                }}
+                                className="absolute z-20 flex items-center gap-1 rounded-full border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/90 px-2 py-1 text-[10px] font-bold text-[var(--theme-primary)]/35 opacity-0 shadow-md backdrop-blur-sm transition-all hover:border-[var(--theme-primary)]/50 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100"
+                              >
+                                <Plus size={12} />
+                                <span>{'\u05e1\u05e6\u05e0\u05d4'}</span>
+                              </button>
+                            )}
+                          </div>
                           <div
                             key={`${plotline.id}-${column.id}`}
                             onDragOver={column.type === 'scene' ? handleDragOver : undefined}
@@ -696,7 +712,13 @@ const Board: React.FC<BoardProps> = ({
                               </div>
                             ) : (
                               <button 
-                                onClick={() => onAddScene(plotline.id, column.sceneOrderIndex)}
+                                onClick={() => {
+                                  if (onAddSceneInSequence) {
+                                    onAddSceneInSequence(plotline.id, index);
+                                    return;
+                                  }
+                                  onAddScene(plotline.id, column.sceneOrderIndex);
+                                }}
                                 className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover/slot:opacity-100 group-hover/plotline:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
                               >
                                 <Plus size={20} />
@@ -707,10 +729,24 @@ const Board: React.FC<BoardProps> = ({
                         );
                       })}
                       <div
-                        className="h-44 w-8 flex-shrink-0"
+                        className="group/add-scene relative flex h-44 w-10 flex-shrink-0 items-center justify-center"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleSceneSequenceDrop(e, boardColumns.length, plotline.id)}
-                      />
+                      >
+                        {onAddSceneInSequence && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAddSceneInSequence(plotline.id, boardColumns.length);
+                            }}
+                            className="absolute z-20 flex items-center gap-1 rounded-full border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/90 px-2 py-1 text-[10px] font-bold text-[var(--theme-primary)]/35 opacity-0 shadow-md backdrop-blur-sm transition-all hover:border-[var(--theme-primary)]/50 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100"
+                          >
+                            <Plus size={12} />
+                            <span>{'\u05e1\u05e6\u05e0\u05d4'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -72,7 +72,6 @@ import {
   SCENE_HISTORY_TYPING_IDLE_MS,
   calculateChangedCharacters,
   canDeleteSceneVersion,
-  copySceneVersionToNewScene,
   createSceneVersion,
   createSceneVersionFromScene,
   restoreSceneVersion,
@@ -83,9 +82,11 @@ import { boardVersionStorage } from './src/board-version-storage';
 import { logSceneHistoryDebug } from './src/scene-history-debug';
 import {
   addChapterDividerToBookSequence,
+  addSceneToBookSequence,
   deleteChapterDividerFromBookSequence,
   moveChapterDividerInBookSequence,
   moveSceneInBookSequence,
+  normalizeBookSequence,
   renameChapterInBookSequence,
 } from './src/book-sequence';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -842,18 +843,28 @@ const App: React.FC = () => {
 
     setBooks(prev => prev.map(book => {
       if (book.id !== bookId) return book;
-      const nextProject = copySceneVersionToNewScene({
-        project: book,
-        version,
-        versionId,
-        newSceneId: `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      });
+      const sourceScene = book.scenes.find(item => item.id === version.sceneId);
+      if (!sourceScene || version.id !== versionId) return book;
+      const newSceneId = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const newScene: Scene = {
+        ...sourceScene,
+        id: newSceneId,
+        title: `\u05e2\u05d5\u05ea\u05e7 \u05e9\u05dc ${version.sceneTitle}`,
+        content: version.content,
+        position: sourceScene.position + 1,
+        isCompleted: false,
+        restoredFromVersionId: undefined,
+      };
+      const sourceSequenceIndex = normalizeBookSequence(book)
+        .findIndex(item => item.type === 'scene' && item.sceneId === version.sceneId);
+      const insertIndex = sourceSequenceIndex === -1 ? sourceScene.position + 1 : sourceSequenceIndex + 1;
+      const updates = addSceneToBookSequence(book, newScene, insertIndex);
 
-      if (nextProject === book) return book;
+      if (!updates) return book;
 
       return {
         ...book,
-        ...nextProject,
+        ...updates,
         updatedAt: Date.now(),
         pendingSync: true,
       };
@@ -1022,19 +1033,33 @@ const App: React.FC = () => {
     const titles = bulkTitles.split('\n').map(t => t.trim()).filter(t => t !== '');
     if (titles.length === 0) return;
 
-    const startPos = activeBook.scenes.length;
-    const newScenes: Scene[] = titles.map((title, idx) => ({
-      id: `s-bulk-${Date.now()}-${idx}`,
-      plotlineId: bulkPlotlineId,
-      title,
-      content: '',
-      position: startPos + idx,
-      isCompleted: false
-    }));
+    const createdAt = Date.now();
+    let updates: Pick<Project, 'scenes' | 'bookSequence' | 'chapterMarkers'> | null = {
+      scenes: activeBook.scenes,
+      bookSequence: activeBook.bookSequence,
+      chapterMarkers: activeBook.chapterMarkers || [],
+    };
 
-    updateActiveBook({
-      scenes: [...activeBook.scenes, ...newScenes].map((s, idx) => ({ ...s, position: idx }))
+    titles.forEach((title, idx) => {
+      if (!updates) return;
+      const newScene: Scene = {
+        id: `s-bulk-${createdAt}-${idx}`,
+        plotlineId: bulkPlotlineId,
+        title,
+        content: '',
+        position: updates.scenes.length,
+        isCompleted: false
+      };
+      const next = addSceneToBookSequence(
+        { ...activeBook, ...updates },
+        newScene,
+        Number.MAX_SAFE_INTEGER
+      );
+      updates = next;
     });
+
+    if (!updates) return;
+    updateActiveBook(updates);
     setBulkTitles('');
     setIsBulkAddOpen(false);
   };
@@ -1104,32 +1129,23 @@ const App: React.FC = () => {
   };
 
   const addScene = (plotlineId: string, atPosition?: number) => {
+    addSceneInSequence(plotlineId, atPosition ?? Number.MAX_SAFE_INTEGER);
+  };
+
+  const addSceneInSequence = (plotlineId: string, targetSequenceIndex: number) => {
     if (!activeBook) return;
-    const newPos = atPosition !== undefined ? atPosition : activeBook.scenes.length;
     const newScene: Scene = {
       id: `s-${Date.now()}`,
       plotlineId,
-      title: 'סצנה חדשה',
+      title: '\u05e1\u05e6\u05e0\u05d4 \u05d7\u05d3\u05e9\u05d4',
       content: '',
-      position: newPos,
+      position: activeBook.scenes.length,
       isCompleted: false
     };
-    
-    const newScenes = [...activeBook.scenes];
-    newScenes.splice(newPos, 0, newScene);
 
-    // Shift chapter markers that are at or after the insertion point
-    const updatedMarkers = (activeBook.chapterMarkers || []).map(m => {
-      if (m.position >= newPos) {
-        return { ...m, position: m.position + 1 };
-      }
-      return m;
-    });
-
-    updateActiveBook({
-      scenes: newScenes.map((s, idx) => ({ ...s, position: idx })),
-      chapterMarkers: updatedMarkers
-    });
+    const updates = addSceneToBookSequence(activeBook, newScene, targetSequenceIndex);
+    if (!updates) return;
+    updateActiveBook(updates);
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
@@ -2418,6 +2434,7 @@ const App: React.FC = () => {
                     title={activeBook.title}
                     visiblePlotlines={visiblePlotlines}
                     onAddScene={addScene}
+                    onAddSceneInSequence={addSceneInSequence}
                     onMoveScene={moveScene} 
                     onMoveSceneInSequence={moveSceneInSequence}
                     updateScene={updateScene} 
