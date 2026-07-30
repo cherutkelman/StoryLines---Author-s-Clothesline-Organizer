@@ -1,7 +1,13 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Scene, Project, ChapterMarker, BoardViewMode } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown, Square, Triangle, Circle, Diamond, Hexagon } from 'lucide-react';
+import { Scene, Project, ChapterMarker, BoardViewMode, BoardVersion } from '../types';
+import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown, Square, Triangle, Circle, Diamond, Hexagon, History } from 'lucide-react';
+import BoardVersionHistorySidebar from './BoardVersionHistorySidebar';
+import {
+  createBoardPreviewProject,
+  formatBoardVersionDate,
+  formatBoardVersionTime,
+  getBoardVersionDisplayName,
+} from '../src/board-version-history-ui';
 import { getBoardSequenceColumns } from '../src/book-sequence';
 
 const INSERTION_SLOT_WIDTH = 40;
@@ -37,6 +43,8 @@ interface BoardProps {
   onRenameChapter?: (chapterId: string, title: string) => void;
   onDeleteChapter?: (chapterId: string) => void;
   onMoveChapterDivider?: (chapterId: string, targetSequenceIndex: number) => void;
+  onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
+  onPreviewVersionChange?: (version: BoardVersion | null) => void;
 }
 
 const Board: React.FC<BoardProps> = ({ 
@@ -63,20 +71,50 @@ const Board: React.FC<BoardProps> = ({
   onAddChapterDivider,
   onRenameChapter,
   onDeleteChapter,
-  onMoveChapterDivider
+  onMoveChapterDivider,
+  onLoadBoardVersions,
+  onPreviewVersionChange
 }) => {
   const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const pinchGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const isPreviewMode = Boolean(previewVersion);
+  const boardProject = previewVersion ? createBoardPreviewProject(project, previewVersion) : project;
+  const effectiveVisiblePlotlines = isPreviewMode
+    ? boardProject.plotlines.map(plotline => plotline.id)
+    : visiblePlotlines;
+
+  useEffect(() => {
+    onPreviewVersionChange?.(previewVersion);
+  }, [previewVersion, onPreviewVersionChange]);
+
+  useEffect(() => {
+    return () => {
+      onPreviewVersionChange?.(null);
+    };
+  }, [onPreviewVersionChange]);
+
+  const closeBoardPreview = () => {
+    setPreviewVersion(null);
+  };
+
+  const showBoardPreview = (version: BoardVersion) => {
+    setPreviewVersion(version);
+  };
 
   const handleZoomChange = (newZoom: number) => {
     setZoomLevel(newZoom);
-    onZoomChange?.(newZoom);
+    if (!isPreviewMode) {
+      onZoomChange?.(newZoom);
+    }
   };
+
 
   useEffect(() => {
     if (!initialViewMode || initialViewMode === viewMode) return;
@@ -85,19 +123,27 @@ const Board: React.FC<BoardProps> = ({
 
   const handleViewModeChange = (newViewMode: BoardViewMode) => {
     setViewMode(newViewMode);
-    onViewModeChange?.(newViewMode);
+    if (!isPreviewMode) {
+      onViewModeChange?.(newViewMode);
+    }
   };
 
   const handleDragStart = (sceneId: string) => {
+    if (isPreviewMode) return;
     dragItem.current = { type: 'scene', sceneId };
   };
 
   const handleChapterDragStart = (chapterId: string) => {
+    if (isPreviewMode) return;
     dragItem.current = { type: 'chapter-divider', chapterId };
   };
 
   const handleDrop = (e: React.DragEvent, targetGlobalIndex: number, targetPlotlineId: string) => {
     e.preventDefault();
+    if (isPreviewMode) {
+      dragItem.current = null;
+      return;
+    }
     if (dragItem.current?.type === 'scene') {
       onMoveScene(dragItem.current.sceneId, targetGlobalIndex, targetPlotlineId);
     }
@@ -111,6 +157,10 @@ const Board: React.FC<BoardProps> = ({
 
   const handleSceneSequenceDrop = (e: React.DragEvent, targetSequenceIndex: number, targetPlotlineId: string) => {
     e.preventDefault();
+    if (isPreviewMode) {
+      dragItem.current = null;
+      return;
+    }
     if (dragItem.current?.type === 'scene') {
       onMoveSceneInSequence?.(dragItem.current.sceneId, targetSequenceIndex, targetPlotlineId);
     } else if (dragItem.current?.type === 'chapter-divider') {
@@ -121,6 +171,10 @@ const Board: React.FC<BoardProps> = ({
 
   const handleSceneRowDrop = (e: React.DragEvent, targetPlotlineId: string) => {
     e.preventDefault();
+    if (isPreviewMode) {
+      dragItem.current = null;
+      return;
+    }
     if (dragItem.current?.type === 'scene') {
       const currentSequenceIndex = getSceneSequenceIndex(dragItem.current.sceneId);
       if (currentSequenceIndex !== null) {
@@ -132,6 +186,10 @@ const Board: React.FC<BoardProps> = ({
 
   const handleChapterDividerDrop = (e: React.DragEvent, targetSequenceIndex: number) => {
     e.preventDefault();
+    if (isPreviewMode) {
+      dragItem.current = null;
+      return;
+    }
     if (dragItem.current?.type === 'chapter-divider') {
       onMoveChapterDivider?.(dragItem.current.chapterId, targetSequenceIndex);
     }
@@ -215,15 +273,15 @@ const Board: React.FC<BoardProps> = ({
     text += `-----------------------------------\n\n`;
 
     // Filter scenes to only include those from visible plotlines and sort by position (right to left)
-    const exportedScenes = project.scenes
-      .filter(s => visiblePlotlines.includes(s.plotlineId))
+    const exportedScenes = boardProject.scenes
+      .filter(s => effectiveVisiblePlotlines.includes(s.plotlineId))
       .sort((a, b) => {
         if (a.position !== b.position) {
           return a.position - b.position;
         }
         // If same position, sort by plotline order
-        const plotlineAIndex = project.plotlines.findIndex(p => p.id === a.plotlineId);
-        const plotlineBIndex = project.plotlines.findIndex(p => p.id === b.plotlineId);
+        const plotlineAIndex = boardProject.plotlines.findIndex(p => p.id === a.plotlineId);
+        const plotlineBIndex = boardProject.plotlines.findIndex(p => p.id === b.plotlineId);
         return plotlineAIndex - plotlineBIndex;
       });
 
@@ -231,11 +289,11 @@ const Board: React.FC<BoardProps> = ({
       text += "אין סצנות להצגה בקווי העלילה הנבחרים.\n";
     } else {
       exportedScenes.forEach((scene, index) => {
-        const chapterMarker = project.chapterMarkers?.find(m => m.position === scene.position);
+        const chapterMarker = boardProject.chapterMarkers?.find(m => m.position === scene.position);
         if (chapterMarker) {
           text += `\n=== ${chapterMarker.title} ===\n\n`;
         }
-        const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
+        const plotline = boardProject.plotlines.find(p => p.id === scene.plotlineId);
         text += `סצנה ${index + 1} | קו עלילה: ${plotline?.name || 'ללא'} | מיקום: ${scene.position + 1}\n`;
         text += `כותרת: ${scene.title || 'ללא כותרת'}\n`;
         text += `תמצית:\n${scene.summary || 'לא נכתבה תמצית...'}\n`;
@@ -253,14 +311,14 @@ const Board: React.FC<BoardProps> = ({
   };
 
   // The number of columns is the number of scenes plus one for adding at the end
-  const columnCount = Math.max(project.scenes.length + 1, 10); 
+  const columnCount = Math.max(boardProject.scenes.length + 1, 10);
 
-  const activePlotlines = project.plotlines.filter(p => visiblePlotlines.includes(p.id));
-  const boardColumns = useMemo(() => getBoardSequenceColumns(project), [project]);
+  const activePlotlines = boardProject.plotlines.filter(p => effectiveVisiblePlotlines.includes(p.id));
+  const boardColumns = useMemo(() => getBoardSequenceColumns(boardProject), [boardProject]);
 
-  const sortedMarkers = [...(project.chapterMarkers || [])].sort((a, b) => a.position - b.position);
+  const sortedMarkers = [...(boardProject.chapterMarkers || [])].sort((a, b) => a.position - b.position);
   const chapters: { id: string; title: string; scenes: Scene[]; isEditable?: boolean }[] = [];
-  const visibleScenes = project.scenes.filter(s => visiblePlotlines.includes(s.plotlineId));
+  const visibleScenes = boardProject.scenes.filter(s => effectiveVisiblePlotlines.includes(s.plotlineId));
 
   if (sortedMarkers.length === 0) {
     chapters.push({ id: 'default', title: 'כל הסצנות', scenes: visibleScenes });
@@ -280,8 +338,8 @@ const Board: React.FC<BoardProps> = ({
         (!nextMarker || s.position < nextMarker.position)
       ).sort((a, b) => {
         if (a.position !== b.position) return a.position - b.position;
-        const pA = project.plotlines.findIndex(p => p.id === a.plotlineId);
-        const pB = project.plotlines.findIndex(p => p.id === b.plotlineId);
+        const pA = boardProject.plotlines.findIndex(p => p.id === a.plotlineId);
+        const pB = boardProject.plotlines.findIndex(p => p.id === b.plotlineId);
         return pA - pB;
       });
       chapters.push({
@@ -296,14 +354,14 @@ const Board: React.FC<BoardProps> = ({
   const getCharacterArcMarkers = (sceneId: string) => {
     const linkedTypes = new Set<'argument' | 'validation' | 'contradiction' | 'needReason' | 'obstacle' | 'resolution'>();
 
-    (project.characterArcs || []).forEach((arc) => {
+    (boardProject.characterArcs || []).forEach((arc) => {
       (arc.sceneLinks || []).forEach((link) => {
         if (link.sceneId !== sceneId) return;
         linkedTypes.add(link.type || 'argument');
       });
     });
 
-    (project.conflicts || []).forEach((conflict) => {
+    (boardProject.conflicts || []).forEach((conflict) => {
       (conflict.rows || []).forEach((row) => {
         (row.needReasonScenes ?? row.goalScenes ?? []).forEach((link) => {
           if (link.sceneId === sceneId) linkedTypes.add('needReason');
@@ -440,15 +498,19 @@ const Board: React.FC<BoardProps> = ({
 
       {/* Top Right Actions */}
       <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+9.25rem)] left-6 z-40 flex items-center gap-3 lg:bottom-auto lg:left-auto lg:right-6 lg:top-6">
-        <button 
-          onClick={() => onBulkAdd(project.plotlines[0]?.id || '')}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] border border-[var(--theme-primary)] rounded-xl shadow-lg hover:opacity-90 transition-all font-bold text-sm"
+        <button
+          onClick={() => {
+            if (isPreviewMode) return;
+            onBulkAdd(boardProject.plotlines[0]?.id || '');
+          }}
+          disabled={isPreviewMode}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] border border-[var(--theme-primary)] rounded-xl shadow-lg hover:opacity-90 transition-all font-bold text-sm disabled:cursor-not-allowed disabled:opacity-40"
           title="הוספה מהירה של סצנות"
         >
           <CopyPlus size={18} />
           <span>הוספה מהירה</span>
         </button>
-        <button 
+        <button
           onClick={exportBoard}
           className="hidden items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm lg:flex"
           title="ייצוא לוח עלילה"
@@ -456,7 +518,42 @@ const Board: React.FC<BoardProps> = ({
           <Download size={18} />
           <span>ייצוא לוח</span>
         </button>
+        <button
+          onClick={() => setIsVersionHistoryOpen(true)}
+          disabled={!onLoadBoardVersions}
+          className="hidden items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:flex"
+          title="היסטוריית גרסאות"
+        >
+          <History size={18} />
+          <span>היסטוריית גרסאות</span>
+        </button>
       </div>
+
+      {onLoadBoardVersions && (
+        <BoardVersionHistorySidebar
+          isOpen={isVersionHistoryOpen}
+          boardTitle={title}
+          onClose={() => setIsVersionHistoryOpen(false)}
+          onLoadVersions={onLoadBoardVersions}
+          activePreviewVersionId={previewVersion?.id ?? null}
+          onPreviewVersion={showBoardPreview}
+        />
+      )}
+
+      {previewVersion && (
+        <div className="absolute right-6 top-20 z-40 flex max-w-[calc(100%-3rem)] flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 shadow-xl lg:top-24" dir="rtl">
+          <History size={18} />
+          <span>
+            מציג גרסת לוח היסטורית: {getBoardVersionDisplayName(previewVersion)} ? {formatBoardVersionDate(previewVersion.createdAt)} ? {formatBoardVersionTime(previewVersion.createdAt)}
+          </span>
+          <button
+            onClick={closeBoardPreview}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-black text-amber-900 shadow-sm hover:bg-amber-100"
+          >
+            חזור ללוח הנוכחי
+          </button>
+        </div>
+      )}
 
       {/* Board Scrollable Area */}
       <div ref={boardScrollRef} className="flex-1 overflow-auto bg-[var(--theme-bg)] cursor-grab active:cursor-grabbing scrollbar-hide">
@@ -484,7 +581,7 @@ const Board: React.FC<BoardProps> = ({
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleChapterDividerDrop(e, index)}
                       >
-                        {onAddChapterDivider && (
+                        {!isPreviewMode && onAddChapterDivider && (
                           <button
                             onClick={() => onAddChapterDivider(index)}
                             className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
@@ -499,9 +596,9 @@ const Board: React.FC<BoardProps> = ({
                       >
                         {column.type === 'chapter-divider' && (
                           <div
-                            draggable
+                            draggable={!isPreviewMode}
                             onDragStart={() => handleChapterDragStart(column.chapterMarker.id)}
-                            className="absolute bottom-0 left-1/2 z-20 flex w-[112px] -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--theme-primary)]/20 bg-[var(--theme-card)] px-2.5 py-2 text-[var(--theme-primary)] shadow-xl cursor-grab active:cursor-grabbing"
+                            className={`absolute bottom-0 left-1/2 z-20 flex w-[112px] -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--theme-primary)]/20 bg-[var(--theme-card)] px-2.5 py-2 text-[var(--theme-primary)] shadow-xl ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                           >
                             <div className="flex h-6 w-3 flex-shrink-0 items-center justify-center rounded-full text-[var(--theme-primary)]/35">
                               <div className="h-4 w-1 rounded-full bg-current" />
@@ -509,15 +606,21 @@ const Board: React.FC<BoardProps> = ({
                             <input
                               className="min-w-0 flex-1 bg-transparent p-0 text-center text-xs font-black text-[var(--theme-primary)] handwritten border-none focus:ring-0"
                               value={column.chapterMarker.title}
-                              onChange={(e) => onRenameChapter?.(column.chapterMarker.id, e.target.value)}
+                              readOnly={isPreviewMode}
+                              onChange={(e) => {
+                                if (isPreviewMode) return;
+                                onRenameChapter?.(column.chapterMarker.id, e.target.value);
+                              }}
                             />
                             <button
+                              disabled={isPreviewMode}
                               onClick={() => {
+                                if (isPreviewMode) return;
                                 if (window.confirm('\u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05d4\u05e4\u05e8\u05e7? \u05d4\u05e1\u05e6\u05e0\u05d5\u05ea \u05dc\u05d0 \u05d9\u05d9\u05de\u05d7\u05e7\u05d5.')) {
                                   onDeleteChapter?.(column.chapterMarker.id);
                                 }
                               }}
-                              className="rounded-full p-1 text-[var(--theme-primary)]/35 transition-all hover:bg-red-50 hover:text-red-500"
+                              className="rounded-full p-1 text-[var(--theme-primary)]/35 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
                               title={'\u05de\u05d7\u05e7 \u05e4\u05e8\u05e7'}
                             >
                               <X size={14} />
@@ -533,7 +636,7 @@ const Board: React.FC<BoardProps> = ({
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleChapterDividerDrop(e, boardColumns.length)}
                   >
-                    {onAddChapterDivider && (
+                    {!isPreviewMode && onAddChapterDivider && (
                       <button
                         onClick={() => onAddChapterDivider(boardColumns.length)}
                         className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
@@ -545,7 +648,7 @@ const Board: React.FC<BoardProps> = ({
                 </div>
                 {/* Chapter Markers Layer */}
                 <div className="hidden">
-                  {project.chapterMarkers?.map(marker => (
+                  {boardProject.chapterMarkers?.map(marker => (
                     <div 
                       key={marker.id}
                       className="absolute top-0 bottom-0 border-r-2 border-dashed border-[var(--theme-primary)]/30 pointer-events-auto"
@@ -561,10 +664,18 @@ const Board: React.FC<BoardProps> = ({
                         <input 
                           className="min-w-0 flex-1 bg-transparent border-none focus:ring-0 text-xs lg:text-base font-black text-[var(--theme-primary)] p-0 handwritten"
                           value={marker.title}
-                          onChange={(e) => onUpdateChapterMarker(marker.id, { title: e.target.value })}
+                          readOnly={isPreviewMode}
+                          onChange={(e) => {
+                            if (isPreviewMode) return;
+                            onUpdateChapterMarker(marker.id, { title: e.target.value });
+                          }}
                         />
                         <button 
-                          onClick={() => onDeleteChapterMarker(marker.id)}
+                          disabled={isPreviewMode}
+                          onClick={() => {
+                            if (isPreviewMode) return;
+                            onDeleteChapterMarker(marker.id);
+                          }}
                           className="p-1.5 text-[var(--theme-primary)]/20 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                         >
                           <X size={16} />
@@ -581,10 +692,10 @@ const Board: React.FC<BoardProps> = ({
                 <div className="hidden">
                   <div className="absolute left-8 right-8 top-1/2 h-px -translate-y-1/2 bg-gray-300/80" />
                   {Array.from({ length: columnCount }).map((_, i) => {
-                    const hasMarker = project.chapterMarkers?.some(m => m.position === i);
+                    const hasMarker = boardProject.chapterMarkers?.some(m => m.position === i);
                     return (
                       <div key={i} className="relative w-44 flex-shrink-0 flex justify-center group/marker-btn">
-                        {!hasMarker && (
+                        {!hasMarker && !isPreviewMode && (
                           <button 
                             onClick={() => onAddChapterMarker(i)}
                             className="relative z-10 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-transparent text-[var(--theme-primary)]/20 hover:text-[var(--theme-primary)] transition-all"
@@ -627,7 +738,7 @@ const Board: React.FC<BoardProps> = ({
                         const sceneInThisSlot = column.type === 'scene' && column.scene.plotlineId === plotline.id
                           ? column.scene
                           : null;
-                        const isLinkedToPlotStructure = sceneInThisSlot && Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
+                        const isLinkedToPlotStructure = sceneInThisSlot && Object.values(boardProject.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
                         
                         return (
                           <React.Fragment key={`${plotline.id}-${column.id}-fragment`}>
@@ -637,11 +748,12 @@ const Board: React.FC<BoardProps> = ({
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleSceneSequenceDrop(e, index, plotline.id)}
                           >
-                            {onAddSceneInSequence && (
+                            {!isPreviewMode && onAddSceneInSequence && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  if (isPreviewMode) return;
                                   onAddSceneInSequence(plotline.id, index);
                                 }}
                                 className="absolute z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/50 text-[var(--theme-border)] opacity-0 shadow-md transition-all hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100 group-hover/plotline:opacity-100"
@@ -664,10 +776,14 @@ const Board: React.FC<BoardProps> = ({
                               </>
                             ) : sceneInThisSlot ? (
                               <div
-                                draggable
+                                data-board-scene-id={sceneInThisSlot.id}
+                                draggable={!isPreviewMode}
                                 onDragStart={() => handleDragStart(sceneInThisSlot.id)}
-                                onDoubleClick={() => onSceneDoubleClick?.(sceneInThisSlot.id)}
-                                className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm cursor-grab active:cursor-grabbing transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
+                                onDoubleClick={() => {
+                                  if (isPreviewMode) return;
+                                  onSceneDoubleClick?.(sceneInThisSlot.id);
+                                }}
+                                className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
                                 style={{ borderTopColor: plotline.color }}
                               >
                                 <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
@@ -688,7 +804,12 @@ const Board: React.FC<BoardProps> = ({
                                 )}
 
                                 <button 
-                                  onClick={(e) => { e.stopPropagation(); onDeleteScene(sceneInThisSlot.id); }}
+                                  disabled={isPreviewMode}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isPreviewMode) return;
+                                    onDeleteScene(sceneInThisSlot.id);
+                                  }}
                                   className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover/slot:opacity-100 transition-all"
                                   title="מחק סצנה"
                                 >
@@ -698,14 +819,22 @@ const Board: React.FC<BoardProps> = ({
                                 <input 
                                   className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
                                   value={sceneInThisSlot.title}
-                                  onChange={(e) => updateScene(sceneInThisSlot.id, { title: e.target.value })}
+                                  readOnly={isPreviewMode}
+                                  onChange={(e) => {
+                                    if (isPreviewMode) return;
+                                    updateScene(sceneInThisSlot.id, { title: e.target.value });
+                                  }}
                                 />
                                 <div className="h-px bg-[var(--theme-secondary)] my-3" />
                                 <textarea 
                                   className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
                                   value={sceneInThisSlot.summary || ''}
                                   placeholder="תמצית ההתרחשות..."
-                                  onChange={(e) => updateScene(sceneInThisSlot.id, { summary: e.target.value })}
+                                  readOnly={isPreviewMode}
+                                  onChange={(e) => {
+                                    if (isPreviewMode) return;
+                                    updateScene(sceneInThisSlot.id, { summary: e.target.value });
+                                  }}
                                 />
                                 {renderCharacterArcMarkers(sceneInThisSlot.id)}
                                 <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
@@ -714,9 +843,10 @@ const Board: React.FC<BoardProps> = ({
                                   </span>
                                 </div>
                               </div>
-                            ) : !onAddSceneInSequence ? (
+                            ) : !isPreviewMode && !onAddSceneInSequence ? (
                               <button 
                                 onClick={() => {
+                                  if (isPreviewMode) return;
                                   onAddScene(plotline.id, column.sceneOrderIndex);
                                 }}
                                 className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover/slot:opacity-100 group-hover/plotline:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
@@ -736,11 +866,12 @@ const Board: React.FC<BoardProps> = ({
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleSceneSequenceDrop(e, boardColumns.length, plotline.id)}
                       >
-                        {onAddSceneInSequence && (
+                        {!isPreviewMode && onAddSceneInSequence && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isPreviewMode) return;
                               onAddSceneInSequence(plotline.id, boardColumns.length);
                             }}
                             className="absolute z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/50 text-[var(--theme-border)] opacity-0 shadow-md transition-all hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100 group-hover/plotline:opacity-100"
@@ -765,7 +896,11 @@ const Board: React.FC<BoardProps> = ({
                         <input 
                           className="text-4xl font-black text-[var(--theme-primary)] handwritten tracking-widest uppercase bg-transparent border-none focus:ring-0 p-0 w-auto min-w-[300px]"
                           value={chapter.title}
-                          onChange={(e) => onUpdateChapterMarker(chapter.id, { title: e.target.value })}
+                          readOnly={isPreviewMode}
+                          onChange={(e) => {
+                            if (isPreviewMode) return;
+                            onUpdateChapterMarker(chapter.id, { title: e.target.value });
+                          }}
                         />
                       ) : (
                         <h2 className="text-4xl font-black text-[var(--theme-primary)] handwritten tracking-widest uppercase">
@@ -780,12 +915,16 @@ const Board: React.FC<BoardProps> = ({
 
                     <div className="flex flex-wrap gap-12 px-8">
                       {chapter.scenes.map((scene) => {
-                        const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
-                        const isLinkedToPlotStructure = Object.values(project.plotStructurePoints || {}).some(point => point.sceneId === scene.id);
+                        const plotline = boardProject.plotlines.find(p => p.id === scene.plotlineId);
+                        const isLinkedToPlotStructure = Object.values(boardProject.plotStructurePoints || {}).some(point => point.sceneId === scene.id);
                         return (
                           <div
                             key={scene.id}
-                            onDoubleClick={() => onSceneDoubleClick?.(scene.id)}
+                            data-board-scene-id={scene.id}
+                            onDoubleClick={() => {
+                              if (isPreviewMode) return;
+                              onSceneDoubleClick?.(scene.id);
+                            }}
                             className={`w-44 h-44 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative flex flex-col ${scene.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
                             style={{ borderTopColor: plotline?.color }}
                           >
@@ -809,14 +948,22 @@ const Board: React.FC<BoardProps> = ({
                             <input 
                               className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
                               value={scene.title}
-                              onChange={(e) => updateScene(scene.id, { title: e.target.value })}
+                              readOnly={isPreviewMode}
+                              onChange={(e) => {
+                                if (isPreviewMode) return;
+                                updateScene(scene.id, { title: e.target.value });
+                              }}
                             />
                             <div className="h-px bg-[var(--theme-secondary)] my-3" />
                             <textarea 
                               className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
                               value={scene.summary || ''}
                               placeholder="תמצית ההתרחשות..."
-                              onChange={(e) => updateScene(scene.id, { summary: e.target.value })}
+                              readOnly={isPreviewMode}
+                              onChange={(e) => {
+                                if (isPreviewMode) return;
+                                updateScene(scene.id, { summary: e.target.value });
+                              }}
                             />
                             {renderCharacterArcMarkers(scene.id)}
                             <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
@@ -865,8 +1012,12 @@ const Board: React.FC<BoardProps> = ({
           </div>
           {!isSummaryCollapsed && (
             <textarea 
-              value={project.summary || ''}
-              onChange={(e) => onUpdateSummary(e.target.value)}
+              value={boardProject.summary || ''}
+              readOnly={isPreviewMode}
+              onChange={(e) => {
+                if (isPreviewMode) return;
+                onUpdateSummary(e.target.value);
+              }}
               placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
               className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none text-lg leading-relaxed animate-in fade-in slide-in-from-bottom-2"
             />

@@ -71,6 +71,22 @@ describe('board history', () => {
     expect('sceneVersions' in snapshot).toBe(false);
   });
 
+  it('keeps bookSequence and chapter marker locations in a board snapshot', () => {
+    const book = {
+      ...createBook(),
+      bookSequence: [
+        { id: 'scene:s1', type: 'scene', sceneId: 's1' },
+        { id: 'chapter:c1', type: 'chapter-divider', chapterId: 'c1' },
+        { id: 'scene:s2', type: 'scene', sceneId: 's2' },
+      ],
+    } as Book;
+
+    const snapshot = createBoardSnapshot(book);
+
+    expect(snapshot.bookSequence).toEqual(book.bookSequence);
+    expect(snapshot.chapterMarkers).toEqual([{ id: 'c1', position: 1, title: 'Chapter' }]);
+  });
+
   it('detects board changes by comparing snapshots', () => {
     const before = createBoardSnapshot(createBook());
     const changedBook = {
@@ -137,7 +153,13 @@ describe('board history', () => {
   });
 
   it('does not create an automatic board version when leaving without board changes', () => {
-    const book = createBook();
+    const book = {
+      ...createBook(),
+      bookSequence: [
+        { id: 'scene:s1', type: 'scene' as const, sceneId: 's1' },
+        { id: 'scene:s2', type: 'scene' as const, sceneId: 's2' },
+      ],
+    };
     const baseline = createBoardSnapshot(book);
 
     expect(createAutomaticBoardVersionOnExit(book, baseline, 20, 'exit-version')).toBeNull();
