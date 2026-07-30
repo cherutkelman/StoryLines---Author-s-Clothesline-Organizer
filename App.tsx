@@ -2457,6 +2457,7 @@ const App: React.FC = () => {
                     onRenameChapter={renameChapter}
                     onDeleteChapter={deleteChapter}
                     onMoveChapterDivider={moveChapterDivider}
+                    onLoadBoardVersions={() => boardVersionStorage.loadBoardVersions(activeBook.id)}
                   />
                 </div>
               )}
