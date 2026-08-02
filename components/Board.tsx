@@ -8,6 +8,7 @@ import {
   formatBoardVersionTime,
   getBoardVersionDisplayName,
 } from '../src/board-version-history-ui';
+import { findBoardSnapshotScenesMissingFromCurrent } from '../src/board-deleted-scene-restore';
 import { getBoardSequenceColumns } from '../src/book-sequence';
 
 const INSERTION_SLOT_WIDTH = 40;
@@ -45,6 +46,7 @@ interface BoardProps {
   onMoveChapterDivider?: (chapterId: string, targetSequenceIndex: number) => void;
   onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
   onPreviewVersionChange?: (version: BoardVersion | null) => void;
+  onRestoreDeletedSceneFromVersion?: (version: BoardVersion, sceneId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
 }
 
 const Board: React.FC<BoardProps> = ({ 
@@ -73,7 +75,8 @@ const Board: React.FC<BoardProps> = ({
   onDeleteChapter,
   onMoveChapterDivider,
   onLoadBoardVersions,
-  onPreviewVersionChange
+  onPreviewVersionChange,
+  onRestoreDeletedSceneFromVersion
 }) => {
   const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
@@ -81,6 +84,9 @@ const Board: React.FC<BoardProps> = ({
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
+  const [restoringDeletedSceneId, setRestoringDeletedSceneId] = useState<string | null>(null);
+  const [deletedSceneRestoreError, setDeletedSceneRestoreError] = useState<string | null>(null);
+  const [restoredDeletedSceneIds, setRestoredDeletedSceneIds] = useState<Set<string>>(() => new Set());
   const boardRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const pinchGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
@@ -102,10 +108,50 @@ const Board: React.FC<BoardProps> = ({
 
   const closeBoardPreview = () => {
     setPreviewVersion(null);
+    setDeletedSceneRestoreError(null);
+    setRestoredDeletedSceneIds(new Set());
   };
 
   const showBoardPreview = (version: BoardVersion) => {
     setPreviewVersion(version);
+    setDeletedSceneRestoreError(null);
+    setRestoredDeletedSceneIds(new Set());
+  };
+
+  const currentSceneIds = useMemo(() => new Set(project.scenes.map(scene => scene.id)), [project.scenes]);
+  const missingPreviewSceneIds = useMemo(() => {
+    if (!previewVersion) return new Set<string>();
+    return new Set(findBoardSnapshotScenesMissingFromCurrent(previewVersion.snapshot, project).map(scene => scene.id));
+  }, [previewVersion, project]);
+
+  useEffect(() => {
+    setRestoredDeletedSceneIds(prev => {
+      const next = new Set([...prev].filter(sceneId => currentSceneIds.has(sceneId)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [currentSceneIds]);
+
+  const handleRestoreDeletedScene = async (sceneId: string) => {
+    if (!previewVersion || !onRestoreDeletedSceneFromVersion || restoringDeletedSceneId) return;
+
+    setRestoringDeletedSceneId(sceneId);
+    setDeletedSceneRestoreError(null);
+
+    try {
+      const result = await onRestoreDeletedSceneFromVersion(previewVersion, sceneId);
+      if (result.success) {
+        setRestoredDeletedSceneIds(prev => new Set(prev).add(sceneId));
+        return;
+      }
+      if (result.message) {
+        setDeletedSceneRestoreError(result.message);
+      }
+    } catch (error) {
+      console.warn('[BoardVersionHistory] Failed to restore deleted scene.', error);
+      setDeletedSceneRestoreError('לא ניתן היה להחזיר את הסצנה ללוח הנוכחי.');
+    } finally {
+      setRestoringDeletedSceneId(null);
+    }
   };
 
   const handleZoomChange = (newZoom: number) => {
@@ -552,6 +598,11 @@ const Board: React.FC<BoardProps> = ({
           >
             חזור ללוח הנוכחי
           </button>
+          {deletedSceneRestoreError && (
+            <span className="w-full text-xs font-black text-red-700">
+              {deletedSceneRestoreError}
+            </span>
+          )}
         </div>
       )}
 
@@ -775,74 +826,110 @@ const Board: React.FC<BoardProps> = ({
                                 <div className="relative z-10 h-16 w-8 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-md" />
                               </>
                             ) : sceneInThisSlot ? (
-                              <div
-                                data-board-scene-id={sceneInThisSlot.id}
-                                draggable={!isPreviewMode}
-                                onDragStart={() => handleDragStart(sceneInThisSlot.id)}
-                                onDoubleClick={() => {
-                                  if (isPreviewMode) return;
-                                  onSceneDoubleClick?.(sceneInThisSlot.id);
-                                }}
-                                className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
-                                style={{ borderTopColor: plotline.color }}
-                              >
-                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
-                                   <div className="w-1 h-1 bg-[var(--theme-primary)]/20 rounded-full" />
-                                   <div className="w-2 h-4 bg-[var(--theme-primary)]/5 rounded-full" />
-                                </div>
-                                
-                                {sceneInThisSlot.isCompleted && (
-                                  <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
-                                    <CheckCircle2 size={18} />
+                              (() => {
+                                const isDeletedFromCurrent = isPreviewMode && missingPreviewSceneIds.has(sceneInThisSlot.id);
+                                const isRestoredToCurrent = isPreviewMode && restoredDeletedSceneIds.has(sceneInThisSlot.id) && currentSceneIds.has(sceneInThisSlot.id);
+                                const isRestoringThisScene = restoringDeletedSceneId === sceneInThisSlot.id;
+
+                                return (
+                                  <div
+                                    data-board-scene-id={sceneInThisSlot.id}
+                                    draggable={!isPreviewMode}
+                                    onDragStart={() => handleDragStart(sceneInThisSlot.id)}
+                                    onDoubleClick={() => {
+                                      if (isPreviewMode) return;
+                                      onSceneDoubleClick?.(sceneInThisSlot.id);
+                                    }}
+                                    className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''} ${isDeletedFromCurrent ? 'ring-2 ring-red-200' : ''} ${isRestoredToCurrent ? 'ring-2 ring-green-200' : ''}`}
+                                    style={{ borderTopColor: plotline.color }}
+                                  >
+                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
+                                       <div className="w-1 h-1 bg-[var(--theme-primary)]/20 rounded-full" />
+                                       <div className="w-2 h-4 bg-[var(--theme-primary)]/5 rounded-full" />
+                                    </div>
+
+                                    {sceneInThisSlot.isCompleted && (
+                                      <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
+                                        <CheckCircle2 size={18} />
+                                      </div>
+                                    )}
+
+                                    {isLinkedToPlotStructure && (
+                                      <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
+                                        <Pin size={14} className="rotate-45" />
+                                      </div>
+                                    )}
+
+                                    {!isPreviewMode && (
+                                      <button
+                                        disabled={isPreviewMode}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isPreviewMode) return;
+                                          onDeleteScene(sceneInThisSlot.id);
+                                        }}
+                                        className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover/slot:opacity-100 transition-all"
+                                        title="מחק סצנה"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+
+                                    {isDeletedFromCurrent && (
+                                      <span className="absolute -top-3 -right-3 z-30 rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 shadow-sm">
+                                        נמחקה
+                                      </span>
+                                    )}
+
+                                    {isRestoredToCurrent && (
+                                      <span className="absolute -top-3 -right-3 z-30 rounded-full bg-green-50 px-2 py-1 text-[10px] font-black text-green-700 shadow-sm">
+                                        הוחזרה ללוח הנוכחי
+                                      </span>
+                                    )}
+
+                                    <input
+                                      className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
+                                      value={sceneInThisSlot.title}
+                                      readOnly={isPreviewMode}
+                                      onChange={(e) => {
+                                        if (isPreviewMode) return;
+                                        updateScene(sceneInThisSlot.id, { title: e.target.value });
+                                      }}
+                                    />
+                                    <div className="h-px bg-[var(--theme-secondary)] my-3" />
+                                    <textarea
+                                      className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
+                                      value={sceneInThisSlot.summary || ''}
+                                      placeholder="תמצית ההתרחשות..."
+                                      readOnly={isPreviewMode}
+                                      onChange={(e) => {
+                                        if (isPreviewMode) return;
+                                        updateScene(sceneInThisSlot.id, { summary: e.target.value });
+                                      }}
+                                    />
+                                    {renderCharacterArcMarkers(sceneInThisSlot.id)}
+                                    <div className="mt-auto pt-1 border-t border-amber-50/50 flex flex-col items-center gap-1">
+                                      {isDeletedFromCurrent && onRestoreDeletedSceneFromVersion ? (
+                                        <button
+                                          type="button"
+                                          disabled={isRestoringThisScene}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void handleRestoreDeletedScene(sceneInThisSlot.id);
+                                          }}
+                                          className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-black text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                          {isRestoringThisScene ? 'מחזירה...' : 'החזר סצנה ללוח הנוכחי'}
+                                        </button>
+                                      ) : (
+                                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
+                                          {plotline.name}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-
-                                {isLinkedToPlotStructure && (
-                                  <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
-                                    <Pin size={14} className="rotate-45" />
-                                  </div>
-                                )}
-
-                                <button 
-                                  disabled={isPreviewMode}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isPreviewMode) return;
-                                    onDeleteScene(sceneInThisSlot.id);
-                                  }}
-                                  className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover/slot:opacity-100 transition-all"
-                                  title="מחק סצנה"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-
-                                <input 
-                                  className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
-                                  value={sceneInThisSlot.title}
-                                  readOnly={isPreviewMode}
-                                  onChange={(e) => {
-                                    if (isPreviewMode) return;
-                                    updateScene(sceneInThisSlot.id, { title: e.target.value });
-                                  }}
-                                />
-                                <div className="h-px bg-[var(--theme-secondary)] my-3" />
-                                <textarea 
-                                  className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
-                                  value={sceneInThisSlot.summary || ''}
-                                  placeholder="תמצית ההתרחשות..."
-                                  readOnly={isPreviewMode}
-                                  onChange={(e) => {
-                                    if (isPreviewMode) return;
-                                    updateScene(sceneInThisSlot.id, { summary: e.target.value });
-                                  }}
-                                />
-                                {renderCharacterArcMarkers(sceneInThisSlot.id)}
-                                <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
-                                  <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
-                                    {plotline.name}
-                                  </span>
-                                </div>
-                              </div>
+                                );
+                              })()
                             ) : !isPreviewMode && !onAddSceneInSequence ? (
                               <button 
                                 onClick={() => {

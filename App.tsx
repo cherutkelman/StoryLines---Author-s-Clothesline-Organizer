@@ -57,7 +57,7 @@ import {
   AlertCircle,
   Menu
 } from 'lucide-react';
-import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot } from './types';
+import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot, BoardVersion } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
 import Questionnaires from './components/Questionnaires';
@@ -77,8 +77,13 @@ import {
   restoreSceneVersion,
 } from './src/scene-history';
 import { sceneVersionStorage } from './src/scene-version-storage';
-import { createAutomaticBoardVersionOnExit, createBoardSnapshot } from './src/board-history';
+import { createAutomaticBoardVersionOnExit, createBoardSnapshot, createBoardVersion } from './src/board-history';
 import { boardVersionStorage } from './src/board-version-storage';
+import {
+  chooseSceneVersionForDeletedSceneRestore,
+  getHistoricalChapterForScene,
+  restoreDeletedSceneFromBoardSnapshot,
+} from './src/board-deleted-scene-restore';
 import { logSceneHistoryDebug } from './src/scene-history-debug';
 import {
   addChapterDividerToBookSequence,
@@ -1146,6 +1151,88 @@ const App: React.FC = () => {
     const updates = addSceneToBookSequence(activeBook, newScene, targetSequenceIndex);
     if (!updates) return;
     updateActiveBook(updates);
+  };
+
+  const restoreDeletedBoardSceneFromVersion = async (version: BoardVersion, sceneId: string): Promise<{ success: boolean; message?: string }> => {
+    if (!activeBook || activeBook.id !== version.bookId) {
+      return { success: false, message: 'לא ניתן להחזיר את הסצנה כי הספר הפעיל אינו תואם לגרסה ההיסטורית.' };
+    }
+
+    const historicalScene = version.snapshot.scenes.find(scene => scene.id === sceneId);
+    if (!historicalScene) {
+      return { success: false, message: 'לא נמצאה סצנה מתאימה בגרסה ההיסטורית.' };
+    }
+
+    if (activeBook.scenes.some(scene => scene.id === sceneId)) {
+      return { success: true };
+    }
+
+    let textVersion: SceneVersion | null = null;
+    try {
+      textVersion = chooseSceneVersionForDeletedSceneRestore(
+        await loadSceneVersionsForScene(activeBook.id, sceneId, true)
+      );
+    } catch (error) {
+      console.warn('[BoardVersionHistory] Failed to load deleted scene text versions.', error);
+      return { success: false, message: 'לא ניתן היה לטעון את היסטוריית הטקסט של הסצנה.' };
+    }
+
+    if (!textVersion) {
+      window.alert('לא ניתן להחזיר את הסצנה כי לא נמצאה גרסת טקסט מלאה עבורה.');
+      return { success: false };
+    }
+
+    const historicalPlotline = version.snapshot.plotlines.find(plotline => plotline.id === historicalScene.plotlineId);
+    const targetPlotline = activeBook.plotlines.find(plotline => plotline.id === historicalScene.plotlineId) || activeBook.plotlines[0];
+    const historicalChapter = getHistoricalChapterForScene(version.snapshot, sceneId);
+    const targetChapterExists = Boolean(
+      historicalChapter && activeBook.chapterMarkers?.some(marker => marker.id === historicalChapter.id)
+    );
+
+    const confirmText = [
+      'הסצנה תחזור ללוח הנוכחי מתוך הגרסה ההיסטורית.',
+      'אם קיימת היסטוריית טקסט, התוכן האחרון שלה ישוחזר.',
+      '',
+      `שם הסצנה: ${historicalScene.title || textVersion.sceneTitle}`,
+      `גרסת טקסט: נמצאה (${new Date(textVersion.createdAt).toLocaleString('he-IL')})`,
+      `קו עלילה: ${targetPlotline?.name || historicalPlotline?.name || 'לא ידוע'}`,
+      `פרק: ${targetChapterExists ? historicalChapter?.title : 'מיקום בטוח בלוח הנוכחי'}`,
+    ].join('\n');
+
+    if (!window.confirm(confirmText)) {
+      return { success: false };
+    }
+
+    const restoreResult = restoreDeletedSceneFromBoardSnapshot(activeBook, version.snapshot, sceneId, textVersion);
+    if (restoreResult.status === 'already_exists') {
+      return { success: true };
+    }
+    if (restoreResult.status !== 'restored' || !restoreResult.updates) {
+      const messages: Record<string, string> = {
+        missing_snapshot_scene: 'לא נמצאה סצנה מתאימה בגרסה ההיסטורית.',
+        missing_text_version: 'לא נמצאה גרסת טקסט מלאה עבור הסצנה.',
+        missing_plotline: 'לא נמצא קו עלילה מתאים להחזרת הסצנה.',
+        restored: '',
+        already_exists: '',
+      };
+      return { success: false, message: messages[restoreResult.status] || 'לא ניתן היה להחזיר את הסצנה.' };
+    }
+
+    try {
+      await boardVersionStorage.saveBoardVersion(createBoardVersion({
+        book: activeBook,
+        versionType: 'manual',
+        reason: 'manual',
+        manualName: 'לפני החזרת סצנה שנמחקה',
+        id: uuidv4(),
+      }));
+    } catch (error) {
+      console.warn('[BoardVersionHistory] Failed to save backup before restoring deleted scene.', error);
+      return { success: false, message: 'לא ניתן היה ליצור גרסת גיבוי לפני החזרת הסצנה, ולכן השחזור לא בוצע.' };
+    }
+
+    updateActiveBook(restoreResult.updates);
+    return { success: true };
   };
 
   const updateScene = (id: string, updates: Partial<Scene>) => {
@@ -2458,6 +2545,7 @@ const App: React.FC = () => {
                     onDeleteChapter={deleteChapter}
                     onMoveChapterDivider={moveChapterDivider}
                     onLoadBoardVersions={() => boardVersionStorage.loadBoardVersions(activeBook.id)}
+                    onRestoreDeletedSceneFromVersion={restoreDeletedBoardSceneFromVersion}
                   />
                 </div>
               )}

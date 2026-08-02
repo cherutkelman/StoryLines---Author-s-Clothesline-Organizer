@@ -53,4 +53,26 @@ describe('board UI source', () => {
     expect(sidebarSource).not.toContain('onCompareVersion');
     expect(sidebarSource).not.toContain('השווה לגרסה הנוכחית');
   });
+
+  it('allows only deleted-scene restore actions inside historical board preview cards', () => {
+    const boardSource = readFileSync('components/Board.tsx', 'utf8');
+
+    expect(boardSource).toContain('findBoardSnapshotScenesMissingFromCurrent');
+    expect(boardSource).toContain('החזר סצנה ללוח הנוכחי');
+    expect(boardSource).toContain('הוחזרה ללוח הנוכחי');
+    expect(boardSource).not.toContain('שחזר שם');
+    expect(boardSource).not.toContain('שחזר מיקום');
+    expect(boardSource).not.toContain('שחזר החלפה');
+  });
+
+  it('backs up the current board before restoring a deleted scene', () => {
+    const appSource = readFileSync('App.tsx', 'utf8');
+    const backupIndex = appSource.indexOf('boardVersionStorage.saveBoardVersion(createBoardVersion');
+    const updateIndex = appSource.indexOf('updateActiveBook(restoreResult.updates)');
+
+    expect(appSource).toContain('window.confirm(confirmText)');
+    expect(backupIndex).toBeGreaterThan(-1);
+    expect(updateIndex).toBeGreaterThan(-1);
+    expect(backupIndex).toBeLessThan(updateIndex);
+  });
 });
