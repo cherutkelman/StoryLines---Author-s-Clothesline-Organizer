@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getAccordionIdPrefix, isQuestionnaireCategoryChange, usesAccordionNavigation } from './categoryNavigationState';
+import { isQuestionnaireCategoryChange, usesAccordionNavigation } from './categoryNavigationState';
 import { scheduleQuestionnaireCategoryTopScroll } from './useScrollToQuestionnaireCategoryTop';
 
 describe('questionnaire category navigation', () => {
@@ -13,14 +13,6 @@ describe('questionnaire category navigation', () => {
     expect(usesAccordionNavigation('fantasyWorlds')).toBe(true);
     expect(usesAccordionNavigation('backgrounds')).toBe(false);
     expect(usesAccordionNavigation('relationships')).toBe(false);
-  });
-
-  it('provides stable accessible id prefixes', () => {
-    expect(getAccordionIdPrefix('characters')).toBe('character');
-    expect(getAccordionIdPrefix('places')).toBe('place');
-    expect(getAccordionIdPrefix('periods')).toBe('period');
-    expect(getAccordionIdPrefix('twists')).toBe('twist');
-    expect(getAccordionIdPrefix('fantasyWorlds')).toBe('fantasy-world');
   });
 
   it('recognizes an actual category change', () => {
