@@ -127,6 +127,7 @@ export const TWIST_QUESTIONS = [
   { id: "truth_moment", category: "טוויסט", question: "מה קורה ברגע האמת:", type: "textarea" },
   { id: "clues", category: "טוויסט", question: "אילו רמזים מקדימים נמצאים בטקסט:", type: "textarea" },
   { id: "immediate_impact", category: "טוויסט", question: "איך השינוי משפיע באופן מיידי על הסיפור:", type: "textarea" },
+  { id: "immediate_impact_caractor", category: "טוויסט", question: "איך השינוי משפיע באופן מיידי על הדמויות:", type: "textarea" },
   { id: "long_term_impact", category: "טוויסט", question: "אילו השלכות יש לטוויסט בטווח הארוך:", type: "textarea" },
   { id: "next_twist", category: "טוויסט", question: "האם ואיך זה מוביל לטוויסט הבא:", type: "textarea" },
   { id: "mention_for_end", category: "טוויסט", question: "מה צריך להיות מוזכר במהלך הטוויסט כדי לוודא הגעה לסוף הרצוי:", type: "textarea" }

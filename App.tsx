@@ -64,7 +64,7 @@ import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
 import AuthDebugPanel from './components/AuthDebugPanel';
-import { MAP_NAV_ITEMS, type MapTabId } from './components/mapNavigation';
+import { MAP_NAV_ITEMS, MAPS_AREA_LABEL, MAPS_AREA_SHORT_LABEL, type MapTabId } from './components/mapNavigation';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './components/questionnaireNavigation';
 import { logAuthDebugEvent, shortUid } from './src/authDebug';
 import {
@@ -108,7 +108,7 @@ const NAV_ITEMS: { id: AppView; icon: React.ElementType; label: string; shortLab
   { id: 'planning', icon: Layout, label: 'תכנון עלילה', shortLabel: 'תכנון' },
   { id: 'board', icon: Layout, label: 'לוח עלילה', shortLabel: 'לוח' },
   { id: 'editor', icon: LucideType, label: 'עורך טקסט', shortLabel: 'כתיבה' },
-  { id: 'maps', icon: MapIcon, label: 'מפות', shortLabel: 'מפות' },
+  { id: 'maps', icon: MapIcon, label: MAPS_AREA_LABEL, shortLabel: MAPS_AREA_SHORT_LABEL },
   { id: 'questionnaires', icon: ListChecks, label: 'שאלונים', shortLabel: 'שאלונים' },
 ];
 
