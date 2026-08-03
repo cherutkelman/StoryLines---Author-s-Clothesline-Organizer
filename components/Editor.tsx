@@ -1,70 +1,30 @@
 
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Project, Scene, QuestionnaireEntry, SceneVersion, SceneVersionReason } from '../types';
+import { Scene, QuestionnaireEntry } from '../types';
 import { canDeleteSceneVersion, diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
 import { getBookSequenceDisplayItems } from '../src/book-sequence';
 import { relationshipQuestionSections } from './relationshipQuestions';
+import { EditorProps } from './editor/editorTypes';
+import { formatVersionDate, formatVersionTime, getVersionReasonLabel, getVersionTypeLabel } from './editor/editorHistoryHelpers';
+import EditorToolbar from './editor/EditorToolbar';
+import EditorSceneList from './editor/EditorSceneList';
+import EditorHistoryPanel from './editor/EditorHistoryPanel';
 import { 
   BookOpen, 
   CheckCircle2, 
   Circle, 
   Hash, 
   CopyPlus, 
-  Maximize2, 
-  Minimize2, 
-  ChevronDown,
-  AlignJustify,
-  Focus,
   UserCircle2,
   Search,
   ArrowRight,
   X,
   MapPin,
-  Pencil,
-  Plus,
-  Download,
   Trash2,
-  Flag,
-  Info,
   FileText,
-  Users,
-  History,
-  RotateCcw,
-  GitCompare,
-  ClipboardCopy,
-  Save
+  Users
 } from 'lucide-react';
-
-interface EditorProps {
-  project: Project;
-  bookId: string;
-  user: any;
-  visiblePlotlines: string[];
-  onUpdateScene: (id: string, updates: Partial<Scene>) => void;
-  onDeleteScene: (id: string) => void;
-  onOpenBulkAdd: () => void;
-  initialFocusedSceneId?: string | null;
-  onFocusScene?: (id: string | null, previousSceneSnapshot?: Scene) => Promise<void> | void;
-  initialExpandedSceneIds?: string[];
-  onExpandedScenesChange?: (ids: string[]) => void;
-  initialDisplayMode?: 'full' | 'focus';
-  onDisplayModeChange?: (mode: 'full' | 'focus') => void;
-  onExport?: () => void;
-  sceneVersions?: SceneVersion[];
-  onLoadSceneVersions?: (sceneId: string) => Promise<number> | number;
-  onCreateManualSceneVersion?: (sceneId: string, name?: string, note?: string) => void;
-  onRestoreSceneVersion?: (sceneId: string, versionId: string) => void;
-  onCopySceneVersion?: (versionId: string) => Promise<void> | void;
-  onDeleteSceneVersion?: (versionId: string) => Promise<void> | void;
-  onRenameSceneVersion?: (versionId: string, name?: string) => Promise<void> | void;
-  onUpdateChapterMarker?: (id: string, updates: any) => void;
-  isLibrarySidebarCollapsed?: boolean;
-  externalSearchQuery?: string;
-  onExternalSearchQueryChange?: (value: string) => void;
-  externalCommand?: { action: 'tips'; nonce: number } | null;
-  appActiveSceneId?: string | null;
-}
 
 const AutoExpandingTextarea: React.FC<{
   value: string;
@@ -207,28 +167,6 @@ const DebouncedInput: React.FC<{
     />
   );
 };
-
-const getVersionReasonLabel = (reason: SceneVersionReason): string => {
-  const labels: Record<SceneVersionReason, string> = {
-    typing_pause: 'הפסקה בכתיבה',
-    scene_change: 'מעבר לסצנה אחרת',
-    page_navigation: 'מעבר למסך אחר',
-    before_delete: 'לפני מחיקה',
-    manual: 'שמירה ידנית',
-    restore: 'לפני שחזור',
-  };
-  return labels[reason];
-};
-
-const getVersionTypeLabel = (version: SceneVersion): string => {
-  if (version.versionType === 'manual') return 'ידנית';
-  if (version.versionType === 'before_delete') return 'לפני מחיקה';
-  if (version.versionType === 'restored') return 'שוחזרה';
-  return 'אוטומטית';
-};
-
-const formatVersionDate = (createdAt: number) => new Date(createdAt).toLocaleDateString('he-IL');
-const formatVersionTime = (createdAt: number) => new Date(createdAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
 
 const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
@@ -646,10 +584,6 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     }
   };
 
-  const isInteractiveElement = (target: EventTarget | null) => {
-    return target instanceof HTMLElement && Boolean(target.closest('button, input, textarea, select, a'));
-  };
-
   const getCharacterName = (characterId: string) => {
     return project.characters?.find(character => character.id === characterId)?.name || 'דמות ללא שם';
   };
@@ -748,139 +682,28 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-8 relative">
-      <div className="sticky top-4 z-40 mb-12 flex flex-col items-center gap-4">
-        <div className="bg-[var(--theme-primary)]/90 backdrop-blur-md text-[var(--theme-bg)] px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-6 border border-[var(--theme-primary)]/50">
-          <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg shadow-sm">
-            <Hash size={16} className="opacity-70" />
-            <span className="text-sm font-black tabular-nums">{totalWords.toLocaleString()} מילים</span>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-1 bg-black/10 p-1 rounded-lg">
-            <button onClick={() => handleDisplayModeChange('focus')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'focus' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><Focus size={14} /><span>מיקוד</span></button>
-            <button onClick={() => handleDisplayModeChange('full')} className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === 'full' ? 'bg-[var(--theme-bg)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-bg)]/60 hover:text-[var(--theme-bg)]'}`}><AlignJustify size={14} /><span>מלא</span></button>
-          </div>
-
-          <div className="hidden sm:block w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
-
-          <div className="flex items-center gap-2">
-            {isSearchOpen ? (
-              <div className="hidden sm:flex items-center bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg px-3 py-1.5 shadow-sm animate-in fade-in slide-in-from-right-2">
-                <Search size={14} className="opacity-70 mr-2" />
-                <input 
-                  autoFocus
-                  value={activeSearchQuery}
-                  onChange={(e) => updateSearchQuery(e.target.value)}
-                  placeholder="חפש מילים..."
-                  className="bg-transparent border-none focus:ring-0 text-xs text-[var(--theme-primary)] placeholder:text-[var(--theme-primary)]/40 w-32"
-                />
-                <button onClick={() => { setIsSearchOpen(false); updateSearchQuery(''); }} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] ml-2">
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setIsSearchOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-                title="חיפוש"
-              >
-                <Search size={14} />
-                <span>חיפוש</span>
-              </button>
-            )}
-            
-            <button 
-              onClick={onOpenBulkAdd}
-              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-              title="הוספת סצנות חדשות"
-            >
-              <Plus size={14} />
-              <span>סצנה חדשה</span>
-            </button>
-            <button 
-              onClick={() => setBridgeType('characters')} 
-              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
-              title="שליפת מידע מהשאלונים"
-            >
-              <BookOpen size={14} />
-              <span>שלוף משאלון</span>
-            </button>
-            <div className="hidden sm:block w-px h-6 bg-[var(--theme-bg)]/10 mx-1" />
-            <button 
-              onClick={onExport}
-              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
-              title="ייצוא כתב יד"
-            >
-              <Download size={14} />
-              <span>ייצוא</span>
-            </button>
-            <button
-              onClick={handleHistoryButtonClick}
-              disabled={!resolvedHistorySceneId}
-              className={`flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold transition-all shadow-sm ${resolvedHistorySceneId ? 'hover:opacity-80' : 'opacity-40 cursor-not-allowed'}`}
-              title="היסטוריית גרסאות"
-            >
-              <History size={14} />
-              <span>היסטוריית גרסאות</span>
-            </button>
-            <button 
-              onClick={() => setIsInfoModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg text-xs font-bold hover:opacity-80 transition-all shadow-sm"
-              title="מידע על כתיבה"
-            >
-              <Info size={14} />
-              <span>טיפים</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {activeSequenceItems.map((item, idx) => {
-          if (item.type === 'chapter-divider') {
-            return (
-              <div key={item.id} className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
-                <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
-                  <Flag size={20} />
-                </div>
-                <div className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest">
-                  {item.chapterMarker.title}
-                </div>
-              </div>
-            );
-          }
-
-          const scene = item.scene;
-          const plotline = project.plotlines.find(p => p.id === scene.plotlineId);
-          const isExpanded = displayMode === 'full' || expandedSceneIds.includes(scene.id);
-
-          return (
-            <React.Fragment key={scene.id}>
-              <article
-                className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
-                style={{ borderRightColor: plotline?.color }}
-                onClick={(event) => {
-                  if (displayMode === 'full' || isInteractiveElement(event.target)) return;
-                  void toggleSceneExpanded(scene.id);
-                }}
-              >
-                {!isExpanded ? (
-                  <div className={`group flex items-center justify-between bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${scene.isCompleted ? 'bg-green-50/20' : ''}`}>
-                    <div className="flex items-center gap-4">
-                      <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
-                      <div className="flex flex-col">
-                        <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
-                        {scene.summary && (
-                          <p className="mt-0.5 max-w-md truncate text-[11px] font-medium text-[var(--theme-primary)]/40">
-                            {scene.summary}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-primary)]/30 px-2 py-0.5 bg-[var(--theme-secondary)] rounded">{plotline?.name}</span>
-                      {scene.isCompleted && <CheckCircle2 size={16} className="text-green-500" />}
-                    </div>
-                    <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
-                  </div>
-                ) : (
+      <EditorToolbar
+        totalWords={totalWords}
+        displayMode={displayMode}
+        isSearchOpen={isSearchOpen}
+        searchQuery={activeSearchQuery}
+        hasActiveScene={Boolean(resolvedHistorySceneId)}
+        onDisplayModeChange={handleDisplayModeChange}
+        onSearchOpenChange={setIsSearchOpen}
+        onSearchQueryChange={updateSearchQuery}
+        onOpenBulkAdd={onOpenBulkAdd}
+        onOpenQuestionnaireBridge={() => setBridgeType('characters')}
+        onExport={onExport}
+        onOpenHistory={handleHistoryButtonClick}
+        onOpenTips={() => setIsInfoModalOpen(true)}
+      />
+      <EditorSceneList
+        items={activeSequenceItems}
+        plotlines={project.plotlines}
+        displayMode={displayMode}
+        expandedSceneIds={expandedSceneIds}
+        onSelectScene={toggleSceneExpanded}
+        renderExpandedScene={(scene, plotline) => (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <header className="flex items-center justify-between mb-4">
                     <div className="flex-1 flex items-center gap-4">
@@ -949,276 +772,27 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                     />
 
                 </div>
-              )}
-            </article>
-          </React.Fragment>
-          );
-        })}
-      </div>
+        )}
+      />
 
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] flex justify-end bg-black/35 backdrop-blur-sm" dir="rtl">
-          <button
-            className="absolute inset-0 cursor-default"
-            onClick={() => setIsHistoryOpen(false)}
-            aria-label="סגור היסטוריית גרסאות"
-          />
-          <aside className="relative h-full w-full max-w-5xl bg-[var(--theme-card)] shadow-2xl border-r border-[var(--theme-border)] flex flex-col">
-            <header className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] px-6 py-5 bg-[var(--theme-secondary)]/20">
-              <div className="min-w-0">
-                <h2 className="text-xl font-black text-[var(--theme-primary)]">היסטוריית גרסאות</h2>
-                <p className="truncate text-sm font-bold text-[var(--theme-primary)]/50">
-                  {historyScene?.title || 'סצנה ללא כותרת'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsManualVersionFormOpen(true)}
-                  disabled={!historyScene}
-                  className="flex items-center gap-2 rounded-lg bg-[var(--theme-primary)] px-4 py-2 text-xs font-bold text-[var(--theme-card)] transition-all hover:opacity-90 disabled:opacity-40"
-                >
-                  <Save size={14} />
-                  <span>שמור גרסה</span>
-                </button>
-                <button onClick={() => setIsHistoryOpen(false)} className="p-2 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]">
-                  <X size={24} />
-                </button>
-              </div>
-            </header>
-
-            {historyScene ? (
-              <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[320px_1fr]">
-                <section className="min-h-0 overflow-y-auto border-l border-[var(--theme-border)] bg-[var(--theme-secondary)]/10 p-4">
-                  <div className="mb-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="text-sm font-black text-[var(--theme-primary)]">הגרסה הנוכחית</span>
-                      <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-black text-green-700">פעילה</span>
-                    </div>
-                    <div className="text-xs font-bold text-[var(--theme-primary)]/45">
-                      {historyScene.content.length.toLocaleString()} תווים
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {historyVersions.map(version => {
-                      const isSelected = selectedVersion?.id === version.id;
-                      const isCurrentSource = historyScene.restoredFromVersionId === version.id;
-
-                      return (
-                        <button
-                          key={version.id}
-                          onClick={() => {
-                            setSelectedVersionId(version.id);
-                            setHistoryMode('view');
-                          }}
-                          className={`w-full rounded-lg border p-3 text-right transition-all ${
-                            isSelected
-                              ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-sm'
-                              : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-primary)] hover:border-[var(--theme-accent)]'
-                          }`}
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <span className="text-sm font-black">{formatVersionDate(version.createdAt)}</span>
-                            <span className={`rounded px-2 py-0.5 text-[10px] font-black ${isSelected ? 'bg-white/20' : 'bg-[var(--theme-secondary)]'}`}>
-                              {getVersionTypeLabel(version)}
-                            </span>
-                          </div>
-                          <div className={`text-xs font-bold ${isSelected ? 'text-[var(--theme-card)]/70' : 'text-[var(--theme-primary)]/50'}`}>
-                            {formatVersionTime(version.createdAt)} · {getVersionReasonLabel(version.reason)}
-                          </div>
-                          {version.name && (
-                            <div className={`mt-2 truncate text-xs font-black ${isSelected ? 'text-[var(--theme-card)]' : 'text-[var(--theme-primary)]'}`}>
-                              {version.name}
-                            </div>
-                          )}
-                          {isCurrentSource && (
-                            <div className={`mt-2 text-[10px] font-black ${isSelected ? 'text-[var(--theme-card)]/80' : 'text-green-700'}`}>
-                              מקור הגרסה הנוכחית
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {historyVersions.length === 0 && (
-                    <div className="rounded-lg border border-dashed border-[var(--theme-border)] p-8 text-center text-sm font-bold text-[var(--theme-primary)]/35">
-                      עדיין אין גרסאות שמורות לסצנה הזו.
-                    </div>
-                  )}
-                </section>
-
-                <section className="min-h-0 overflow-y-auto p-6">
-                  {isManualVersionFormOpen && (
-                    <div className="mb-5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/15 p-4">
-                      <div className="mb-3 text-sm font-black text-[var(--theme-primary)]">שמירת גרסה ידנית</div>
-                      <div className="grid gap-3">
-                        <input
-                          value={manualVersionName}
-                          onChange={(event) => setManualVersionName(event.target.value)}
-                          placeholder="שם קצר לגרסה"
-                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-accent)]"
-                        />
-                        <textarea
-                          value={manualVersionNote}
-                          onChange={(event) => setManualVersionNote(event.target.value)}
-                          placeholder="הערה אופציונלית"
-                          rows={3}
-                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-accent)]"
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleCreateManualVersion}
-                            className="rounded-lg bg-[var(--theme-primary)] px-4 py-2 text-xs font-bold text-[var(--theme-card)]"
-                          >
-                            שמור
-                          </button>
-                          <button
-                            onClick={() => setIsManualVersionFormOpen(false)}
-                            className="rounded-lg px-4 py-2 text-xs font-bold text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]"
-                          >
-                            ביטול
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedVersion ? (
-                    <div className="space-y-5">
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
-                        <div>
-                          <div className="text-sm font-black text-[var(--theme-primary)]">
-                            {formatVersionDate(selectedVersion.createdAt)} · {formatVersionTime(selectedVersion.createdAt)}
-                          </div>
-                          <div className="text-xs font-bold text-[var(--theme-primary)]/50">
-                            {getVersionTypeLabel(selectedVersion)} · {getVersionReasonLabel(selectedVersion.reason)}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            onClick={() => setHistoryMode('view')}
-                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${historyMode === 'view' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
-                          >
-                            <FileText size={14} />
-                            <span>הצג</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCopiedVersionNoticeId(null);
-                              setHistoryMode('compare');
-                            }}
-                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${historyMode === 'compare' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
-                          >
-                            <GitCompare size={14} />
-                            <span>השווה לנוכחי</span>
-                          </button>
-                          <button
-                            onClick={handleRestoreVersion}
-                            className="flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800"
-                          >
-                            <RotateCcw size={14} />
-                            <span>שחזר</span>
-                          </button>
-                          <button
-                            onClick={() => { void handleCopyVersion(); }}
-                            className="flex items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-3 py-2 text-xs font-bold text-[var(--theme-primary)]"
-                          >
-                            <ClipboardCopy size={14} />
-                            <span>צור עותק</span>
-                          </button>
-                          {historyMode === 'view' && (
-                            <button
-                              onClick={openRenameVersionDialog}
-                              disabled={Boolean(renamingVersionId)}
-                              className="flex items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-3 py-2 text-xs font-bold text-[var(--theme-primary)] disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Pencil size={14} />
-                              <span>שנה שם</span>
-                            </button>
-                          )}
-                          {historyMode === 'view' && selectedVersionCanBeDeleted && (
-                            <button
-                              onClick={openDeleteVersionConfirmation}
-                              disabled={Boolean(deletingVersionId)}
-                              className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Trash2 size={14} />
-                              <span>מחק גרסה</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {historyMode === 'compare' && !hasComparisonChanges && (
-                        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/30 p-4 text-center text-sm font-black text-[var(--theme-primary)]">
-                          אין הבדלים בין הגרסאות.
-                        </div>
-                      )}
-
-                      {historyMode === 'view' && copiedVersionNoticeId === selectedVersion.id && (
-                        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-secondary)]/30 p-4 text-center text-sm font-black text-[var(--theme-primary)]">
-                          נוצר עותק.
-                        </div>
-                      )}
-
-                      {deleteVersionError && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm font-black text-red-700">
-                          {deleteVersionError}
-                        </div>
-                      )}
-
-                      {renameVersionError && !renameCandidateVersion && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm font-black text-red-700">
-                          {renameVersionError}
-                        </div>
-                      )}
-
-                      {selectedVersion.name && (
-                        <div className="rounded-lg bg-[var(--theme-secondary)]/30 p-3 text-sm font-bold text-[var(--theme-primary)]">
-                          {selectedVersion.name}
-                        </div>
-                      )}
-                      {selectedVersion.note && (
-                        <div className="rounded-lg bg-[var(--theme-secondary)]/20 p-3 text-sm leading-relaxed text-[var(--theme-primary)]/70">
-                          {selectedVersion.note}
-                        </div>
-                      )}
-
-                      {historyMode === 'view' ? (
-                        <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
-                          {selectedVersion.content || 'אין תוכן בגרסה הזו.'}
-                        </article>
-                      ) : (
-                        <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
-                          {comparisonParts.map((part, index) => {
-                            if (part.type === 'added') {
-                              return <ins key={index} className="bg-green-100 text-green-800 no-underline">{part.text}</ins>;
-                            }
-                            if (part.type === 'removed') {
-                              return <del key={index} className="bg-red-100 text-red-800">{part.text}</del>;
-                            }
-                            return <span key={index}>{part.text}</span>;
-                          })}
-                        </article>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--theme-border)] p-10 text-center text-sm font-bold text-[var(--theme-primary)]/35">
-                      בחרי גרסה מהרשימה או שמרי גרסה ידנית חדשה.
-                    </div>
-                  )}
-                </section>
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-center p-10 text-center text-sm font-bold text-[var(--theme-primary)]/35">
-                אין סצנה פעילה להצגת היסטוריה.
-              </div>
-            )}
-          </aside>
-        </div>
+        <EditorHistoryPanel
+          historyScene={historyScene} historyVersions={historyVersions} selectedVersion={selectedVersion}
+          selectedVersionCanBeDeleted={selectedVersionCanBeDeleted} historyMode={historyMode}
+          comparisonParts={comparisonParts} hasComparisonChanges={hasComparisonChanges}
+          copiedVersionNoticeId={copiedVersionNoticeId} deletingVersionId={deletingVersionId}
+          renamingVersionId={renamingVersionId} deleteVersionError={deleteVersionError}
+          renameVersionError={renameVersionError} renameCandidateVersion={renameCandidateVersion}
+          isManualVersionFormOpen={isManualVersionFormOpen} manualVersionName={manualVersionName}
+          manualVersionNote={manualVersionNote} setIsHistoryOpen={setIsHistoryOpen}
+          setIsManualVersionFormOpen={setIsManualVersionFormOpen} setManualVersionName={setManualVersionName}
+          setManualVersionNote={setManualVersionNote} setSelectedVersionId={setSelectedVersionId}
+          setHistoryMode={setHistoryMode} setCopiedVersionNoticeId={setCopiedVersionNoticeId}
+          handleCreateManualVersion={handleCreateManualVersion} handleRestoreVersion={handleRestoreVersion}
+          handleCopyVersion={handleCopyVersion} openRenameVersionDialog={openRenameVersionDialog}
+          openDeleteVersionConfirmation={openDeleteVersionConfirmation}
+        />
       )}
-
       {deleteCandidateVersion && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
