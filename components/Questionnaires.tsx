@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
@@ -8,7 +8,6 @@ import {
   Search,
   Zap,
   Users,
-  PanelLeftClose,
   PanelLeftOpen,
   MessageSquarePlus,
   Image as ImageIcon,
@@ -18,6 +17,11 @@ import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { compressImageFile } from '../src/image-utils';
 import { QUESTIONNAIRE_NAV_ITEMS, type QuestionnaireTabId } from './questionnaireNavigation';
 import RelationshipQuestionnaire from './RelationshipQuestionnaire';
+import QuestionnaireFields from './questionnaires/QuestionnaireFields';
+import { CategoryActions, CategorySidebar, MobileCategorySelect } from './questionnaires/QuestionnaireCategoryNavigation';
+import { useScrollToQuestionnaireCategoryTop } from './questionnaires/useScrollToQuestionnaireCategoryTop';
+import { getAccordionIdPrefix, isQuestionnaireCategoryChange, usesAccordionNavigation } from './questionnaires/categoryNavigationState';
+import QuestionnaireAccordion from './questionnaires/QuestionnaireAccordion';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -277,6 +281,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [mode, setMode] = useState<'edit' | 'view'>('view');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
+  const { categoryTopRef, scrollToCategoryTop } = useScrollToQuestionnaireCategoryTop<HTMLDivElement>();
+  const accordionCategoryAnchorsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   
   const [newQuestionLabel, setNewQuestionLabel] = useState('');
 
@@ -351,6 +357,31 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   }
 
   const currentCategory = activeCategory || categories[currentCategoryIndex] || categories[0];
+  const usesQuestionnaireAccordion = usesAccordionNavigation(activeTab);
+
+  const handleCategorySelect = (index: number) => {
+    if (!isQuestionnaireCategoryChange({
+      mode,
+      categories,
+      currentCategoryIndex,
+      activeCategory,
+      nextIndex: index,
+    })) return;
+
+    setCurrentCategoryIndex(index);
+    setActiveCategory(mode === 'edit' ? null : categories[index]);
+    scrollToCategoryTop(
+      usesQuestionnaireAccordion
+        ? accordionCategoryAnchorsRef.current[categories[index]]
+        : null,
+    );
+  };
+
+  const handleShowAllCategories = () => {
+    if (activeCategory === null) return;
+    setActiveCategory(null);
+    scrollToCategoryTop();
+  };
 
   const Icon = activeTab === 'characters' ? User : activeTab === 'relationships' ? Users : activeTab === 'places' ? MapPin : activeTab === 'periods' ? Clock : activeTab === 'twists' ? Zap : activeTab === 'fantasyWorlds' ? Wand2 : FileText;
   const addEntryLabel = isRelationshipsTab
@@ -804,31 +835,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         <ChevronDown size={18} className="pointer-events-none absolute left-4 text-[var(--theme-primary)]/50" />
       </label>
 
-      {selectedEntry && categories.length > 0 && (
-        <label className="relative flex w-full items-center lg:hidden">
-          <LayoutList size={18} className="pointer-events-none absolute right-4 text-[var(--theme-primary)]/60" />
-          <select
-            value={mode === 'edit' ? String(currentCategoryIndex) : (activeCategory ? String(categories.indexOf(activeCategory)) : '')}
-            onChange={(e) => {
-              if (e.target.value === '') {
-                setActiveCategory(null);
-                return;
-              }
-
-              const nextIndex = Number(e.target.value);
-              setCurrentCategoryIndex(nextIndex);
-              setActiveCategory(mode === 'edit' ? null : categories[nextIndex]);
-            }}
-            className="w-full appearance-none rounded-2xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] py-3.5 pr-12 pl-10 text-sm font-bold text-[var(--theme-primary)] shadow-sm outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/15"
-            aria-label="קטגוריות"
-          >
-            <option value={currentCategoryIndex}>קטגוריות</option>
-            {categories.map((cat, index) => (
-              <option key={cat} value={index}>{cat}</option>
-            ))}
-          </select>
-          <ChevronDown size={18} className="pointer-events-none absolute left-4 text-[var(--theme-primary)]/50" />
-        </label>
+      {selectedEntry && categories.length > 0 && !usesQuestionnaireAccordion && (
+        <MobileCategorySelect
+          categories={categories}
+          currentCategoryIndex={currentCategoryIndex}
+          activeCategory={activeCategory}
+          mode={mode}
+          onSelect={handleCategorySelect}
+          onShowAll={handleShowAllCategories}
+        />
       )}
 
       <div className="flex-none flex flex-col lg:flex-1 lg:flex-row gap-6 lg:min-h-0">
@@ -995,35 +1010,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           </div>
         </div>
 
-        {selectedEntry && mode === 'edit' && isCategoriesVisible && (
-          <div className="hidden w-56 flex-col gap-2 flex-shrink-0 animate-in slide-in-from-right-4 duration-300 lg:flex">
-             <div className="p-2 text-[10px] font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-2 px-4 flex items-center justify-between">
-                <span>קטגוריות שאלון</span>
-                <button onClick={() => setIsCategoriesVisible(false)} className="text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"><X size={14} /></button>
-             </div>
-             <button 
-                onClick={() => setActiveCategory(null)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all ${activeCategory === null ? 'bg-[var(--theme-secondary)] text-[var(--theme-accent)] shadow-sm' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
-             >
-                <LayoutList size={14} />
-                <span>הכל</span>
-             </button>
-             {categories.map((cat, index) => (
-               <button 
-                  key={cat}
-                  onClick={() => {
-                    if (mode === 'edit') {
-                      setCurrentCategoryIndex(index);
-                    } else {
-                      setActiveCategory(cat);
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-right transition-all ${currentCategoryIndex === index ? 'bg-[var(--theme-secondary)] text-[var(--theme-accent)] shadow-sm' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
-               >
-                  <span>{cat}</span>
-               </button>
-             ))}
-          </div>
+        {selectedEntry && mode === 'edit' && isCategoriesVisible && !usesQuestionnaireAccordion && (
+          <CategorySidebar
+            categories={categories}
+            currentCategoryIndex={currentCategoryIndex}
+            activeCategory={activeCategory}
+            onClose={() => setIsCategoriesVisible(false)}
+            onSelect={handleCategorySelect}
+            onShowAll={handleShowAllCategories}
+          />
         )}
 
         <div className="flex-none lg:flex-1 bg-[var(--theme-card)] rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-visible lg:overflow-y-auto flex flex-col min-w-0 transition-all duration-300 scroll-smooth">
@@ -1273,7 +1268,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                               className="min-w-0 flex-1 text-2xl font-bold text-[var(--theme-accent)] bg-transparent border-none focus:ring-0 p-0 handwritten text-4xl w-full"
                               placeholder="שם..."
                             />
-                              {!isCategoriesVisible && (
+                              {!isCategoriesVisible && !usesQuestionnaireAccordion && (
                                 <button
                                   onClick={() => setIsCategoriesVisible(true)}
                                   className="hidden shrink-0 p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-card)] rounded-xl transition-all shadow-sm border border-[var(--theme-border)]/50 lg:block"
@@ -1366,9 +1361,18 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
               </div>
             </div>
 
-            <div className="flex-none overflow-visible p-4 sm:p-8">
+            <div ref={categoryTopRef} className="flex-none overflow-visible p-4 sm:p-8 scroll-mt-24">
                 {mode === 'edit' ? (
-                  <>
+                  <QuestionnaireAccordion
+                    enabled={usesQuestionnaireAccordion}
+                    idPrefix={getAccordionIdPrefix(activeTab)}
+                    categories={categories}
+                    activeCategoryIndex={currentCategoryIndex}
+                    onSelectCategory={handleCategorySelect}
+                    registerCategoryAnchor={(category, element) => {
+                      accordionCategoryAnchorsRef.current[category] = element;
+                    }}
+                  >
                     {currentCategory === "פיתוח דמות" ? (
                       <div className="space-y-8 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
@@ -1678,35 +1682,15 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       </div>
                     ) : (
                       <>
-                        {filteredQuestions.length > 0 ? (
-                          filteredQuestions.map(q => (
-                            <div key={q.id} className="group space-y-3 animate-in fade-in duration-500">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-[10px] font-black text-[var(--text-accent)]/30 uppercase tracking-[0.2em]">{q.category}</span>
-                                  <div className="h-px w-8 bg-[var(--color-secondary)]" />
-                                  <label className="text-sm font-bold text-[var(--text-accent)]">{q.question}</label>
-                                </div>
-                              </div>
-                              {q.type === 'textarea' ? (
-                                <textarea 
-                                  value={selectedEntry.data[q.id] || ''}
-                                  onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
-                                  placeholder="כתוב כאן..."
-                                />
-                              ) : (
-                                <input 
-                                  type="text"
-                                  value={selectedEntry.data[q.id] || ''}
-                                  onChange={(e) => updateEntry({ data: { ...selectedEntry.data, [q.id]: e.target.value } })}
-                                  className="w-full bg-[var(--theme-secondary)]/20 border-2 border-[var(--theme-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--theme-primary)]/20 focus:border-[var(--theme-primary)]/50 transition-all outline-none shadow-inner"
-                                  placeholder="כתוב כאן..."
-                                />
-                              )}
-                            </div>
-                          ))
-                        ) : null}
+                        {filteredQuestions.length > 0 && (
+                          <QuestionnaireFields
+                            questions={filteredQuestions}
+                            data={selectedEntry.data}
+                            onChange={(questionId, value) => updateEntry({
+                              data: { ...selectedEntry.data, [questionId]: value },
+                            })}
+                          />
+                        )}
 
                         {currentCategory === "שאלות נוספות" && customQuestions.length > 0 && (
                           customQuestions.map(cf => (
@@ -1756,10 +1740,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <div className="text-xs font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-4">כוחות ייחודיים</div>
                             <button 
                               onClick={() => {
-                                const index = categories.indexOf("כוחות ייחודיים");
-                                if (index !== -1) {
-                                  setCurrentCategoryIndex(index);
-                                  addUniquePower();
+                                 const index = categories.indexOf("כוחות ייחודיים");
+                                 if (index !== -1) {
+                                   handleCategorySelect(index);
+                                   addUniquePower();
                                 }
                               }}
                               className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
@@ -1775,10 +1759,10 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                             <div className="text-xs font-black text-[var(--theme-accent)]/40 uppercase tracking-widest mb-4">מיקומים ספציפיים</div>
                             <button 
                               onClick={() => {
-                                const index = categories.indexOf("מיקום ספציפי");
-                                if (index !== -1) {
-                                  setCurrentCategoryIndex(index);
-                                  addSpecificLocation();
+                                 const index = categories.indexOf("מיקום ספציפי");
+                                 if (index !== -1) {
+                                   handleCategorySelect(index);
+                                   addSpecificLocation();
                                 }
                               }}
                               className="bg-[var(--theme-primary)] text-[var(--theme-card)] px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-md"
@@ -1789,34 +1773,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           </div>
                         )}
 
-                        {/* Navigation Buttons at bottom */}
-                        <div className="flex items-center justify-between pt-10 border-t border-[var(--theme-border)]/50 mt-10">
-                          <button 
-                            disabled={currentCategoryIndex === 0}
-                            onClick={(e) => { 
-                              setCurrentCategoryIndex(prev => prev - 1); 
-                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-card)] border border-[var(--theme-border)]/50 rounded-xl text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)] transition-all disabled:opacity-30 shadow-sm"
-                          >
-                            <ChevronLeft size={18} className="rotate-180" />
-                            <span>קטגוריה קודמת</span>
-                          </button>
-                          <button 
-                            disabled={currentCategoryIndex === categories.length - 1}
-                            onClick={(e) => { 
-                              setCurrentCategoryIndex(prev => prev + 1); 
-                              e.currentTarget.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl font-bold hover:opacity-90 transition-all disabled:opacity-30 shadow-md"
-                          >
-                            <span>קטגוריה הבאה</span>
-                            <ChevronLeft size={18} />
-                          </button>
-                        </div>
+                        {!usesQuestionnaireAccordion && (
+                          <CategoryActions
+                            currentCategoryIndex={currentCategoryIndex}
+                            categoryCount={categories.length}
+                            onSelect={handleCategorySelect}
+                          />
+                        )}
                       </>
                     )}
-                  </>
+                  </QuestionnaireAccordion>
                 ) : (
                   <div className="max-w-2xl mx-auto space-y-12 py-8">
                      {categories.map(cat => {
