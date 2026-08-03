@@ -19,17 +19,29 @@ describe('plot planning architecture', () => {
     expect(types).toContain('export interface PlotStructureProps');
   });
 
-  it('uses the extracted navigation and complex shared editors', () => {
+  it('routes every planning mode through an independent editor', () => {
     const coordinator = read('components/PlotStructure.tsx');
 
     expect(coordinator).toContain('<PlotPlanningNavigation');
-    expect(coordinator).toContain('<MultiScenePicker');
+    expect(coordinator).toContain('<PlotStructureEditor');
+    expect(coordinator).toContain('<CharacterArcEditor');
     expect(coordinator).toContain('<RelationshipArcEditor');
+    expect(coordinator).toContain('<ConflictEditor');
     expect(coordinator).not.toContain('const MultiScenePicker');
     expect(coordinator).not.toContain('const RelationshipDynamicsTable');
+    expect(coordinator).not.toContain('מבנה שלוש המערכות');
+    expect(coordinator).not.toContain('מטרות, בעיות והישגים');
+    expect(coordinator).not.toContain('קשת ההתפתחות של הדמות');
 
     const relationshipEditor = read('components/plot-planning/RelationshipArcEditor.tsx');
     expect(relationshipEditor).toContain('<RelationshipDynamicsTable');
+
+    const structureEditor = read('components/plot-planning/PlotStructureEditor.tsx');
+    const characterArcEditor = read('components/plot-planning/CharacterArcEditor.tsx');
+    const conflictEditor = read('components/plot-planning/ConflictEditor.tsx');
+    expect(structureEditor).toContain('STRUCTURES.map');
+    expect(characterArcEditor).toContain('<MultiScenePicker');
+    expect(conflictEditor).toContain('<MultiScenePicker');
   });
 
   it('keeps one coordinator-owned callback path to the book state', () => {
@@ -38,6 +50,10 @@ describe('plot planning architecture', () => {
       'components/plot-planning/PlotPlanningNavigation.tsx',
       'components/plot-planning/MultiScenePicker.tsx',
       'components/plot-planning/RelationshipDynamicsTable.tsx',
+      'components/plot-planning/RelationshipArcEditor.tsx',
+      'components/plot-planning/PlotStructureEditor.tsx',
+      'components/plot-planning/CharacterArcEditor.tsx',
+      'components/plot-planning/ConflictEditor.tsx',
       'components/plot-planning/plotPlanningDefinitions.ts',
     ].map(read).join('\n');
 
