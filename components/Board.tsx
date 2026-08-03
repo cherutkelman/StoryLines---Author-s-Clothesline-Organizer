@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Scene, Project, ChapterMarker, BoardViewMode, BoardVersion } from '../types';
-import { Plus, CheckCircle2, CopyPlus, ZoomIn, ZoomOut, Maximize, MessageSquareQuote, Download, Trash2, Flag, X, LayoutGrid, Rows, Pin, ChevronUp, ChevronDown, Square, Triangle, Circle, Diamond, Hexagon, History } from 'lucide-react';
+import { BoardViewMode, BoardVersion } from '../types';
+import { History } from 'lucide-react';
 import BoardVersionHistorySidebar from './BoardVersionHistorySidebar';
 import {
   createBoardPreviewProject,
@@ -10,44 +10,12 @@ import {
 } from '../src/board-version-history-ui';
 import { findBoardSnapshotScenesMissingFromCurrent } from '../src/board-deleted-scene-restore';
 import { getBoardSequenceColumns } from '../src/book-sequence';
-
-const INSERTION_SLOT_WIDTH = 40;
-
-const TrapezoidIcon: React.FC<{ size?: number; className?: string }> = ({ size = 11, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">
-    <path d="M6 5h12l4 14H2L6 5Z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-  </svg>
-);
-
-interface BoardProps {
-  project: Project;
-  title: string;
-  visiblePlotlines: string[];
-  onAddScene: (plotlineId: string, position: number) => void;
-  onAddSceneInSequence?: (plotlineId: string, targetSequenceIndex: number) => void;
-  onMoveScene: (id: string, targetGlobalIndex: number, targetPlotlineId: string) => void;
-  onMoveSceneInSequence?: (sceneId: string, targetSequenceIndex: number, targetPlotlineId: string) => void;
-  updateScene: (id: string, updates: Partial<Scene>) => void;
-  onBulkAdd: (plotlineId: string) => void;
-  onDeleteScene: (id: string) => void;
-  initialZoom?: number;
-  onZoomChange?: (zoom: number) => void;
-  initialViewMode?: BoardViewMode;
-  onViewModeChange?: (viewMode: BoardViewMode) => void;
-  onSceneDoubleClick?: (sceneId: string) => void;
-  onUpdateSummary: (summary: string) => void;
-  onUpdateChapterTitle: (position: number, title: string) => void;
-  onAddChapterMarker: (position: number) => void;
-  onUpdateChapterMarker: (id: string, updates: Partial<ChapterMarker>) => void;
-  onDeleteChapterMarker: (id: string) => void;
-  onAddChapterDivider?: (sequenceIndex: number) => void;
-  onRenameChapter?: (chapterId: string, title: string) => void;
-  onDeleteChapter?: (chapterId: string) => void;
-  onMoveChapterDivider?: (chapterId: string, targetSequenceIndex: number) => void;
-  onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
-  onPreviewVersionChange?: (version: BoardVersion | null) => void;
-  onRestoreDeletedSceneFromVersion?: (version: BoardVersion, sceneId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
-}
+import { BoardProps } from './board/boardTypes';
+import ChaptersBoardView from './board/ChaptersBoardView';
+import PlotlinesBoardView from './board/PlotlinesBoardView';
+import BoardToolbar from './board/BoardToolbar';
+import BoardSummary from './board/BoardSummary';
+import { buildBoardChapters } from './board/boardHelpers';
 
 const Board: React.FC<BoardProps> = ({ 
   project, 
@@ -55,7 +23,6 @@ const Board: React.FC<BoardProps> = ({
   visiblePlotlines, 
   onAddScene, 
   onAddSceneInSequence,
-  onMoveScene, 
   onMoveSceneInSequence,
   updateScene, 
   onBulkAdd, 
@@ -66,7 +33,6 @@ const Board: React.FC<BoardProps> = ({
   onViewModeChange,
   onSceneDoubleClick, 
   onUpdateSummary, 
-  onUpdateChapterTitle,
   onAddChapterMarker,
   onUpdateChapterMarker,
   onDeleteChapterMarker,
@@ -81,7 +47,6 @@ const Board: React.FC<BoardProps> = ({
   const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
-  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
   const [restoringDeletedSceneId, setRestoringDeletedSceneId] = useState<string | null>(null);
@@ -184,18 +149,6 @@ const Board: React.FC<BoardProps> = ({
     dragItem.current = { type: 'chapter-divider', chapterId };
   };
 
-  const handleDrop = (e: React.DragEvent, targetGlobalIndex: number, targetPlotlineId: string) => {
-    e.preventDefault();
-    if (isPreviewMode) {
-      dragItem.current = null;
-      return;
-    }
-    if (dragItem.current?.type === 'scene') {
-      onMoveScene(dragItem.current.sceneId, targetGlobalIndex, targetPlotlineId);
-    }
-    dragItem.current = null;
-  };
-
   const getSceneSequenceIndex = (sceneId: string): number | null => {
     const index = boardColumns.findIndex(column => column.type === 'scene' && column.scene.id === sceneId);
     return index === -1 ? null : index;
@@ -245,8 +198,6 @@ const Board: React.FC<BoardProps> = ({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
-
-  const handleResetZoom = () => setZoomLevel(1);
 
   useEffect(() => {
     const boardContainer = boardScrollRef.current;
@@ -362,218 +313,21 @@ const Board: React.FC<BoardProps> = ({
   const activePlotlines = boardProject.plotlines.filter(p => effectiveVisiblePlotlines.includes(p.id));
   const boardColumns = useMemo(() => getBoardSequenceColumns(boardProject), [boardProject]);
 
-  const sortedMarkers = [...(boardProject.chapterMarkers || [])].sort((a, b) => a.position - b.position);
-  const chapters: { id: string; title: string; scenes: Scene[]; isEditable?: boolean }[] = [];
-  const visibleScenes = boardProject.scenes.filter(s => effectiveVisiblePlotlines.includes(s.plotlineId));
-
-  if (sortedMarkers.length === 0) {
-    chapters.push({ id: 'default', title: 'כל הסצנות', scenes: visibleScenes });
-  } else {
-    if (sortedMarkers[0].position > 0) {
-      chapters.push({
-        id: 'prologue',
-        title: 'פתיחה',
-        scenes: visibleScenes.filter(s => s.position < sortedMarkers[0].position)
-      });
-    }
-
-    sortedMarkers.forEach((marker, idx) => {
-      const nextMarker = sortedMarkers[idx + 1];
-      const chapterScenes = visibleScenes.filter(s => 
-        s.position >= marker.position && 
-        (!nextMarker || s.position < nextMarker.position)
-      ).sort((a, b) => {
-        if (a.position !== b.position) return a.position - b.position;
-        const pA = boardProject.plotlines.findIndex(p => p.id === a.plotlineId);
-        const pB = boardProject.plotlines.findIndex(p => p.id === b.plotlineId);
-        return pA - pB;
-      });
-      chapters.push({
-        id: marker.id,
-        title: marker.title,
-        scenes: chapterScenes,
-        isEditable: true
-      });
-    });
-  }
-
-  const getCharacterArcMarkers = (sceneId: string) => {
-    const linkedTypes = new Set<'argument' | 'validation' | 'contradiction' | 'needReason' | 'obstacle' | 'resolution'>();
-
-    (boardProject.characterArcs || []).forEach((arc) => {
-      (arc.sceneLinks || []).forEach((link) => {
-        if (link.sceneId !== sceneId) return;
-        linkedTypes.add(link.type || 'argument');
-      });
-    });
-
-    (boardProject.conflicts || []).forEach((conflict) => {
-      (conflict.rows || []).forEach((row) => {
-        (row.needReasonScenes ?? row.goalScenes ?? []).forEach((link) => {
-          if (link.sceneId === sceneId) linkedTypes.add('needReason');
-        });
-        (row.obstacleScenes || []).forEach((link) => {
-          if (link.sceneId === sceneId) linkedTypes.add('obstacle');
-        });
-        (row.resolutionScenes || []).forEach((link) => {
-          if (link.sceneId === sceneId) linkedTypes.add('resolution');
-        });
-      });
-    });
-
-    return [
-      {
-        type: 'argument' as const,
-        title: 'טיעון לאמונה השקרית',
-        className: 'text-blue-500 bg-blue-50 border-blue-200',
-        icon: <Square size={11} className="fill-blue-500/20" />
-      },
-      {
-        type: 'validation' as const,
-        title: 'הוכחה לטיעון',
-        className: 'text-orange-500 bg-orange-50 border-orange-200',
-        icon: <Triangle size={11} className="fill-orange-500/20" />
-      },
-      {
-        type: 'contradiction' as const,
-        title: 'הפרכת הטיעון',
-        className: 'text-green-500 bg-green-50 border-green-200',
-        icon: <Circle size={11} className="fill-green-500/20" />
-      },
-      {
-        type: 'needReason' as const,
-        title: 'טיעון לצורך במטרה',
-        className: 'text-purple-500 bg-purple-50 border-purple-200',
-        icon: <Diamond size={11} className="fill-purple-500/20" />
-      },
-      {
-        type: 'obstacle' as const,
-        title: 'בעיה בדרך להשגת המטרה',
-        className: 'text-rose-500 bg-rose-50 border-rose-200',
-        icon: <TrapezoidIcon size={11} />
-      },
-      {
-        type: 'resolution' as const,
-        title: 'הישג בדרך לפתרון ולהצלחה',
-        className: 'text-cyan-500 bg-cyan-50 border-cyan-200',
-        icon: <Hexagon size={11} className="fill-cyan-500/20" />
-      }
-    ].filter((marker) => linkedTypes.has(marker.type));
-  };
-
-  const renderCharacterArcMarkers = (sceneId: string) => {
-    const markers = getCharacterArcMarkers(sceneId);
-    if (markers.length === 0) return null;
-
-    return (
-      <div className="absolute bottom-8 left-2 z-20 flex max-w-[72px] flex-wrap items-center gap-1">
-        {markers.map((marker) => (
-          <span
-            key={marker.type}
-            title={marker.title}
-            className={`w-5 h-5 rounded-md border shadow-sm flex items-center justify-center ${marker.className}`}
-          >
-            {marker.icon}
-          </span>
-        ))}
-      </div>
-    );
-  };
+  const chapters = buildBoardChapters(boardProject, effectiveVisiblePlotlines);
 
   return (
     <div className="relative h-full w-full overflow-hidden flex flex-col">
-      {/* Zoom Controls Overlay */}
-      <div className="absolute top-6 left-6 z-40 hidden items-center gap-3 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] lg:flex">
-        <button 
-          onClick={() => handleZoomChange(Math.max(0.2, zoomLevel - 0.1))}
-          className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-colors"
-          title="הקטנה"
-        >
-          <ZoomOut size={20} />
-        </button>
-        
-        <input 
-          type="range" 
-          min="0.2" 
-          max="1.5" 
-          step="0.05" 
-          value={zoomLevel} 
-          onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-          className="w-32 accent-[var(--theme-primary)]"
-        />
-
-        <button 
-          onClick={() => handleZoomChange(Math.min(1.5, zoomLevel + 0.1))}
-          className="p-2 text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-xl transition-colors"
-          title="הגדלה"
-        >
-          <ZoomIn size={20} />
-        </button>
-
-        <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
-
-        <button 
-          onClick={() => handleZoomChange(1)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] rounded-lg transition-colors"
-        >
-          <Maximize size={16} />
-          <span>{Math.round(zoomLevel * 100)}%</span>
-        </button>
-
-        <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
-
-        <div className="flex bg-[var(--theme-secondary)]/50 p-1 rounded-xl border border-[var(--theme-border)]/50">
-          <button 
-            onClick={() => handleViewModeChange('plotlines')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'plotlines' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`}
-            title="תצוגת קווי עלילה"
-          >
-            <LayoutGrid size={16} />
-            <span>קווים</span>
-          </button>
-          <button 
-            onClick={() => handleViewModeChange('chapters')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'chapters' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`}
-            title="תצוגת פרקים"
-          >
-            <Rows size={16} />
-            <span>פרקים</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Top Right Actions */}
-      <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+9.25rem)] left-6 z-40 flex items-center gap-3 lg:bottom-auto lg:left-auto lg:right-6 lg:top-6">
-        <button
-          onClick={() => {
-            if (isPreviewMode) return;
-            onBulkAdd(boardProject.plotlines[0]?.id || '');
-          }}
-          disabled={isPreviewMode}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-primary)] text-[var(--theme-card)] border border-[var(--theme-primary)] rounded-xl shadow-lg hover:opacity-90 transition-all font-bold text-sm disabled:cursor-not-allowed disabled:opacity-40"
-          title="הוספה מהירה של סצנות"
-        >
-          <CopyPlus size={18} />
-          <span>הוספה מהירה</span>
-        </button>
-        <button
-          onClick={exportBoard}
-          className="hidden items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm lg:flex"
-          title="ייצוא לוח עלילה"
-        >
-          <Download size={18} />
-          <span>ייצוא לוח</span>
-        </button>
-        <button
-          onClick={() => setIsVersionHistoryOpen(true)}
-          disabled={!onLoadBoardVersions}
-          className="hidden items-center gap-2 px-4 py-2 bg-[var(--theme-card)]/80 backdrop-blur-md text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-xl shadow-lg hover:bg-[var(--theme-secondary)] transition-all font-bold text-sm disabled:cursor-not-allowed disabled:opacity-40 lg:flex"
-          title="היסטוריית גרסאות"
-        >
-          <History size={18} />
-          <span>היסטוריית גרסאות</span>
-        </button>
-      </div>
+      <BoardToolbar
+        zoomLevel={zoomLevel}
+        viewMode={viewMode}
+        isPreviewMode={isPreviewMode}
+        canOpenHistory={Boolean(onLoadBoardVersions)}
+        onZoomChange={handleZoomChange}
+        onViewModeChange={handleViewModeChange}
+        onBulkAdd={() => { if (!isPreviewMode) onBulkAdd(boardProject.plotlines[0]?.id || ''); }}
+        onExport={exportBoard}
+        onOpenHistory={() => setIsVersionHistoryOpen(true)}
+      />
 
       {onLoadBoardVersions && (
         <BoardVersionHistorySidebar
@@ -619,457 +373,46 @@ const Board: React.FC<BoardProps> = ({
         >
           <div className="relative">
             {viewMode === 'plotlines' ? (
-              <>
-                <div className="relative flex items-end px-8 mb-1 lg:mb-3 min-h-20">
-                  <div className="invisible pointer-events-none flex h-20 shrink-0 items-center pr-12 pl-16 -mr-32">
-                    <div className="min-w-[160px]" />
-                  </div>
-                  {boardColumns.map((column, index) => (
-                    <React.Fragment key={`chapter-title-fragment-${column.id}`}>
-                      <div
-                        className="group/add-chapter relative flex h-24 flex-shrink-0 items-end justify-center"
-                        style={{ width: `${INSERTION_SLOT_WIDTH}px` }}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleChapterDividerDrop(e, index)}
-                      >
-                        {!isPreviewMode && onAddChapterDivider && (
-                          <button
-                            onClick={() => onAddChapterDivider(index)}
-                            className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
-                          >
-                            + {'\u05e4\u05e8\u05e7'}
-                          </button>
-                        )}
-                      </div>
-                      <div
-                        className="relative flex h-20 flex-shrink-0 items-end justify-center"
-                        style={{ width: `${column.width}px` }}
-                      >
-                        {column.type === 'chapter-divider' && (
-                          <div
-                            draggable={!isPreviewMode}
-                            onDragStart={() => handleChapterDragStart(column.chapterMarker.id)}
-                            className={`absolute bottom-0 left-1/2 z-20 flex w-[112px] -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--theme-primary)]/20 bg-[var(--theme-card)] px-2.5 py-2 text-[var(--theme-primary)] shadow-xl ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
-                          >
-                            <div className="flex h-6 w-3 flex-shrink-0 items-center justify-center rounded-full text-[var(--theme-primary)]/35">
-                              <div className="h-4 w-1 rounded-full bg-current" />
-                            </div>
-                            <input
-                              className="min-w-0 flex-1 bg-transparent p-0 text-center text-xs font-black text-[var(--theme-primary)] handwritten border-none focus:ring-0"
-                              value={column.chapterMarker.title}
-                              readOnly={isPreviewMode}
-                              onChange={(e) => {
-                                if (isPreviewMode) return;
-                                onRenameChapter?.(column.chapterMarker.id, e.target.value);
-                              }}
-                            />
-                            <button
-                              disabled={isPreviewMode}
-                              onClick={() => {
-                                if (isPreviewMode) return;
-                                if (window.confirm('\u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05d4\u05e4\u05e8\u05e7? \u05d4\u05e1\u05e6\u05e0\u05d5\u05ea \u05dc\u05d0 \u05d9\u05d9\u05de\u05d7\u05e7\u05d5.')) {
-                                  onDeleteChapter?.(column.chapterMarker.id);
-                                }
-                              }}
-                              className="rounded-full p-1 text-[var(--theme-primary)]/35 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
-                              title={'\u05de\u05d7\u05e7 \u05e4\u05e8\u05e7'}
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </React.Fragment>
-                  ))}
-                  <div
-                    className="group/add-chapter relative flex h-24 flex-shrink-0 items-end justify-center"
-                    style={{ width: `${INSERTION_SLOT_WIDTH}px` }}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleChapterDividerDrop(e, boardColumns.length)}
-                  >
-                    {!isPreviewMode && onAddChapterDivider && (
-                      <button
-                        onClick={() => onAddChapterDivider(boardColumns.length)}
-                        className="mb-4 rounded-full border border-dashed border-[var(--theme-primary)]/20 bg-[var(--theme-card)]/70 px-2 py-1 text-[10px] font-black text-[var(--theme-primary)]/30 opacity-0 shadow-sm transition-all group-hover/add-chapter:opacity-100 hover:border-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
-                      >
-                        + {'\u05e4\u05e8\u05e7'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {/* Chapter Markers Layer */}
-                <div className="hidden">
-                  {boardProject.chapterMarkers?.map(marker => (
-                    <div 
-                      key={marker.id}
-                      className="absolute top-0 bottom-0 border-r-2 border-dashed border-[var(--theme-primary)]/30 pointer-events-auto"
-                      style={{ 
-                        right: `${marker.position * (176 + 48) + 32 + 88}px`, // 176 is w-44, 48 is gap-12, 32 is px-8, 88 is half of w-44
-                        width: '2px'
-                      }}
-                    >
-                      <div className="absolute top-0 lg:-top-12 left-1/2 -translate-x-1/2 bg-[var(--theme-card)] border-2 border-[var(--theme-primary)]/20 rounded-2xl shadow-2xl p-2 lg:p-3 flex items-center gap-2 lg:gap-3 w-[132px] lg:w-auto lg:min-w-[200px] backdrop-blur-md">
-                        <div className="bg-[var(--theme-primary)]/10 p-1.5 lg:p-2 rounded-xl">
-                          <Flag size={16} className="text-[var(--theme-primary)]" />
-                        </div>
-                        <input 
-                          className="min-w-0 flex-1 bg-transparent border-none focus:ring-0 text-xs lg:text-base font-black text-[var(--theme-primary)] p-0 handwritten"
-                          value={marker.title}
-                          readOnly={isPreviewMode}
-                          onChange={(e) => {
-                            if (isPreviewMode) return;
-                            onUpdateChapterMarker(marker.id, { title: e.target.value });
-                          }}
-                        />
-                        <button 
-                          disabled={isPreviewMode}
-                          onClick={() => {
-                            if (isPreviewMode) return;
-                            onDeleteChapterMarker(marker.id);
-                          }}
-                          className="p-1.5 text-[var(--theme-primary)]/20 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <X size={16} />
-                        </button>
-                        
-                        {/* Decorative Pin */}
-                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-[var(--theme-card)] border-b-2 border-r-2 border-[var(--theme-primary)]/20 rotate-45" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add Marker Row */}
-                <div className="hidden">
-                  <div className="absolute left-8 right-8 top-1/2 h-px -translate-y-1/2 bg-gray-300/80" />
-                  {Array.from({ length: columnCount }).map((_, i) => {
-                    const hasMarker = boardProject.chapterMarkers?.some(m => m.position === i);
-                    return (
-                      <div key={i} className="relative w-44 flex-shrink-0 flex justify-center group/marker-btn">
-                        {!hasMarker && !isPreviewMode && (
-                          <button 
-                            onClick={() => onAddChapterMarker(i)}
-                            className="relative z-10 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-transparent text-[var(--theme-primary)]/20 hover:text-[var(--theme-primary)] transition-all"
-                          >
-                            <Flag size={14} />
-                            <span className="text-[10px] font-bold">הוסף פרק</span>
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Plotline Ropes */}
-                {activePlotlines.map((plotline) => (
-                  <div key={plotline.id} className="relative h-48 flex items-center mb-12 group/plotline">
-                    <div 
-                      className="absolute inset-x-0 h-0.5 opacity-40 shadow-sm"
-                      style={{ 
-                        backgroundColor: plotline.color, 
-                        top: '50%',
-                        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.1) 50%, transparent 50%)',
-                        backgroundSize: '10px 100%'
-                      }}
-                    />
-                    
-                    <div className="sticky right-0 z-30 flex items-center h-full pr-12 pl-16 bg-gradient-to-l from-[var(--theme-bg)] via-[var(--theme-bg)]/95 to-transparent -mr-32 group/label pointer-events-none">
-                      <div className="flex flex-col gap-1 min-w-[160px] pointer-events-auto">
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-xl font-black uppercase tracking-tighter text-[var(--theme-primary)] block truncate handwritten text-3xl drop-shadow-sm">
-                            {plotline.name}
-                          </span>
-                        </div>
-                        <div className="h-2.5 w-full rounded-full shadow-md border border-white/50" style={{ backgroundColor: plotline.color }} />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center px-8 w-full">
-                      {boardColumns.map((column, index) => {
-                        const sceneInThisSlot = column.type === 'scene' && column.scene.plotlineId === plotline.id
-                          ? column.scene
-                          : null;
-                        const isLinkedToPlotStructure = sceneInThisSlot && Object.values(boardProject.plotStructurePoints || {}).some(point => point.sceneId === sceneInThisSlot.id);
-                        
-                        return (
-                          <React.Fragment key={`${plotline.id}-${column.id}-fragment`}>
-                          <div
-                            className="group/add-scene relative flex h-44 flex-shrink-0 items-center justify-center"
-                            style={{ width: `${INSERTION_SLOT_WIDTH}px` }}
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => handleSceneSequenceDrop(e, index, plotline.id)}
-                          >
-                            {!isPreviewMode && onAddSceneInSequence && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isPreviewMode) return;
-                                  onAddSceneInSequence(plotline.id, index);
-                                }}
-                                className="absolute z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/50 text-[var(--theme-border)] opacity-0 shadow-md transition-all hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100 group-hover/plotline:opacity-100"
-                              >
-                                <Plus size={20} />
-                              </button>
-                            )}
-                          </div>
-                          <div
-                            key={`${plotline.id}-${column.id}`}
-                            onDragOver={column.type === 'scene' ? handleDragOver : undefined}
-                            onDrop={column.type === 'scene' ? (e) => handleSceneRowDrop(e, plotline.id) : undefined}
-                            className="h-44 flex-shrink-0 flex items-center justify-center relative group group/slot"
-                            style={{ width: `${column.width}px` }}
-                          >
-                            {column.type === 'chapter-divider' ? (
-                              <>
-                                <div className="absolute inset-y-[-3rem] left-1/2 w-0 -translate-x-1/2 border-r-2 border-dashed border-[var(--theme-primary)]/30" />
-                                <div className="relative z-10 h-16 w-8 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-md" />
-                              </>
-                            ) : sceneInThisSlot ? (
-                              (() => {
-                                const isDeletedFromCurrent = isPreviewMode && missingPreviewSceneIds.has(sceneInThisSlot.id);
-                                const isRestoredToCurrent = isPreviewMode && restoredDeletedSceneIds.has(sceneInThisSlot.id) && currentSceneIds.has(sceneInThisSlot.id);
-                                const isRestoringThisScene = restoringDeletedSceneId === sceneInThisSlot.id;
-
-                                return (
-                                  <div
-                                    data-board-scene-id={sceneInThisSlot.id}
-                                    draggable={!isPreviewMode}
-                                    onDragStart={() => handleDragStart(sceneInThisSlot.id)}
-                                    onDoubleClick={() => {
-                                      if (isPreviewMode) return;
-                                      onSceneDoubleClick?.(sceneInThisSlot.id);
-                                    }}
-                                    className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''} ${isDeletedFromCurrent ? 'ring-2 ring-red-200' : ''} ${isRestoredToCurrent ? 'ring-2 ring-green-200' : ''}`}
-                                    style={{ borderTopColor: plotline.color }}
-                                  >
-                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
-                                       <div className="w-1 h-1 bg-[var(--theme-primary)]/20 rounded-full" />
-                                       <div className="w-2 h-4 bg-[var(--theme-primary)]/5 rounded-full" />
-                                    </div>
-
-                                    {sceneInThisSlot.isCompleted && (
-                                      <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
-                                        <CheckCircle2 size={18} />
-                                      </div>
-                                    )}
-
-                                    {isLinkedToPlotStructure && (
-                                      <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
-                                        <Pin size={14} className="rotate-45" />
-                                      </div>
-                                    )}
-
-                                    {!isPreviewMode && (
-                                      <button
-                                        disabled={isPreviewMode}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (isPreviewMode) return;
-                                          onDeleteScene(sceneInThisSlot.id);
-                                        }}
-                                        className="absolute -top-2 -left-2 text-red-400 hover:text-red-600 bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30 opacity-40 group-hover/slot:opacity-100 transition-all"
-                                        title="מחק סצנה"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-
-                                    {isDeletedFromCurrent && (
-                                      <span className="absolute -top-3 -right-3 z-30 rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 shadow-sm">
-                                        נמחקה
-                                      </span>
-                                    )}
-
-                                    {isRestoredToCurrent && (
-                                      <span className="absolute -top-3 -right-3 z-30 rounded-full bg-green-50 px-2 py-1 text-[10px] font-black text-green-700 shadow-sm">
-                                        הוחזרה ללוח הנוכחי
-                                      </span>
-                                    )}
-
-                                    <input
-                                      className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
-                                      value={sceneInThisSlot.title}
-                                      readOnly={isPreviewMode}
-                                      onChange={(e) => {
-                                        if (isPreviewMode) return;
-                                        updateScene(sceneInThisSlot.id, { title: e.target.value });
-                                      }}
-                                    />
-                                    <div className="h-px bg-[var(--theme-secondary)] my-3" />
-                                    <textarea
-                                      className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
-                                      value={sceneInThisSlot.summary || ''}
-                                      placeholder="תמצית ההתרחשות..."
-                                      readOnly={isPreviewMode}
-                                      onChange={(e) => {
-                                        if (isPreviewMode) return;
-                                        updateScene(sceneInThisSlot.id, { summary: e.target.value });
-                                      }}
-                                    />
-                                    {renderCharacterArcMarkers(sceneInThisSlot.id)}
-                                    <div className="mt-auto pt-1 border-t border-amber-50/50 flex flex-col items-center gap-1">
-                                      {isDeletedFromCurrent && onRestoreDeletedSceneFromVersion ? (
-                                        <button
-                                          type="button"
-                                          disabled={isRestoringThisScene}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void handleRestoreDeletedScene(sceneInThisSlot.id);
-                                          }}
-                                          className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-black text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60"
-                                        >
-                                          {isRestoringThisScene ? 'מחזירה...' : 'החזר סצנה ללוח הנוכחי'}
-                                        </button>
-                                      ) : (
-                                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
-                                          {plotline.name}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })()
-                            ) : !isPreviewMode && !onAddSceneInSequence ? (
-                              <button 
-                                onClick={() => {
-                                  if (isPreviewMode) return;
-                                  onAddScene(plotline.id, column.sceneOrderIndex);
-                                }}
-                                className="w-10 h-10 rounded-full border-2 border-dashed border-[var(--theme-border)] text-[var(--theme-border)] opacity-0 group-hover/slot:opacity-100 group-hover/plotline:opacity-100 hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] transition-all flex items-center justify-center bg-[var(--theme-card)]/50"
-                              >
-                                <Plus size={20} />
-                              </button>
-                            ) : (
-                              null
-                            )}
-                          </div>
-                          </React.Fragment>
-                        );
-                      })}
-                      <div
-                        className="group/add-scene relative flex h-44 flex-shrink-0 items-center justify-center"
-                        style={{ width: `${INSERTION_SLOT_WIDTH}px` }}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleSceneSequenceDrop(e, boardColumns.length, plotline.id)}
-                      >
-                        {!isPreviewMode && onAddSceneInSequence && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isPreviewMode) return;
-                              onAddSceneInSequence(plotline.id, boardColumns.length);
-                            }}
-                            className="absolute z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-[var(--theme-border)] bg-[var(--theme-card)]/50 text-[var(--theme-border)] opacity-0 shadow-md transition-all hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)] group-hover/add-scene:opacity-100 group-hover/plotline:opacity-100"
-                          >
-                            <Plus size={20} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </>
+              <PlotlinesBoardView
+                boardColumns={boardColumns}
+                activePlotlines={activePlotlines}
+                boardProject={boardProject}
+                columnCount={columnCount}
+                isPreviewMode={isPreviewMode}
+                currentSceneIds={currentSceneIds}
+                missingPreviewSceneIds={missingPreviewSceneIds}
+                restoredDeletedSceneIds={restoredDeletedSceneIds}
+                restoringDeletedSceneId={restoringDeletedSceneId}
+                onAddScene={onAddScene}
+                onAddSceneInSequence={onAddSceneInSequence}
+                updateScene={updateScene}
+                onDeleteScene={onDeleteScene}
+                onSceneDoubleClick={onSceneDoubleClick}
+                onAddChapterMarker={onAddChapterMarker}
+                onUpdateChapterMarker={onUpdateChapterMarker}
+                onDeleteChapterMarker={onDeleteChapterMarker}
+                onAddChapterDivider={onAddChapterDivider}
+                onRenameChapter={onRenameChapter}
+                onDeleteChapter={onDeleteChapter}
+                canRestoreDeletedScene={Boolean(onRestoreDeletedSceneFromVersion)}
+                onRestoreDeletedScene={(sceneId) => { void handleRestoreDeletedScene(sceneId); }}
+                onDragStart={handleDragStart}
+                onChapterDragStart={handleChapterDragStart}
+                onDragOver={handleDragOver}
+                onChapterDividerDrop={handleChapterDividerDrop}
+                onSceneSequenceDrop={handleSceneSequenceDrop}
+                onSceneRowDrop={handleSceneRowDrop}
+              />
             ) : (
-              <div className="space-y-24">
-                {chapters.map((chapter) => (
-                  <div key={chapter.id} className="relative">
-                    <div className="flex items-center gap-6 mb-12 sticky right-0 z-30 bg-gradient-to-l from-[var(--theme-bg)] via-[var(--theme-bg)]/90 to-transparent pr-8 py-2">
-                      <div className="bg-[var(--theme-primary)]/10 p-3 rounded-2xl">
-                        <Flag size={24} className="text-[var(--theme-primary)]" />
-                      </div>
-                      {chapter.isEditable ? (
-                        <input 
-                          className="text-4xl font-black text-[var(--theme-primary)] handwritten tracking-widest uppercase bg-transparent border-none focus:ring-0 p-0 w-auto min-w-[300px]"
-                          value={chapter.title}
-                          readOnly={isPreviewMode}
-                          onChange={(e) => {
-                            if (isPreviewMode) return;
-                            onUpdateChapterMarker(chapter.id, { title: e.target.value });
-                          }}
-                        />
-                      ) : (
-                        <h2 className="text-4xl font-black text-[var(--theme-primary)] handwritten tracking-widest uppercase">
-                          {chapter.title}
-                        </h2>
-                      )}
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[var(--theme-border)] to-transparent" />
-                      <span className="text-xs font-black text-[var(--theme-primary)]/30 uppercase tracking-widest bg-[var(--theme-secondary)]/50 px-4 py-1.5 rounded-full border border-[var(--theme-border)]/50">
-                        {chapter.scenes.length} סצנות
-                      </span>
-                    </div>
+              <ChaptersBoardView
+                chapters={chapters}
+                boardProject={boardProject}
+                isPreviewMode={isPreviewMode}
+                onSceneDoubleClick={onSceneDoubleClick}
+                onUpdateChapterMarker={onUpdateChapterMarker}
+                updateScene={updateScene}
+              />
 
-                    <div className="flex flex-wrap gap-12 px-8">
-                      {chapter.scenes.map((scene) => {
-                        const plotline = boardProject.plotlines.find(p => p.id === scene.plotlineId);
-                        const isLinkedToPlotStructure = Object.values(boardProject.plotStructurePoints || {}).some(point => point.sceneId === scene.id);
-                        return (
-                          <div
-                            key={scene.id}
-                            data-board-scene-id={scene.id}
-                            onDoubleClick={() => {
-                              if (isPreviewMode) return;
-                              onSceneDoubleClick?.(scene.id);
-                            }}
-                            className={`w-44 h-44 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative flex flex-col ${scene.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''}`}
-                            style={{ borderTopColor: plotline?.color }}
-                          >
-                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
-                               <div className="w-1 h-1 bg-[var(--theme-primary)]/20 rounded-full" />
-                               <div className="w-2 h-4 bg-[var(--theme-primary)]/5 rounded-full" />
-                            </div>
-
-                            {scene.isCompleted && (
-                              <div className="absolute -top-2 -right-2 text-green-500 bg-[var(--theme-card)] rounded-full shadow-md p-0.5 z-30">
-                                <CheckCircle2 size={18} />
-                              </div>
-                            )}
-
-                            {isLinkedToPlotStructure && (
-                              <div className="absolute -top-2 right-6 text-[var(--theme-accent)] bg-[var(--theme-card)] rounded-full shadow-md p-1 z-30" title="מקושר למבנה העלילה">
-                                <Pin size={14} className="rotate-45" />
-                              </div>
-                            )}
-
-                            <input 
-                              className="text-sm font-bold w-full text-center bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] handwritten"
-                              value={scene.title}
-                              readOnly={isPreviewMode}
-                              onChange={(e) => {
-                                if (isPreviewMode) return;
-                                updateScene(scene.id, { title: e.target.value });
-                              }}
-                            />
-                            <div className="h-px bg-[var(--theme-secondary)] my-3" />
-                            <textarea 
-                              className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
-                              value={scene.summary || ''}
-                              placeholder="תמצית ההתרחשות..."
-                              readOnly={isPreviewMode}
-                              onChange={(e) => {
-                                if (isPreviewMode) return;
-                                updateScene(scene.id, { summary: e.target.value });
-                              }}
-                            />
-                            {renderCharacterArcMarkers(scene.id)}
-                            <div className="mt-auto pt-1 border-t border-amber-50/50 flex justify-center">
-                              <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline?.color}20`, color: plotline?.color }}>
-                                {plotline?.name}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {chapter.scenes.length === 0 && (
-                        <div className="w-full h-32 flex items-center justify-center border-2 border-dashed border-[var(--theme-border)] rounded-3xl text-[var(--theme-primary)]/20 font-bold">
-                          אין סצנות בפרק זה
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
             {activePlotlines.length === 0 && (
               <div className="h-96 flex flex-col items-center justify-center text-[var(--theme-primary)]/20">
@@ -1081,36 +424,12 @@ const Board: React.FC<BoardProps> = ({
         </div>
       </div>
 
-      {/* Plot Summary Box - Sticky at bottom */}
-      <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] lg:bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl px-6 z-30">
-        <div className={`bg-[var(--theme-card)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl shadow-2xl p-4 flex flex-col gap-2 transition-all duration-300 ${isSummaryCollapsed ? 'h-14 overflow-hidden' : ''}`}>
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-xs font-black text-[var(--theme-primary)] uppercase tracking-widest flex items-center gap-2">
-              <MessageSquareQuote size={14} />
-              תקציר העלילה
-            </h3>
-            <button 
-              onClick={() => setIsSummaryCollapsed(!isSummaryCollapsed)}
-              className="p-1 hover:bg-[var(--theme-secondary)] rounded-lg transition-colors text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"
-              title={isSummaryCollapsed ? "הגדל תקציר" : "מזער תקציר"}
-            >
-              {isSummaryCollapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-          </div>
-          {!isSummaryCollapsed && (
-            <textarea 
-              value={boardProject.summary || ''}
-              readOnly={isPreviewMode}
-              onChange={(e) => {
-                if (isPreviewMode) return;
-                onUpdateSummary(e.target.value);
-              }}
-              placeholder="כתוב כאן את תקציר העלילה הכללי של הספר..."
-              className="w-full h-24 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm text-[var(--theme-primary)] focus:ring-4 focus:ring-[var(--theme-primary)]/20 outline-none resize-none text-lg leading-relaxed animate-in fade-in slide-in-from-bottom-2"
-            />
-          )}
-        </div>
-      </div>
+      <BoardSummary
+        summary={boardProject.summary || ''}
+        readOnly={isPreviewMode}
+        onUpdateSummary={onUpdateSummary}
+      />
+
     </div>
   );
 };

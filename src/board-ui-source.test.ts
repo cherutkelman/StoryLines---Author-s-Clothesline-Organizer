@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('board UI source', () => {
   it('does not show the add-chapter button on scene slots while keeping the marker row action', () => {
-    const source = readFileSync('components/Board.tsx', 'utf8');
+    const source = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
 
     expect(source).toContain('group/marker-btn');
     expect(source).toContain('onAddChapterMarker(i)');
@@ -43,7 +43,7 @@ describe('board UI source', () => {
   });
 
   it('keeps board version compare and restore UI out of the final board preview flow', () => {
-    const boardSource = readFileSync('components/Board.tsx', 'utf8');
+    const boardSource = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
     const sidebarSource = readFileSync('components/BoardVersionHistorySidebar.tsx', 'utf8');
 
     expect(boardSource).not.toContain('compareVersion');
@@ -56,13 +56,14 @@ describe('board UI source', () => {
 
   it('allows only deleted-scene restore actions inside historical board preview cards', () => {
     const boardSource = readFileSync('components/Board.tsx', 'utf8');
+    const plotlinesViewSource = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
 
     expect(boardSource).toContain('findBoardSnapshotScenesMissingFromCurrent');
-    expect(boardSource).toContain('החזר סצנה ללוח הנוכחי');
-    expect(boardSource).toContain('הוחזרה ללוח הנוכחי');
-    expect(boardSource).not.toContain('שחזר שם');
-    expect(boardSource).not.toContain('שחזר מיקום');
-    expect(boardSource).not.toContain('שחזר החלפה');
+    expect(plotlinesViewSource).toContain('החזר סצנה ללוח הנוכחי');
+    expect(plotlinesViewSource).toContain('הוחזרה ללוח הנוכחי');
+    expect(plotlinesViewSource).not.toContain('שחזר שם');
+    expect(plotlinesViewSource).not.toContain('שחזר מיקום');
+    expect(plotlinesViewSource).not.toContain('שחזר החלפה');
   });
 
   it('backs up the current board before restoring a deleted scene', () => {
