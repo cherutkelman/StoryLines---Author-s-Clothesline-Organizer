@@ -21,9 +21,24 @@ export const missingFirebaseEnvVars = REQUIRED_FIREBASE_ENV_VARS.filter(
 
 export const isFirebaseConfigured = missingFirebaseEnvVars.length === 0;
 
+const FIREBASE_AUTH_DOMAIN = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '__missing_firebase_auth_domain__';
+const VERCEL_PRODUCTION_HOST = 'story-lines-author-s-clothesline-or.vercel.app';
+
+const getAuthDomain = () => {
+  if (
+    !isElectron
+    && typeof window !== 'undefined'
+    && window.location.hostname === VERCEL_PRODUCTION_HOST
+  ) {
+    return window.location.host;
+  }
+
+  return FIREBASE_AUTH_DOMAIN;
+};
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '__missing_firebase_api_key__',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '__missing_firebase_auth_domain__',
+  authDomain: getAuthDomain(),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '__missing_firebase_project_id__',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '__missing_firebase_storage_bucket__',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '__missing_firebase_messaging_sender_id__',
