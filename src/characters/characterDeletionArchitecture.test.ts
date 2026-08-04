@@ -21,8 +21,10 @@ describe('character deletion wiring', () => {
     const questionnaires = read('components/Questionnaires.tsx');
     const app = read('App.tsx');
 
-    expect(questionnaires).toContain('למחוק את הדמות מהספר? הדמות תוסר גם מכל מפות הדמויות בספר.');
-    expect(questionnaires).toContain('onDeleteCharacter(entryId)');
+    expect(questionnaires).toContain('setCharacterRemovalCandidateId(entryId)');
+    expect(questionnaires).toContain('onDeleteCharacter(characterId)');
+    expect(questionnaires).toContain('onHideCharacterFromQuestionnaire(characterId)');
+    expect(questionnaires).toContain("title={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה'");
     expect(questionnaires).toContain('handleEntrySelect(null)');
     expect(app).toContain('deleteCharacterFromBook(book, characterId)');
     expect(app).toContain('if (book.id !== activeBookId) return book;');

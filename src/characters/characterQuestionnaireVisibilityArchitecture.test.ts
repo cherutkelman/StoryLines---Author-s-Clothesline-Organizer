@@ -38,8 +38,34 @@ describe('character questionnaire visibility architecture', () => {
     expect(questionnaires).toContain("setMode('edit')");
   });
 
+  it('hides one local record through a dedicated active-book-only path', () => {
+    const app = read('App.tsx');
+    const questionnaires = read('components/Questionnaires.tsx');
+    const visibility = read('src/characters/characterQuestionnaireVisibility.ts');
+
+    expect(visibility).toContain('hideCharacterInBookFromQuestionnaire');
+    expect(app).toContain('const hideCharacterFromActiveQuestionnaire = (characterId: string) =>');
+    expect(app).toContain('hideCharacterInBookFromQuestionnaire(book, characterId)');
+    expect(app).toContain('onHideCharacterFromQuestionnaire={hideCharacterFromActiveQuestionnaire}');
+    expect(questionnaires).toContain('onHideCharacterFromQuestionnaire: (characterId: string) => void');
+    expect(questionnaires).toContain('onHideCharacterFromQuestionnaire(characterId)');
+    expect(questionnaires).not.toContain('onUpdateCharacters(characters.map(character =>\n        character.id === characterId ? { ...character, questionnaireVisibility');
+  });
+
   it('does not add questionnaire visibility to shared synchronization fields', () => {
     const shared = read('src/characters/characterSharedData.ts');
     expect(shared).not.toContain('questionnaireVisibility');
+  });
+
+  it('keeps hide and full deletion as separate questionnaire actions', () => {
+    const questionnaires = read('components/Questionnaires.tsx');
+    const dialog = read('components/questionnaires/CharacterRemovalDialog.tsx');
+
+    expect(questionnaires).toContain('onHideFromQuestionnaire={hideCharacterFromQuestionnaire}');
+    expect(questionnaires).toContain('onDeleteFromBook={deleteCharacterFromBookAndMaps}');
+    expect(dialog).toContain("if (action === 'hide') onHideFromQuestionnaire(characterId)");
+    expect(dialog).toContain('else onDeleteFromBook(characterId)');
+    expect(dialog).not.toContain('confirm(');
+    expect(dialog).not.toContain('window.confirm');
   });
 });

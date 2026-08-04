@@ -1,4 +1,4 @@
-import type { CharacterEntry } from '../../types';
+import type { Book, CharacterEntry } from '../../types';
 
 export const isCharacterVisibleInQuestionnaire = (character: CharacterEntry): boolean =>
   character.questionnaireVisibility !== 'hidden';
@@ -19,3 +19,18 @@ export const restoreCharacterInListToQuestionnaire = (
 ): CharacterEntry[] => characters.map(character =>
   character.id === characterId ? restoreCharacterToQuestionnaire(character) : character
 );
+
+export const hideCharacterInListFromQuestionnaire = (
+  characters: CharacterEntry[],
+  characterId: string
+): CharacterEntry[] => characters.map(character =>
+  character.id === characterId ? hideCharacterFromQuestionnaire(character) : character
+);
+
+export const hideCharacterInBookFromQuestionnaire = (
+  book: Book,
+  characterId: string
+): Book => ({
+  ...book,
+  characters: hideCharacterInListFromQuestionnaire(book.characters || [], characterId),
+});

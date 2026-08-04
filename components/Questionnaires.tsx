@@ -51,6 +51,7 @@ import { createCharacterEntry } from '../src/characters/characterFactory';
 import CharacterImportDialog from './questionnaires/CharacterImportDialog';
 import CharacterSyncDialog from './questionnaires/CharacterSyncDialog';
 import ExistingCharacterQuestionnaireDialog from './questionnaires/ExistingCharacterQuestionnaireDialog';
+import CharacterRemovalDialog from './questionnaires/CharacterRemovalDialog';
 import { isCharacterVisibleInQuestionnaire } from '../src/characters/characterQuestionnaireVisibility';
 
 interface QuestionnairesProps {
@@ -65,6 +66,7 @@ interface QuestionnairesProps {
   relationships: any[];
   onUpdateCharacters: (entries: CharacterEntry[]) => void;
   onDeleteCharacter: (characterId: string) => void;
+  onHideCharacterFromQuestionnaire: (characterId: string) => void;
   onRestoreCharacterToQuestionnaire: (characterId: string) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
@@ -106,7 +108,7 @@ const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
   allBooks, activeBookId, characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
-  onUpdateCharacters, onDeleteCharacter, onRestoreCharacterToQuestionnaire, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
+  onUpdateCharacters, onDeleteCharacter, onHideCharacterFromQuestionnaire, onRestoreCharacterToQuestionnaire, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
   onApplyCharacterSyncBooks,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
@@ -122,6 +124,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [isExistingCharacterQuestionnaireOpen, setIsExistingCharacterQuestionnaireOpen] = useState(false);
   const [isCharacterSyncOpen, setIsCharacterSyncOpen] = useState(false);
   const [characterSyncFeedback, setCharacterSyncFeedback] = useState('');
+  const [characterRemovalCandidateId, setCharacterRemovalCandidateId] = useState<string | null>(null);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const { categoryTopRef, scrollToCategoryTop } = useScrollToQuestionnaireCategoryTop<HTMLDivElement>();
   const accordionCategoryAnchorsRef = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -172,29 +175,45 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
 
   const deleteEntry = (entryId: string, genericConfirmation: string, clearGenericSelectionOnCancel = false) => {
-    const confirmation = activeTab === 'characters'
-      ? 'למחוק את הדמות מהספר? הדמות תוסר גם מכל מפות הדמויות בספר.'
-      : genericConfirmation;
-    if (!confirm(confirmation)) {
-      if (activeTab !== 'characters' && clearGenericSelectionOnCancel && selectedEntryId === entryId) {
+    if (activeTab === 'characters') {
+      setCharacterRemovalCandidateId(entryId);
+      return;
+    }
+
+    if (!confirm(genericConfirmation)) {
+      if (clearGenericSelectionOnCancel && selectedEntryId === entryId) {
         handleEntrySelect(null);
       }
       return;
     }
 
-    if (activeTab === 'characters') {
-      onDeleteCharacter(entryId);
-      setIsCharacterSyncOpen(false);
-      setCharacterSyncFeedback('');
-      setMode('view');
-    } else {
-      updateFn(entries.filter(entry => entry.id !== entryId));
-    }
+    updateFn(entries.filter(entry => entry.id !== entryId));
     if (selectedEntryId === entryId) handleEntrySelect(null);
   };
   const selectedCharacter = activeTab === 'characters'
     ? characters.find(character => character.id === selectedEntryId)
     : undefined;
+  const characterRemovalCandidate = characters.find(character => character.id === characterRemovalCandidateId) || null;
+
+  const finishCharacterRemoval = (characterId: string) => {
+    setCharacterRemovalCandidateId(null);
+    if (selectedEntryId === characterId) {
+      setIsCharacterSyncOpen(false);
+      setCharacterSyncFeedback('');
+      setMode('view');
+      handleEntrySelect(null);
+    }
+  };
+
+  const hideCharacterFromQuestionnaire = (characterId: string) => {
+    onHideCharacterFromQuestionnaire(characterId);
+    finishCharacterRemoval(characterId);
+  };
+
+  const deleteCharacterFromBookAndMaps = (characterId: string) => {
+    onDeleteCharacter(characterId);
+    finishCharacterRemoval(characterId);
+  };
   const selectedRelationship = isRelationshipsTab ? relationships.find(rel => rel.id === selectedEntryId) : null;
   
   const currentGender = selectedEntry?.data?.gender || 'female';
@@ -873,6 +892,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         <button 
                           onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                           className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                          title={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
+                          aria-label={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -901,6 +922,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                     className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                    title="מחיקת פריט"
+                    aria-label="מחיקת פריט"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -924,6 +947,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                   <button 
                     onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                     className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
+                    title="מחיקת פריט"
+                    aria-label="מחיקת פריט"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -1089,7 +1114,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       <button
                         onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                         className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
-                        title="מחיקת פריט"
+                        title={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
+                        aria-label={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
                       >
                         <Trash2 size={18} />
                       </button>
@@ -1141,7 +1167,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       <button
                         onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                         className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
-                        title="מחיקת פריט"
+                        title={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
+                        aria-label={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
                       >
                         <Trash2 size={18} />
                       </button>
@@ -1247,7 +1274,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     <button 
                       onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                       className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
-                      title="מחיקת פריט"
+                      title={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
+                      aria-label={activeTab === 'characters' ? 'אפשרויות הסרה ומחיקה' : 'מחיקת פריט'}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -2043,6 +2071,14 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           setIsCharacterAddMenuOpen(false);
         }}
         onClose={() => setIsExistingCharacterQuestionnaireOpen(false)}
+      />
+
+      <CharacterRemovalDialog
+        isOpen={characterRemovalCandidate !== null}
+        character={characterRemovalCandidate}
+        onHideFromQuestionnaire={hideCharacterFromQuestionnaire}
+        onDeleteFromBook={deleteCharacterFromBookAndMaps}
+        onClose={() => setCharacterRemovalCandidateId(null)}
       />
 
       {selectedCharacter && (
