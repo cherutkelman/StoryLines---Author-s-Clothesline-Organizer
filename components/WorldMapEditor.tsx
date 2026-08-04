@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { WorldMap, MapElement, QuestionnaireEntry, PixelEraserStroke } from '../types';
 import useImage from 'use-image';
-import { getDefaultMapIconSize, ICON_COMPONENTS, MAP_TEXT_FONT, WorldMapTool } from './maps/worldMapDefinitions';
+import { getDefaultMapIconSize, getMapIconBrushSpacing, ICON_COMPONENTS, MAP_TEXT_FONT, WorldMapTool } from './maps/worldMapDefinitions';
 
 interface WorldMapEditorProps {
   map: WorldMap;
@@ -155,6 +155,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const [currentStrokeWidth, setCurrentStrokeWidth] = useState(4);
   const [currentColor, setCurrentColor] = useState('#78350f');
   const [brushOpacity, setBrushOpacity] = useState(1);
+  const [iconBrushSize, setIconBrushSize] = useState(30);
+  const [iconBrushDensity, setIconBrushDensity] = useState(50);
   const [selectedIcon, setSelectedIcon] = useState<'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'fish' | 'horse' | 'snake' | 'cattle' | 'sheep' | 'eagle' | 'wildcat' | 'flower' | 'wave' | 'village' | 'camp' | 'temple' | 'hotel' | 'hospital' | 'factory' | 'park' | 'city' | 'car' | 'bus' | 'ambulance' | 'fire_truck' | 'truck' | 'tractor' | 'train' | 'plane' | 'ship' | 'desert' | 'beach' | 'rainbow' | 'fire' | 'field' | 'traffic_light' | 'barrier' | 'cat' | 'bird' | 'market'>('house');
   const [showPlacesList, setShowPlacesList] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -177,6 +179,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const containerRef = useRef<HTMLDivElement>(null);
   const activeEraserElementIdRef = useRef<string | null>(null);
   const activeEraserStrokeIdRef = useRef<string | null>(null);
+  const activeIconBrushSettingsRef = useRef<{ size: number; density: number } | null>(null);
 
   const getRelativePointerPosition = (stage: any) => {
     const pointer = stage.getPointerPosition();
@@ -398,8 +401,17 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       setIsDrawing(false);
       setLastPlacedPos(null);
     }
+    activeIconBrushSettingsRef.current = null;
     activeEraserElementIdRef.current = null;
     activeEraserStrokeIdRef.current = null;
+  };
+
+  const switchTool = (nextTool: WorldMapTool) => {
+    stopDrawing();
+    if (nextTool !== tool) {
+      setSelectedIds([]);
+    }
+    setTool(nextTool);
   };
 
   useEffect(() => {
@@ -599,6 +611,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         }
       }, 50);
     } else if (tool === 'icon') {
+      const brushSettings = { size: iconBrushSize, density: iconBrushDensity };
+      activeIconBrushSettingsRef.current = brushSettings;
       const id = `el-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const newElement: MapElement = {
         id,
@@ -607,13 +621,17 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         x: pos.x,
         y: pos.y,
         fill: getIconFill(selectedIcon),
-        iconSize: getDefaultMapIconSize(selectedIcon)
+        iconSize: brushSettings.size
       };
 
       if (iconCategory === 'nature' || iconCategory === 'construction') {
         setIsDrawing(true);
         setLastPlacedPos(pos);
-        setLocalElements(prev => [...prev, newElement]);
+        setLocalElements(prev => {
+          const updatedElements = [...prev, newElement];
+          localElementsRef.current = updatedElements;
+          return updatedElements;
+        });
       } else {
         onUpdateMap({ elements: [...map.elements, newElement] });
         setSelectedIds([id]);
@@ -670,18 +688,33 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       const dy = pos.y - lastPlacedPos.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist > 40) { // Threshold for repeating icons
-        const id = `el-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        const newElement: MapElement = {
-          id,
-          type: 'icon',
-          iconType: selectedIcon,
-          x: pos.x,
-          y: pos.y,
-          fill: getIconFill(selectedIcon)
-        };
-        setLocalElements(prev => [...prev, newElement]);
-        setLastPlacedPos(pos);
+      const brushSettings = activeIconBrushSettingsRef.current || {
+        size: iconBrushSize,
+        density: iconBrushDensity
+      };
+      const spacing = getMapIconBrushSpacing(brushSettings.size, brushSettings.density);
+
+      if (dist >= spacing) {
+        const iconCount = Math.floor(dist / spacing);
+        const placedIcons: MapElement[] = Array.from({ length: iconCount }, (_, index) => {
+          const distanceFromLast = spacing * (index + 1);
+          return {
+            id: `el-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`,
+            type: 'icon',
+            iconType: selectedIcon,
+            x: lastPlacedPos.x + (dx / dist) * distanceFromLast,
+            y: lastPlacedPos.y + (dy / dist) * distanceFromLast,
+            fill: getIconFill(selectedIcon),
+            iconSize: brushSettings.size
+          };
+        });
+        setLocalElements(prev => {
+          const updatedElements = [...prev, ...placedIcons];
+          localElementsRef.current = updatedElements;
+          return updatedElements;
+        });
+        const finalIcon = placedIcons[placedIcons.length - 1];
+        setLastPlacedPos({ x: finalIcon.x, y: finalIcon.y });
       }
       return;
     }
@@ -781,6 +814,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       activeEraserStrokeIdRef.current = null;
       setIsDrawing(false);
       setLastPlacedPos(null);
+      activeIconBrushSettingsRef.current = null;
       return;
     }
 
@@ -789,6 +823,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
     }
     setIsDrawing(false);
     setLastPlacedPos(null);
+    activeIconBrushSettingsRef.current = null;
     activeEraserElementIdRef.current = null;
     activeEraserStrokeIdRef.current = null;
   };
@@ -1135,14 +1170,14 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       <div className="flex h-full z-20 shadow-xl">
         <div className="w-16 bg-[var(--theme-card)] border-l border-[var(--theme-border)] flex flex-col items-center py-6 gap-4 overflow-y-auto no-scrollbar">
           <button 
-            onClick={() => { stopDrawing(); setActiveTab('select'); setTool('select'); setShowPathTools(false); }}
+            onClick={() => { switchTool('select'); setActiveTab('select'); setShowPathTools(false); }}
             className={`p-3 rounded-xl transition-all ${activeTab === 'select' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
             title="בחירה"
           >
             <MousePointer2 size={20} />
           </button>
           <button 
-            onClick={() => { stopDrawing(); setActiveTab('pan'); setTool('pan'); setShowPathTools(false); }}
+            onClick={() => { switchTool('pan'); setActiveTab('pan'); setShowPathTools(false); }}
             className={`p-3 rounded-xl transition-all ${activeTab === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
             title="הזזת מפה"
           >
@@ -1150,14 +1185,14 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
           </button>
           <div className="h-px w-8 bg-[var(--theme-border)]/50" />
           <button 
-            onClick={() => { stopDrawing(); setActiveTab('icons'); setTool('icon'); setIconCategory('nature'); setShowPathTools(true); }}
+            onClick={() => { switchTool('icon'); setActiveTab('icons'); setIconCategory('nature'); setShowPathTools(true); }}
             className={`p-3 rounded-xl transition-all ${activeTab === 'icons' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
             title="אייקונים"
           >
             <Trees size={20} />
           </button>
           <button 
-            onClick={() => { stopDrawing(); setActiveTab('paint'); setTool('brush'); setShowPathTools(true); }}
+            onClick={() => { switchTool('brush'); setActiveTab('paint'); setShowPathTools(true); }}
             className={`p-3 rounded-xl transition-all ${activeTab === 'paint' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
             title="צביעה וציור"
           >
@@ -1210,21 +1245,65 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 </div>
                 <div className="grid grid-cols-2 gap-1 mb-4">
                   <button 
-                    onClick={() => { stopDrawing(); setIconCategory('nature'); setTool('icon'); }}
+                    onClick={() => { switchTool('icon'); setIconCategory('nature'); }}
                     className={`p-2 rounded-lg text-[10px] font-bold transition-all ${iconCategory === 'nature' && tool === 'icon' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                   >טבע</button>
                   <button 
-                    onClick={() => { stopDrawing(); setIconCategory('construction'); setTool('icon'); }}
+                    onClick={() => { switchTool('icon'); setIconCategory('construction'); }}
                     className={`p-2 rounded-lg text-[10px] font-bold transition-all ${iconCategory === 'construction' && tool === 'icon' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                   >בנייה</button>
                   <button 
-                    onClick={() => { stopDrawing(); setIconCategory('transportation'); setTool('icon'); }}
+                    onClick={() => { switchTool('icon'); setIconCategory('transportation'); }}
                     className={`p-2 rounded-lg text-[10px] font-bold transition-all ${iconCategory === 'transportation' && tool === 'icon' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                   >תחבורה</button>
                   <button 
-                    onClick={() => { stopDrawing(); setIconCategory('animals'); setTool('icon'); }}
+                    onClick={() => { switchTool('icon'); setIconCategory('animals'); }}
                     className={`p-2 rounded-lg text-[10px] font-bold transition-all ${iconCategory === 'animals' && tool === 'icon' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                   >חיות</button>
+                </div>
+
+                <div className="px-2 py-3 mb-4 space-y-4 rounded-xl bg-[var(--theme-secondary)]/60 border border-[var(--theme-border)]/50">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label htmlFor="icon-brush-size" className="text-[10px] font-bold text-[var(--theme-primary)] uppercase">גודל</label>
+                      <span className="text-[10px] font-bold text-[var(--theme-primary)]/60">{iconBrushSize}</span>
+                    </div>
+                    <input
+                      id="icon-brush-size"
+                      type="range"
+                      min="12"
+                      max="80"
+                      step="1"
+                      value={iconBrushSize}
+                      onChange={(e) => setIconBrushSize(Number(e.target.value))}
+                      className="w-full accent-[var(--theme-primary)]"
+                    />
+                    <div className="flex justify-between text-[8px] font-bold text-[var(--theme-primary)]/40">
+                      <span>קטן</span>
+                      <span>גדול</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label htmlFor="icon-brush-density" className="text-[10px] font-bold text-[var(--theme-primary)] uppercase">צפיפות</label>
+                      <span className="text-[10px] font-bold text-[var(--theme-primary)]/60">{iconBrushDensity}%</span>
+                    </div>
+                    <input
+                      id="icon-brush-density"
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={iconBrushDensity}
+                      onChange={(e) => setIconBrushDensity(Number(e.target.value))}
+                      className="w-full accent-[var(--theme-primary)]"
+                    />
+                    <div className="flex justify-between text-[8px] font-bold text-[var(--theme-primary)]/40">
+                      <span>מרווחת</span>
+                      <span>צפופה</span>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -1238,28 +1317,28 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 
                 <div className="space-y-1">
                   <button 
-                    onClick={() => { stopDrawing(); setTool('brush'); }}
+                    onClick={() => switchTool('brush')}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all ${tool === 'brush' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <Brush size={16} />
                     <span className="text-xs font-bold">מברשת</span>
                   </button>
                   <button 
-                    onClick={() => { stopDrawing(); setTool('border'); }}
+                    onClick={() => switchTool('border')}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all ${tool === 'border' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <Flag size={16} />
                     <span className="text-xs font-bold">גבול</span>
                   </button>
                   <button 
-                    onClick={() => { stopDrawing(); setTool('area'); }}
+                    onClick={() => switchTool('area')}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all ${tool === 'area' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <Spline size={16} />
                     <span className="text-xs font-bold">שטח צבוע</span>
                   </button>              
                   <button 
-                    onClick={() => { stopDrawing(); setTool('eraser'); }}
+                    onClick={() => switchTool('eraser')}
                     className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all ${tool === 'eraser' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <Eraser size={16} />
@@ -1270,7 +1349,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
                   <div className="grid grid-cols-4 gap-1 px-1">
                     <button 
-                      onClick={() => { stopDrawing(); setTool('line'); }}
+                      onClick={() => switchTool('line')}
                       className={`p-2 rounded-lg flex flex-col items-center gap-1 transition-all ${tool === 'line' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                       title="קו ישר"
                     >
@@ -1278,7 +1357,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       <span className="text-[8px] font-bold">קו</span>
                     </button>
                     <button 
-                      onClick={() => { stopDrawing(); setTool('rect'); }}
+                      onClick={() => switchTool('rect')}
                       className={`p-2 rounded-lg flex flex-col items-center gap-1 transition-all ${tool === 'rect' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                       title="מלבן"
                     >
@@ -1286,7 +1365,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       <span className="text-[8px] font-bold">מלבן</span>
                     </button>
                     <button 
-                      onClick={() => { stopDrawing(); setTool('circle'); }}
+                      onClick={() => switchTool('circle')}
                       className={`p-2 rounded-lg flex flex-col items-center gap-1 transition-all ${tool === 'circle' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                       title="עיגול"
                     >
@@ -1294,7 +1373,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       <span className="text-[8px] font-bold">עיגול</span>
                     </button>
                     <button 
-                      onClick={() => { stopDrawing(); setTool('triangle'); }}
+                      onClick={() => switchTool('triangle')}
                       className={`p-2 rounded-lg flex flex-col items-center gap-1 transition-all ${tool === 'triangle' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)]' : 'bg-[var(--theme-secondary)] text-[var(--theme-primary)]'}`}
                       title="משולש"
                     >
@@ -1469,7 +1548,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 
                 <div className="space-y-2">
                   <button 
-                    onClick={() => { stopDrawing(); setTool('text'); }}
+                    onClick={() => switchTool('text')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${tool === 'text' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <LucideType size={18} />
@@ -1477,7 +1556,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                   </button>
                   
                   <button 
-                    onClick={() => { stopDrawing(); setTool('place'); setShowPlacesList(true); }}
+                    onClick={() => { switchTool('place'); setShowPlacesList(true); }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${tool === 'place' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]'}`}
                   >
                     <MapPin size={18} />

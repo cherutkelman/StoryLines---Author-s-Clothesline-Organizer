@@ -40,3 +40,9 @@ export const getDefaultMapIconSize = (iconType?: string) => {
   if (iconType === 'flower' || iconType === 'market') return 25;
   return 30;
 };
+
+export const getMapIconBrushSpacing = (iconSize: number, density: number) => {
+  const normalizedDensity = Math.min(100, Math.max(1, density));
+  const spacingMultiplier = 2.5 - ((normalizedDensity - 1) / 99) * 2.1;
+  return Math.max(1, iconSize * spacingMultiplier);
+};
