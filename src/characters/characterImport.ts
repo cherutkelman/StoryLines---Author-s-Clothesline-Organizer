@@ -1,52 +1,12 @@
 import { validate as isUuid } from 'uuid';
 import type { CharacterEntry } from '../../types';
 import { createCharacterId } from './characterFactory';
+import { SHARED_CHARACTER_DATA_KEYS } from './characterSharedData';
 
-export const SHARED_CHARACTER_DATA_KEYS = [
-  'gender',
-  'name',
-  'age',
-  'residence',
-  'daily_life',
-  'favorite_food',
-  'favorite_color',
-  'general_appearance',
-  'unique_features',
-  'gestures',
-  'common_phrases',
-  'traits',
-  'abilities',
-  'special_powers',
-  'values',
-  'hobbies',
-  'favorite_place',
-  'strengths',
-  'difficulties',
-  'life_motto',
-  'sweet_memories',
-  'bad_memories',
-  'traumas',
-] as const;
-
-export const BOOK_SPECIFIC_CHARACTER_DATA_KEYS = [
-  'role',
-  'goal',
-  'obstacles',
-  'avoidance',
-  'central_dilemma',
-  'choice_between',
-  'first_choice_revelation',
-  'choice_price',
-  'belief_impact',
-  'similar_dilemma_later',
-  'later_choice_diff',
-  'social_start_end',
-  'family_start_end',
-  'romantic_start_end',
-  'enemy_start_end',
-  'changing_connections',
-  'other_connections',
-] as const;
+export {
+  BOOK_SPECIFIC_CHARACTER_DATA_KEYS,
+  SHARED_CHARACTER_DATA_KEYS,
+} from './characterSharedData';
 
 export type LinkedCharacterImportResult =
   | { ok: true; character: CharacterEntry }
