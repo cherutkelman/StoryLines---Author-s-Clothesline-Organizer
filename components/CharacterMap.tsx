@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Link as LinkIcon, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
+import { Plus, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { compressImageFile } from '../src/image-utils';
@@ -26,12 +26,13 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   onAddExistingCharacters,
   onRemoveCharacterFromMap,
 }) => {
-  const [tool, setTool] = useState<'move' | 'link' | 'pan'>('move');
+  const [tool, setTool] = useState<'link' | 'pan'>('link');
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPanPos, setStartPanPos] = useState({ x: 0, y: 0 });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [movingNodeId, setMovingNodeId] = useState<string | null>(null);
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
@@ -46,6 +47,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     contentHeight: number;
   } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const nodeClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchGestureRef = useRef<{
     mode: 'pan' | 'pinch' | null;
     lastX: number;
@@ -178,44 +180,95 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   }, [localConnections]);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (tool === 'move') {
+    if (tool !== 'pan') {
       setSelectedNodeId(null);
+      setMovingNodeId(null);
     }
+  };
+
+  const handleCanvasDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-character-map-element], button, input, textarea, label')) return;
+    setTool('pan');
+    setSelectedNodeId(null);
+    setMovingNodeId(null);
   };
 
   const addNode = (e: React.MouseEvent) => {
     const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });
     onUpdateCharacters([...characters, newNode]);
     setSelectedNodeId(newNode.id);
+    setMovingNodeId(newNode.id);
   };
 
-  const startNodeInteraction = (id: string) => {
-    if (tool === 'link') {
-      if (selectedNodeId && selectedNodeId !== id) {
-        // Create connection
-        const exists = connections.find(c => (c.fromId === selectedNodeId && c.toId === id) || (c.fromId === id && c.toId === selectedNodeId));
-        if (!exists) {
-          const newConn: CharacterMapConnection = {
-            id: `conn-${Date.now()}`,
-            fromId: selectedNodeId,
-            toId: id,
-            description: 'תיאור הקשר...',
-          };
-          onUpdateConnections([...connections, newConn]);
-        }
-        setSelectedNodeId(null);
-      } else {
-        setSelectedNodeId(id);
+  const connectSelectedNodeTo = (id: string) => {
+    if (tool === 'pan') {
+      setTool('link');
+      setSelectedNodeId(id);
+      return;
+    }
+
+    if (selectedNodeId && selectedNodeId !== id) {
+      const exists = connections.find(c => (c.fromId === selectedNodeId && c.toId === id) || (c.fromId === id && c.toId === selectedNodeId));
+      if (!exists) {
+        const newConn: CharacterMapConnection = {
+          id: `conn-${Date.now()}`,
+          fromId: selectedNodeId,
+          toId: id,
+          description: 'תיאור הקשר...',
+        };
+        onUpdateConnections([...connections, newConn]);
       }
+      setSelectedNodeId(id);
+      setMovingNodeId(id);
     } else {
       setSelectedNodeId(id);
-      setDraggingNodeId(id);
+      setMovingNodeId(id);
     }
+  };
+
+  const selectNode = (id: string) => {
+    if (tool === 'pan') setTool('link');
+    setSelectedNodeId(id);
+    setMovingNodeId(id);
   };
 
   const handleNodeMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    startNodeInteraction(id);
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, label')) {
+      return;
+    }
+    if (movingNodeId === id) setDraggingNodeId(id);
+  };
+
+  const handleNodeClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, label')) return;
+    if (movingNodeId === id) return;
+    if (nodeClickTimeoutRef.current) clearTimeout(nodeClickTimeoutRef.current);
+    nodeClickTimeoutRef.current = setTimeout(() => {
+      selectNode(id);
+      nodeClickTimeoutRef.current = null;
+    }, 220);
+  };
+
+  const handleNodeDoubleClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, label')) return;
+    if (nodeClickTimeoutRef.current) {
+      clearTimeout(nodeClickTimeoutRef.current);
+      nodeClickTimeoutRef.current = null;
+    }
+    setTool('link');
+    if (selectedNodeId && selectedNodeId !== id) {
+      connectSelectedNodeTo(id);
+      return;
+    }
+    setSelectedNodeId(id);
+    setMovingNodeId(id);
   };
 
   const handleNodeTouchStart = (e: React.TouchEvent, id: string) => {
@@ -225,11 +278,11 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     e.stopPropagation();
     if (e.touches.length !== 1) return;
     e.preventDefault();
-    startNodeInteraction(id);
+    selectNode(id);
   };
 
   const handleNodeTouchMove = (e: React.TouchEvent, id: string) => {
-    if (isExporting || draggingNodeId !== id || tool !== 'move' || e.touches.length !== 1) return;
+    if (isExporting || draggingNodeId !== id || e.touches.length !== 1) return;
     e.stopPropagation();
     e.preventDefault();
     const touch = e.touches[0];
@@ -281,7 +334,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
       return;
     }
 
-    if (draggingNodeId && tool === 'move') {
+    if (draggingNodeId) {
       setLocalCharacters(prev => {
         const next = prev.map(n => n.id === draggingNodeId ? { ...n, x, y } : n);
         localCharactersRef.current = next;
@@ -301,6 +354,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
       onUpdateConnections(localConnectionsRef.current);
     }
     setDraggingNodeId(null);
+    setMovingNodeId(null);
     setDraggingLabelId(null);
   };
 
@@ -549,6 +603,17 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isExistingCharacterDialogOpen]);
 
+  useEffect(() => {
+    if (tool !== 'pan') return;
+    const leavePanOnButtonClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('button')) return;
+      setTool('link');
+    };
+    document.addEventListener('pointerdown', leavePanOnButtonClick, true);
+    return () => document.removeEventListener('pointerdown', leavePanOnButtonClick, true);
+  }, [tool]);
+
   const openExistingCharacterDialog = () => {
     setSelectedExistingCharacterIds([]);
     setIsExistingCharacterDialogOpen(true);
@@ -574,20 +639,6 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
       {/* Tool Bar */}
       {!isExporting && (
         <div className="character-map-toolbar absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100vw-1rem)] overflow-x-auto bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2 whitespace-nowrap">
-          <button 
-            onClick={() => setTool('move')}
-            className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <Move size={18} />
-            <span className="text-xs font-bold">הזזה</span>
-          </button>
-          <button 
-            onClick={() => setTool('link')}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${tool === 'link' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
-          >
-            <LinkIcon size={18} />
-            <span className="text-xs font-bold">קישור דמויות</span>
-          </button>
           <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
           <div className="hidden md:flex items-center gap-1 bg-[var(--theme-secondary)] rounded-xl p-1 border border-[var(--theme-border)]/50">
             <button 
@@ -615,15 +666,6 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
               <RotateCcw size={14} />
             </button>
           </div>
-          <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
-          <button 
-            onClick={() => setTool('pan')}
-            className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
-            title="הזזת כל המפה"
-          >
-            <Grab size={18} />
-            <span className="text-xs font-bold">הזזת מפה</span>
-          </button>
           <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={addNode}
@@ -760,6 +802,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         onClick={handleCanvasClick}
+        onDoubleClick={handleCanvasDoubleClick}
         >
         <div 
           className="absolute left-0 top-0 transition-transform duration-75 ease-out origin-top-left"
@@ -813,8 +856,13 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
           return (
             <div 
               key={`${conn.id}-text`}
+              data-character-map-element="connection"
               className="absolute pointer-events-auto z-10 group"
               style={{ left: labelPoint.x, top: labelPoint.y, transform: 'translate(-50%, -50%)' }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                if (tool === 'pan') setTool('link');
+              }}
             >
               <div className="relative flex flex-col items-center">
                 <div 
@@ -822,6 +870,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
                   onMouseDown={(e) => {
                     if (isExporting) return;
                     e.stopPropagation();
+                    if (tool === 'pan') setTool('link');
                     setDraggingLabelId(conn.id);
                   }}
                   onTouchStart={(e) => handleLabelTouchStart(e, conn.id)}
@@ -868,9 +917,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
         {localCharacters.map(node => (
           <div 
             key={node.id}
-            className={`absolute cursor-pointer z-20 group flex flex-col items-center gap-1.5 ${draggingNodeId === node.id ? 'scale-110' : ''}`}
+            data-character-map-element="character"
+            className={`absolute z-20 group flex flex-col items-center gap-1.5 ${movingNodeId === node.id ? 'cursor-move' : 'cursor-pointer'} ${draggingNodeId === node.id ? 'scale-110' : ''}`}
             style={{ left: node.x ?? 200, top: node.y ?? 200, transform: 'translate(-50%, -50%)' }}
             onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+            onClick={(e) => handleNodeClick(e, node.id)}
+            onDoubleClick={(e) => handleNodeDoubleClick(e, node.id)}
             onTouchStart={(e) => handleNodeTouchStart(e, node.id)}
             onTouchMove={(e) => handleNodeTouchMove(e, node.id)}
             onTouchEnd={(e) => handleNodeTouchEnd(e, node.id)}
@@ -954,7 +1006,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
       {!isExporting && (
         <div className="character-map-instructions absolute bottom-8 right-8 text-right pointer-events-none">
           <h4 className="handwritten text-3xl text-[var(--theme-primary)]/40 mb-1">מפת דמויות</h4>
-          <p className="text-[10px] text-[var(--theme-primary)]/30 font-bold uppercase tracking-widest">גרור דמויות כדי לשנות מיקום | השתמש בכלי הקישור לתיאור יחסים</p>
+          <p className="text-[10px] text-[var(--theme-primary)]/30 font-bold uppercase tracking-widest">לחיצה בוחרת דמות ומאפשרת להזיז אותה | לחיצה כפולה על דמות אחרת יוצרת קישור | לחיצה כפולה על שטח ריק מאפשרת להזיז את המפה</p>
         </div>
       )}
     </div>

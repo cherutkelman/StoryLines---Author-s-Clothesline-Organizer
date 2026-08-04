@@ -17,6 +17,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   const [scale, setScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [isPanMode, setIsPanMode] = useState(false);
   
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,17 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isPanMode) return;
+    const leavePanOnButtonClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('button')) return;
+      setIsPanMode(false);
+    };
+    document.addEventListener('pointerdown', leavePanOnButtonClick, true);
+    return () => document.removeEventListener('pointerdown', leavePanOnButtonClick, true);
+  }, [isPanMode]);
 
   // Initialize root node if map is empty
   useEffect(() => {
@@ -227,14 +239,19 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
           x={stagePos.x}
           y={stagePos.y}
           ref={stageRef}
-          draggable
+          draggable={isPanMode}
           onDragEnd={(e) => {
             if (e.target === stageRef.current) {
               setStagePos({ x: e.target.x(), y: e.target.y() });
             }
           }}
           onClick={(e) => {
-            if (e.target === stageRef.current) setSelectedId(rootNode?.id || null);
+            if (!isPanMode && e.target === stageRef.current) setSelectedId(rootNode?.id || null);
+          }}
+          onDblClick={(e) => {
+            if (e.target !== stageRef.current) return;
+            setIsPanMode(true);
+            setSelectedId(null);
           }}
         >
           <Layer>
@@ -259,7 +276,15 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                 key={node.id}
                 x={node.x}
                 y={node.y}
-                draggable
+                draggable={!isPanMode}
+                onMouseDown={(e) => {
+                  if (!isPanMode) return;
+                  const stage = e.target.getStage();
+                  stage?.stopDrag();
+                  stage?.draggable(false);
+                  setIsPanMode(false);
+                  setSelectedId(node.id);
+                }}
                 onDragEnd={(e) => handleNodeDragEnd(node.id, e)}
                 onClick={(e) => {
                   e.cancelBubble = true;

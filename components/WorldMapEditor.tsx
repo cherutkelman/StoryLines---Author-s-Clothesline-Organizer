@@ -8,7 +8,7 @@ import {
   Waves, Route, Circle as CircleIcon, Square, Eraser, Triangle,
   ChevronRight, ChevronLeft, Plus, Minus, Maximize,
   Image as ImageIcon, X, Building2, Castle, Dog, TreePine, Download,
-  TrainFront, Navigation, Flag, Hand, Cat, Bird, Fish, Spline,
+  TrainFront, Navigation, Flag, Cat, Bird, Fish, Spline,
   Leaf, Construction, Truck, Brush, PaintBucket,
   ChevronUp, ChevronDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
@@ -491,6 +491,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   };
 
   useEffect(() => {
+    if (tool !== 'pan') return;
+
+    const leavePanOnButtonClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('button')) return;
+      switchTool('select');
+      setActiveTab('select');
+      setShowPathTools(false);
+    };
+
+    document.addEventListener('pointerdown', leavePanOnButtonClick, true);
+    return () => document.removeEventListener('pointerdown', leavePanOnButtonClick, true);
+  }, [tool]);
+
+  useEffect(() => {
     if (selectedIds.length === 1) {
       const el = map.elements.find(e => e.id === selectedIds[0]);
       if (el) {
@@ -513,6 +528,18 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   }, [selectedIds, map.elements]);
 
   const handleMouseDown = (e: any) => {
+    if (tool === 'pan') {
+      const id = resolveElementId(e.target);
+      if (id && id.startsWith('el-')) {
+        const stage = e.target.getStage();
+        stage?.stopDrag();
+        switchTool('select');
+        setActiveTab('select');
+        setSelectedIds([id]);
+      }
+      return;
+    }
+
     if (tool === 'eraser') {
       e.evt?.preventDefault?.();
       const stage = e.target.getStage();
@@ -908,6 +935,15 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   };
 
   const handleDblClick = (e: any) => {
+    const stage = e.target.getStage();
+    if (e.target === stage) {
+      switchTool('pan');
+      setActiveTab('pan');
+      setShowPathTools(false);
+      setSelectedIds([]);
+      return;
+    }
+
     const id = resolveElementId(e.target);
     if (id && id.startsWith('el-')) {
       setSelectedIds([id]);
@@ -1254,13 +1290,6 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
             title="בחירה"
           >
             <MousePointer2 size={20} />
-          </button>
-          <button 
-            onClick={() => { switchTool('pan'); setActiveTab('pan'); setShowPathTools(false); }}
-            className={`p-3 rounded-xl transition-all ${activeTab === 'pan' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/40 hover:bg-[var(--theme-secondary)]'}`}
-            title="הזזת מפה"
-          >
-            <Hand size={20} />
           </button>
           <div className="h-px w-8 bg-[var(--theme-border)]/50" />
           <button 
@@ -1870,6 +1899,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                   width={bgImage.width} 
                   height={bgImage.height} 
                   opacity={0.8}
+                  listening={false}
                 />
               )}
 
