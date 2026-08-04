@@ -22,6 +22,81 @@ interface WorldMapEditorProps {
   onUpdateMap: (updates: Partial<WorldMap>) => void;
 }
 
+interface AngleDialProps {
+  value: number;
+  onChange: (value: number) => void;
+}
+
+const AngleDial = ({ value, onChange }: AngleDialProps) => {
+  const updateFromPointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    const angle = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+    onChange(Math.round(angle));
+  };
+
+  const angleInRadians = value * Math.PI / 180;
+  const indicatorX = 60 + Math.sin(angleInRadians) * 35;
+  const indicatorY = 60 - Math.cos(angleInRadians) * 35;
+
+  return (
+    <svg
+      viewBox="0 0 120 120"
+      className="w-32 h-32 mx-auto touch-none cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-primary)] rounded-full"
+      role="slider"
+      aria-label="זווית"
+      aria-valuemin={0}
+      aria-valuemax={359}
+      aria-valuenow={value}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        updateFromPointer(e);
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) updateFromPointer(e);
+      }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 15 : 1;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          onChange((value + step) % 360);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          onChange((value - step + 360) % 360);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          onChange(0);
+        }
+      }}
+    >
+      <circle cx="60" cy="60" r="43" fill="var(--theme-card)" stroke="var(--theme-border)" strokeWidth="2" />
+      {[0, 90, 180, 270].map(angle => {
+        const radians = angle * Math.PI / 180;
+        return (
+          <line
+            key={angle}
+            x1={60 + Math.sin(radians) * 37}
+            y1={60 - Math.cos(radians) * 37}
+            x2={60 + Math.sin(radians) * 43}
+            y2={60 - Math.cos(radians) * 43}
+            stroke="var(--theme-primary)"
+            strokeWidth="2"
+          />
+        );
+      })}
+      <text x="60" y="10" textAnchor="middle" fontSize="8" fill="var(--theme-primary)">0°</text>
+      <text x="108" y="63" textAnchor="middle" fontSize="8" fill="var(--theme-primary)">90°</text>
+      <text x="60" y="116" textAnchor="middle" fontSize="8" fill="var(--theme-primary)">180°</text>
+      <text x="12" y="63" textAnchor="middle" fontSize="8" fill="var(--theme-primary)">270°</text>
+      <line x1="60" y1="60" x2={indicatorX} y2={indicatorY} stroke="var(--theme-primary)" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="60" cy="60" r="6" fill="var(--theme-primary)" />
+      <circle cx={indicatorX} cy={indicatorY} r="5" fill="var(--theme-accent)" stroke="var(--theme-card)" strokeWidth="2" />
+    </svg>
+  );
+};
+
 interface ErasableElementProps {
   element: MapElement;
   tool: WorldMapTool;
@@ -157,6 +232,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [iconBrushSize, setIconBrushSize] = useState(30);
   const [iconBrushDensity, setIconBrushDensity] = useState(50);
+  const [iconBrushRotation, setIconBrushRotation] = useState(0);
   const [selectedIcon, setSelectedIcon] = useState<'house' | 'houses' | 'tree' | 'trees' | 'mountain' | 'valley' | 'buildings' | 'palace' | 'bridge' | 'fish' | 'horse' | 'snake' | 'cattle' | 'sheep' | 'eagle' | 'wildcat' | 'flower' | 'wave' | 'village' | 'camp' | 'temple' | 'hotel' | 'hospital' | 'factory' | 'park' | 'city' | 'car' | 'bus' | 'ambulance' | 'fire_truck' | 'truck' | 'tractor' | 'train' | 'plane' | 'ship' | 'desert' | 'beach' | 'rainbow' | 'fire' | 'field' | 'traffic_light' | 'barrier' | 'cat' | 'bird' | 'market'>('house');
   const [showPlacesList, setShowPlacesList] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -179,7 +255,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
   const containerRef = useRef<HTMLDivElement>(null);
   const activeEraserElementIdRef = useRef<string | null>(null);
   const activeEraserStrokeIdRef = useRef<string | null>(null);
-  const activeIconBrushSettingsRef = useRef<{ size: number; density: number } | null>(null);
+  const activeIconBrushSettingsRef = useRef<{ size: number; density: number; rotation: number } | null>(null);
 
   const getRelativePointerPosition = (stage: any) => {
     const pointer = stage.getPointerPosition();
@@ -611,7 +687,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         }
       }, 50);
     } else if (tool === 'icon') {
-      const brushSettings = { size: iconBrushSize, density: iconBrushDensity };
+      const brushSettings = { size: iconBrushSize, density: iconBrushDensity, rotation: iconBrushRotation };
       activeIconBrushSettingsRef.current = brushSettings;
       const id = `el-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const newElement: MapElement = {
@@ -621,7 +697,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
         x: pos.x,
         y: pos.y,
         fill: getIconFill(selectedIcon),
-        iconSize: brushSettings.size
+        iconSize: brushSettings.size,
+        rotation: brushSettings.rotation
       };
 
       if (iconCategory === 'nature' || iconCategory === 'construction') {
@@ -690,7 +767,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
 
       const brushSettings = activeIconBrushSettingsRef.current || {
         size: iconBrushSize,
-        density: iconBrushDensity
+        density: iconBrushDensity,
+        rotation: iconBrushRotation
       };
       const spacing = getMapIconBrushSpacing(brushSettings.size, brushSettings.density);
 
@@ -705,7 +783,8 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
             x: lastPlacedPos.x + (dx / dist) * distanceFromLast,
             y: lastPlacedPos.y + (dy / dist) * distanceFromLast,
             fill: getIconFill(selectedIcon),
-            iconSize: brushSettings.size
+            iconSize: brushSettings.size,
+            rotation: brushSettings.rotation
           };
         });
         setLocalElements(prev => {
@@ -1303,6 +1382,21 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                       <span>מרווחת</span>
                       <span>צפופה</span>
                     </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1 border-t border-[var(--theme-border)]/50">
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <span className="text-[10px] font-bold text-[var(--theme-primary)] uppercase">זווית</span>
+                      <span className="text-[10px] font-bold text-[var(--theme-primary)]/60">{iconBrushRotation}°</span>
+                    </div>
+                    <AngleDial value={iconBrushRotation} onChange={setIconBrushRotation} />
+                    <button
+                      type="button"
+                      onClick={() => setIconBrushRotation(0)}
+                      className="w-full py-1.5 rounded-lg text-[9px] font-bold text-[var(--theme-primary)] bg-[var(--theme-card)] hover:bg-[var(--theme-primary)] hover:text-[var(--theme-card)] transition-colors"
+                    >
+                      איפוס לזווית ישרה
+                    </button>
                   </div>
                 </div>
               </>
