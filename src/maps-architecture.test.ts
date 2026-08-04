@@ -8,7 +8,7 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 describe('maps architecture', () => {
   it('routes all four tools through independent components', () => {
     const manager = read('components/MapsManager.tsx');
-    expect(manager).toContain('<CharacterMap');
+    expect(manager).toContain('<CharacterMapsWorkspace');
     expect(manager).toContain('<WorldMapsWorkspace');
     expect(manager).toContain('<MindMapsWorkspace');
     expect(manager).toContain('<MapGallery');
@@ -35,12 +35,14 @@ describe('maps architecture', () => {
     const extracted = [
       'components/maps/WorldMapsWorkspace.tsx',
       'components/maps/MindMapsWorkspace.tsx',
+      'components/maps/CharacterMapsWorkspace.tsx',
       'components/maps/MapsImportDialog.tsx',
       'components/maps/MapsNavigation.tsx',
       'components/maps/SelectedMapHeader.tsx',
     ].map(read).join('\n');
     expect(app).toContain("updateEntries('maps', maps)");
     expect(app).toContain("updateEntries('mindMaps', mindMaps)");
+    expect(app).toContain("updateEntries('characterMaps', maps)");
     expect(app).toContain('onUpdateMapGallery={updateMapGallery}');
     expect(extracted).not.toContain('updateActiveBook');
   });
@@ -50,5 +52,19 @@ describe('maps architecture', () => {
     expect(gallery).not.toContain('react-konva');
     expect(gallery).not.toContain('<Stage');
     expect(gallery).not.toContain('WorldMapEditor');
+  });
+
+  it('preserves character-map membership, positions, and remapped connections on import', () => {
+    const importer = read('components/maps/MapsImportDialog.tsx');
+    const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
+    const types = read('types.ts');
+
+    expect(types).toContain('characterIds?: string[]');
+    expect(importer).toContain('remappedPositions');
+    expect(importer).toContain('remappedCharacterIds');
+    expect(importer).toContain('characterIdMap[connection.fromId] && characterIdMap[connection.toId]');
+    expect(workspace).toContain('currentMap.characterIds');
+    expect(workspace).toContain('characters.filter(character => characterIds.has(character.id))');
+    expect(workspace).toContain('mergedCharacters');
   });
 });

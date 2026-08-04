@@ -38,7 +38,7 @@ const WorldMapsWorkspace: React.FC<WorldMapsWorkspaceProps> = ({
   return (
 <div className="h-full flex flex-col">
   {!currentMapId ? (
-    <div className="flex-1 p-12 overflow-y-auto">
+    <div className="flex-1 p-12 lg:pt-24 overflow-y-auto">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-[var(--theme-accent)] handwritten text-4xl">המפות שלי</h2>

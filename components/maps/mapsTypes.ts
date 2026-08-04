@@ -1,5 +1,6 @@
 import {
   Book,
+  CharacterDiagram,
   CharacterMapConnection,
   MapGallery,
   MindMap,
@@ -14,11 +15,13 @@ export interface MapsManagerProps {
   characters: QuestionnaireEntry[];
   places: QuestionnaireEntry[];
   connections: CharacterMapConnection[];
+  characterMaps: CharacterDiagram[];
   maps: WorldMap[];
   mindMaps: MindMap[];
   mapGallery?: MapGallery;
   onUpdateCharacters: (characters: QuestionnaireEntry[]) => void;
   onUpdateConnections: (connections: CharacterMapConnection[]) => void;
+  onUpdateCharacterMaps: (maps: CharacterDiagram[]) => void;
   onUpdateMaps: (maps: WorldMap[]) => void;
   onUpdateMindMaps: (mindMaps: MindMap[]) => void;
   onUpdateMapGallery: (gallery: MapGallery) => void;
@@ -28,4 +31,6 @@ export interface MapsManagerProps {
   onMapSelect?: (id: string | null) => void;
   selectedMindMapId?: string | null;
   onMindMapSelect?: (id: string | null) => void;
+  selectedCharacterMapId?: string | null;
+  onCharacterMapSelect?: (id: string | null) => void;
 }

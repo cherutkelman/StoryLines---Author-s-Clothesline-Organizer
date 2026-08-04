@@ -260,6 +260,14 @@ export interface CharacterMapConnection {
   labelOffset?: { x: number; y: number };
 }
 
+export interface CharacterDiagram {
+  id: string;
+  name: string;
+  connections: CharacterMapConnection[];
+  positions: Record<string, { x: number; y: number }>;
+  characterIds?: string[];
+}
+
 export interface MapElement {
   id: string;
   type: 'icon' | 'text' | 'line' | 'image' | 'rect' | 'circle' | 'triangle';
@@ -364,6 +372,7 @@ export interface Project {
   fantasyWorlds?: QuestionnaireEntry[];
   backgrounds?: QuestionnaireEntry[];
   characterMapConnections?: CharacterMapConnection[];
+  characterMaps?: CharacterDiagram[];
   maps?: WorldMap[];
   mindMaps?: MindMap[];
   mapGallery?: MapGallery;
@@ -441,6 +450,7 @@ export interface BookUIState {
   mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps' | 'gallery';
   mapsSelectedMapId?: string | null;
   mapsSelectedMindMapId?: string | null;
+  mapsSelectedCharacterMapId?: string | null;
 }
 
 export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts' | 'twists';

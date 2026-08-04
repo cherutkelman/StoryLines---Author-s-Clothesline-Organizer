@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CopyPlus, X } from 'lucide-react';
-import { Book, MindMap, WorldMap } from '../../types';
+import { Book, CharacterDiagram, MindMap, QuestionnaireEntry, WorldMap } from '../../types';
 import { ImportMapCategory } from './mapsDefinitions';
 
 interface MapsImportDialogProps {
@@ -10,10 +10,35 @@ interface MapsImportDialogProps {
   activeBookId: string;
   maps: WorldMap[];
   mindMaps: MindMap[];
+  characterMaps: CharacterDiagram[];
+  characters: QuestionnaireEntry[];
   onUpdateMaps: (maps: WorldMap[]) => void;
   onUpdateMindMaps: (maps: MindMap[]) => void;
+  onUpdateCharacterMaps: (maps: CharacterDiagram[]) => void;
+  onUpdateCharacters: (characters: QuestionnaireEntry[]) => void;
   onClose: () => void;
 }
+
+const getBookMaps = (book: Book | undefined, category: ImportMapCategory): Array<WorldMap | MindMap | CharacterDiagram> => {
+  if (!book) return [];
+  if (category === 'worldMaps') return book.maps || [];
+  if (category === 'mindMaps') return book.mindMaps || [];
+  if (book.characterMaps?.length) return book.characterMaps;
+
+  const positions = Object.fromEntries(
+    (book.characters || [])
+      .filter(character => typeof character.x === 'number' && typeof character.y === 'number')
+      .map(character => [character.id, { x: character.x!, y: character.y! }])
+  );
+  if (!(book.characters?.length) && !(book.characterMapConnections?.length)) return [];
+  return [{
+    id: `legacy-character-map-${book.id}`,
+    name: 'מפת דמויות 1',
+    connections: book.characterMapConnections || [],
+    positions,
+    characterIds: (book.characters || []).map(character => character.id),
+  }];
+};
 
 const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
   isOpen,
@@ -22,13 +47,19 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
   activeBookId,
   maps,
   mindMaps,
+  characterMaps,
+  characters,
   onUpdateMaps,
   onUpdateMindMaps,
+  onUpdateCharacterMaps,
+  onUpdateCharacters,
   onClose,
 }) => {
   const [importSourceBookId, setImportSourceBookId] = useState('');
   const [importCategory, setImportCategory] = useState<ImportMapCategory>(category);
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
+  const selectedSourceBook = allBooks.find(book => book.id === importSourceBookId);
+  const availableSourceItems = getBookMaps(selectedSourceBook, importCategory);
 
   useEffect(() => {
     if (isOpen) setImportCategory(category);
@@ -38,14 +69,48 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
     if (!importSourceBookId) return;
     const sourceBook = allBooks.find(book => book.id === importSourceBookId);
     if (!sourceBook) return;
-    const sourceField = importCategory === 'worldMaps' ? 'maps' : 'mindMaps';
-    const sourceItems = (sourceBook as any)[sourceField] || [];
+    const sourceItems = getBookMaps(sourceBook, importCategory);
     const itemsToImport = selectedImportIds.length === 0 ? sourceItems : sourceItems.filter((item: any) => selectedImportIds.includes(item.id));
     if (itemsToImport.length === 0) return;
+
+    const characterIdMap: Record<string, string> = {};
+    if (importCategory === 'characterMaps') {
+      const importedCharacters = (sourceBook.characters || []).map(character => {
+        const newId = `char-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        characterIdMap[character.id] = newId;
+        return { ...character, id: newId, x: undefined, y: undefined };
+      });
+      onUpdateCharacters([...characters, ...importedCharacters]);
+    }
+
     const clonedItems = itemsToImport.map((item: any) => {
-      const newId = `${importCategory === 'worldMaps' ? 'map' : 'mind'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const idPrefix = importCategory === 'worldMaps' ? 'map' : importCategory === 'mindMaps' ? 'mind' : 'character-map';
+      const newId = `${idPrefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       if (importCategory === 'worldMaps') {
         return { ...item, id: newId, elements: item.elements.map((element: any) => ({ ...element, id: `el-${Date.now()}-${Math.random()}` })) };
+      }
+      if (importCategory === 'characterMaps') {
+        const remappedPositions = Object.fromEntries(
+          Object.entries(item.positions || {})
+            .filter(([characterId]) => characterIdMap[characterId])
+            .map(([characterId, position]) => [characterIdMap[characterId], position])
+        );
+        const sourceCharacterIds = item.characterIds?.length
+          ? item.characterIds
+          : Array.from(new Set([
+              ...Object.keys(item.positions || {}),
+              ...(item.connections || []).flatMap((connection: any) => [connection.fromId, connection.toId]),
+            ]));
+        const remappedCharacterIds = sourceCharacterIds.flatMap((characterId: string) => characterIdMap[characterId] ? [characterIdMap[characterId]] : []);
+        const remappedConnections = (item.connections || [])
+          .filter((connection: any) => characterIdMap[connection.fromId] && characterIdMap[connection.toId])
+          .map((connection: any) => ({
+            ...connection,
+            id: `conn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            fromId: characterIdMap[connection.fromId],
+            toId: characterIdMap[connection.toId],
+          }));
+        return { ...item, id: newId, positions: remappedPositions, connections: remappedConnections, characterIds: remappedCharacterIds };
       }
       const idMap: Record<string, string> = {};
       const newNodes = item.nodes.map((node: any) => {
@@ -62,7 +127,8 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
       return { ...item, id: newId, nodes: newNodes, edges: newEdges };
     });
     if (importCategory === 'worldMaps') onUpdateMaps([...maps, ...clonedItems]);
-    else onUpdateMindMaps([...mindMaps, ...clonedItems]);
+    else if (importCategory === 'mindMaps') onUpdateMindMaps([...mindMaps, ...clonedItems]);
+    else onUpdateCharacterMaps([...characterMaps, ...clonedItems]);
     onClose();
     setSelectedImportIds([]);
     alert(`יובאו ${clonedItems.length} מפות בהצלחה`);
@@ -120,6 +186,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
             >
               <option value="worldMaps">מפות עולם</option>
               <option value="mindMaps">מפות חשיבה</option>
+              <option value="characterMaps">מפות דמויות</option>
             </select>
           </div>
         </div>
@@ -136,7 +203,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1 scrollbar-hide">
-              {(allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory === 'worldMaps' ? 'maps' : 'mindMaps']?.map((item: any) => (
+              {availableSourceItems.map((item: any) => (
                 <button
                   key={item.id}
                   onClick={() => {
@@ -152,7 +219,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
                   <span className="text-sm font-bold truncate">{item.name || 'ללא שם'}</span>
                 </button>
               ))}
-              {((allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory === 'worldMaps' ? 'maps' : 'mindMaps'] || []).length === 0 && (
+              {availableSourceItems.length === 0 && (
                 <div className="col-span-2 py-8 text-center text-[var(--theme-text)]/30 text-sm font-bold bg-[var(--theme-secondary)]/20 rounded-3xl border-2 border-dashed border-[var(--theme-border)]/30">
                   אין מפות מסוג זה בספר הנבחר
                 </div>
@@ -165,7 +232,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
       <div className="p-8 border-t border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/30 flex gap-4">
         <button 
           onClick={handleImport}
-          disabled={!importSourceBookId || ((allBooks.find(b => b.id === importSourceBookId) as any)?.[importCategory === 'worldMaps' ? 'maps' : 'mindMaps'] || []).length === 0}
+          disabled={!importSourceBookId || availableSourceItems.length === 0}
           className="flex-1 bg-[var(--theme-primary)] text-[var(--theme-card)] py-4 rounded-2xl font-bold text-sm shadow-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <CopyPlus size={18} />

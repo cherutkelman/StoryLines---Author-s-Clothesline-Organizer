@@ -9,6 +9,7 @@ import { isWeb } from '../src/platform';
 interface MapGalleryProps {
   gallery?: MapGalleryData;
   onUpdateGallery: (gallery: MapGalleryData) => void;
+  navigation?: React.ReactNode;
 }
 
 const DEFAULT_CATEGORY_ID = 'gallery-cat-default';
@@ -86,7 +87,7 @@ const migrateInlineGalleryImage = async (image: MapGalleryData['images'][number]
   }
 };
 
-const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => {
+const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery, navigation }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetCategoryId, setTargetCategoryId] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
@@ -102,6 +103,7 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
     : normalized.images.filter(image => image.categoryId === activeCategory.id);
   const activeImageIndex = Math.max(0, categoryImages.findIndex(image => image.id === normalized.activeImageId));
   const activeImage = categoryImages[activeImageIndex] || categoryImages[0];
+  const gridRowHeight = Math.max(140, Math.min(320, Math.round(1100 / normalized.gridColumns!)));
 
   const updateGallery = (updates: Partial<MapGalleryData>) => {
     onUpdateGallery({ ...normalized, ...updates });
@@ -294,6 +296,10 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
             <span className="text-xs font-bold text-[var(--theme-primary)]/50">{categoryImages.length} תמונות</span>
           </div>
 
+          <div className="flex flex-1 justify-center">
+            {navigation}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-secondary)]/40 p-1">
               <button
@@ -453,12 +459,15 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery }) => 
           </div>
         ) : (
           <div
-            className="grid gap-2 sm:gap-3"
-            style={{ gridTemplateColumns: `repeat(${normalized.gridColumns}, minmax(0, 1fr))` }}
+            className="flex flex-wrap items-start gap-2 sm:gap-3"
           >
             {categoryImages.map(image => (
-              <div key={image.id} className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-[var(--theme-card)] border border-[var(--theme-border)] shadow-sm">
-                <img src={image.dataUrl} alt={image.name} className="w-full h-full object-cover" />
+              <div
+                key={image.id}
+                className="group relative flex-none max-w-full overflow-hidden rounded-lg bg-[var(--theme-card)] border border-[var(--theme-border)] shadow-sm"
+                style={{ height: gridRowHeight }}
+              >
+                <img src={image.dataUrl} alt={image.name} className="block h-full w-auto max-w-full object-contain" />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <p className="text-white text-xs font-bold truncate">{image.name}</p>
                 </div>

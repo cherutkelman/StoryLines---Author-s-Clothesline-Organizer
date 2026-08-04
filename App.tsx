@@ -99,7 +99,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
   'characters', 'places', 'periods', 'twists', 'fantasyWorlds', 'backgrounds',
-  'characterMapConnections', 'maps', 'mindMaps', 'mapGallery'
+  'characterMapConnections', 'characterMaps', 'maps', 'mindMaps', 'mapGallery'
 ];
 
 type WebSaveStatus = 'saved' | 'saving' | 'error';
@@ -1576,7 +1576,7 @@ const App: React.FC = () => {
     setBooks(prev => prev.map(b => b.id === id ? { ...b, universeId: undefined } : b));
   };
 
-  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'maps' | 'mindMaps', entries: any[]) => {
+  const updateEntries = (category: 'characters' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | 'characterMapConnections' | 'characterMaps' | 'maps' | 'mindMaps', entries: any[]) => {
     updateActiveBook({ [category]: entries });
   };
 
@@ -2620,11 +2620,13 @@ const App: React.FC = () => {
                       characters={activeBook.characters || []}
                       places={activeBook.places || []}
                       connections={activeBook.characterMapConnections || []}
+                      characterMaps={activeBook.characterMaps || []}
                       maps={activeBook.maps || []}
                       mindMaps={activeBook.mindMaps || []}
                       mapGallery={activeBook.mapGallery}
                       onUpdateCharacters={(chars) => updateEntries('characters', chars)}
                       onUpdateConnections={(conns) => updateEntries('characterMapConnections', conns)}
+                      onUpdateCharacterMaps={(maps) => updateEntries('characterMaps', maps)}
                       onUpdateMaps={(maps) => updateEntries('maps', maps)}
                       onUpdateMindMaps={(mindMaps) => updateEntries('mindMaps', mindMaps)}
                       onUpdateMapGallery={updateMapGallery}
@@ -2634,6 +2636,8 @@ const App: React.FC = () => {
                       onMapSelect={(id) => updateBookUiState({ mapsSelectedMapId: id })}
                       selectedMindMapId={activeUI.mapsSelectedMindMapId}
                       onMindMapSelect={(id) => updateBookUiState({ mapsSelectedMindMapId: id })}
+                      selectedCharacterMapId={activeUI.mapsSelectedCharacterMapId}
+                      onCharacterMapSelect={(id) => updateBookUiState({ mapsSelectedCharacterMapId: id })}
                    />
                 </div>
               )}

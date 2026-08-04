@@ -4,7 +4,7 @@ export const MAPS_AREA_LABEL = 'מפות';
 export const MAPS_AREA_SHORT_LABEL = 'מפות';
 
 export type MapTabId = 'characterDiagram' | 'worldMaps' | 'mindMaps' | 'gallery';
-export type ImportMapCategory = 'worldMaps' | 'mindMaps';
+export type ImportMapCategory = 'characterMaps' | 'worldMaps' | 'mindMaps';
 
 export const MAP_NAV_ITEMS: { id: MapTabId; label: string; icon: LucideIcon }[] = [
   { id: 'characterDiagram', label: 'מפת דמויות', icon: Users },

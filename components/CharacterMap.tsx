@@ -532,7 +532,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
     <div className="h-full flex flex-col relative select-none bg-[var(--theme-bg)]">
       {/* Tool Bar */}
       {!isExporting && (
-        <div className="character-map-toolbar absolute top-6 lg:top-20 left-1/2 -translate-x-1/2 z-30 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
+        <div className="character-map-toolbar absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
           <button 
             onClick={() => setTool('move')}
             className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}

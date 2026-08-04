@@ -4,10 +4,11 @@ import { MAP_NAV_ITEMS, MapTabId } from './mapsDefinitions';
 interface MapsNavigationProps {
   activeTab: MapTabId;
   onChange: (tab: MapTabId) => void;
+  embedded?: boolean;
 }
 
-const MapsNavigation: React.FC<MapsNavigationProps> = ({ activeTab, onChange }) => (
-  <div className="hidden lg:flex absolute top-4 left-1/2 -translate-x-1/2 z-50 items-center gap-1 bg-[var(--theme-card)]/95 border border-[var(--theme-border)] rounded-2xl p-1.5 shadow-xl backdrop-blur-sm">
+const MapsNavigation: React.FC<MapsNavigationProps> = ({ activeTab, onChange, embedded = false }) => (
+  <div className={`hidden lg:flex items-center gap-1 bg-[var(--theme-card)]/95 border border-[var(--theme-border)] rounded-2xl p-1.5 backdrop-blur-sm ${embedded ? 'shadow-sm' : 'absolute top-4 left-1/2 -translate-x-1/2 z-50 shadow-xl'}`}>
     {MAP_NAV_ITEMS.map(item => {
       const Icon = item.icon;
       const isActive = activeTab === item.id;
