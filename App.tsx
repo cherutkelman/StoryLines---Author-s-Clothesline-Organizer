@@ -1584,6 +1584,10 @@ const App: React.FC = () => {
     updateActiveBook({ [category]: entries });
   };
 
+  const applyCharacterSyncBooks = (nextBooks: Book[]) => {
+    setBooks(nextBooks);
+  };
+
   const updateMapGallery = (gallery: MapGallery) => {
     updateActiveBook({ mapGallery: gallery });
   };
@@ -2664,6 +2668,7 @@ const App: React.FC = () => {
                     onUpdateFantasyWorlds={(e) => updateEntries('fantasyWorlds', e)}
                     onUpdateBackgrounds={(e) => updateEntries('backgrounds', e)}
                     onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
+                    onApplyCharacterSyncBooks={applyCharacterSyncBooks}
                     initialTab={activeUI.questionnaireActiveTab}
                     initialSelectedEntryId={activeUI.questionnaireSelectedEntryId}
                     onTabChange={handleQuestionnaireTabChange}

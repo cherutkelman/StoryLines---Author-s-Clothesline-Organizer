@@ -11,7 +11,8 @@ import {
   PanelLeftOpen,
   MessageSquarePlus,
   Image as ImageIcon,
-  Camera
+  Camera,
+  RefreshCw
 } from 'lucide-react';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { compressImageFile } from '../src/image-utils';
@@ -48,6 +49,7 @@ import {
 } from './questionnaires/questionnaireNames';
 import { createCharacterEntry } from '../src/characters/characterFactory';
 import CharacterImportDialog from './questionnaires/CharacterImportDialog';
+import CharacterSyncDialog from './questionnaires/CharacterSyncDialog';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -66,6 +68,7 @@ interface QuestionnairesProps {
   onUpdateFantasyWorlds: (entries: QuestionnaireEntry[]) => void;
   onUpdateBackgrounds: (entries: QuestionnaireEntry[]) => void;
   onUpdateRelationships: (relationships: any[]) => void;
+  onApplyCharacterSyncBooks: (books: Book[]) => void;
   initialTab?: QuestionnaireTabId;
   initialSelectedEntryId?: string | null;
   onTabChange?: (tab: QuestionnaireTabId) => void;
@@ -100,6 +103,7 @@ const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
   allBooks, activeBookId, characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
   onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
+  onApplyCharacterSyncBooks,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
   const [activeTab, setActiveTab] = useState<QuestionnaireTabId>(initialTab || 'characters');
@@ -111,6 +115,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isCharacterAddMenuOpen, setIsCharacterAddMenuOpen] = useState(false);
   const [isCharacterImportOpen, setIsCharacterImportOpen] = useState(false);
+  const [isCharacterSyncOpen, setIsCharacterSyncOpen] = useState(false);
+  const [characterSyncFeedback, setCharacterSyncFeedback] = useState('');
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const { categoryTopRef, scrollToCategoryTop } = useScrollToQuestionnaireCategoryTop<HTMLDivElement>();
   const accordionCategoryAnchorsRef = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -158,10 +164,19 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const entries = rawEntries.map(entry => normalizeEntryForTab(entry, activeTab));
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
+  const selectedCharacter = activeTab === 'characters'
+    ? characters.find(character => character.id === selectedEntryId)
+    : undefined;
   const selectedRelationship = isRelationshipsTab ? relationships.find(rel => rel.id === selectedEntryId) : null;
   
   const currentGender = selectedEntry?.data?.gender || 'female';
   const currentPlaceType = selectedEntry?.data?.placeType || 'macro';
+
+  useEffect(() => {
+    if (!characterSyncFeedback) return;
+    const timeout = window.setTimeout(() => setCharacterSyncFeedback(''), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [characterSyncFeedback]);
 
   const questionsConfig = activeTab === 'characters' 
     ? (currentGender === 'male' ? MALE_QUESTIONS_CONFIG : FEMALE_QUESTIONS_CONFIG)
@@ -636,6 +651,18 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     a.click();
   };
 
+  const renderCharacterSyncButton = () => activeTab === 'characters' && selectedCharacter ? (
+    <button
+      type="button"
+      onClick={() => setIsCharacterSyncOpen(true)}
+      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] px-3 py-2 text-sm font-bold text-[var(--theme-primary)] shadow-sm transition-all hover:bg-[var(--theme-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/20"
+      title="סנכרון מידע כללי בין ספרים"
+    >
+      <RefreshCw size={17} />
+      <span>סנכרון מידע</span>
+    </button>
+  ) : null;
+
   return (
     <div className="min-h-full lg:h-full flex flex-col p-4 sm:p-6 gap-4 sm:gap-6 max-w-[1600px] mx-auto">
       <div className="hidden justify-center flex-shrink-0 sm:flex">
@@ -1005,6 +1032,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       >
                         <Download size={18} />
                       </button>
+                      {renderCharacterSyncButton()}
                       <div className="flex items-center gap-2">
                         {isSearchActive && (
                           <input
@@ -1075,6 +1103,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       >
                         <Download size={18} />
                       </button>
+                      {renderCharacterSyncButton()}
                       <button
                         onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
                         className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
@@ -1954,6 +1983,24 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
         }}
         onClose={() => setIsCharacterImportOpen(false)}
       />
+
+      {selectedCharacter && (
+        <CharacterSyncDialog
+          isOpen={isCharacterSyncOpen}
+          books={allBooks}
+          activeBookId={activeBookId}
+          character={selectedCharacter}
+          onApplyBooks={onApplyCharacterSyncBooks}
+          onSuccess={() => setCharacterSyncFeedback('המידע הכללי של הדמות סונכרן.')}
+          onClose={() => setIsCharacterSyncOpen(false)}
+        />
+      )}
+
+      {characterSyncFeedback && (
+        <div role="status" className="fixed bottom-5 left-1/2 z-[140] -translate-x-1/2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white shadow-xl" dir="rtl">
+          {characterSyncFeedback}
+        </div>
+      )}
     </div>
   );
 };   
