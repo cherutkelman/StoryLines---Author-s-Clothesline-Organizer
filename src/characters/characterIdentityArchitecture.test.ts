@@ -13,7 +13,7 @@ describe('character identity infrastructure wiring', () => {
     const relationshipArc = read('components/plot-planning/RelationshipArcEditor.tsx');
     const mapImporter = read('components/maps/MapsImportDialog.tsx');
 
-    expect(questionnaires).toContain('? createCharacterEntry()');
+    expect(questionnaires).toContain('const newEntry = createCharacterEntry();');
     expect(characterMap).toContain('const newNode = createCharacterEntry();');
     expect(relationshipDynamics).toContain('createCharacterEntry({ name })');
     expect(relationshipArc).toContain('createPlanningCharacter(newName)');

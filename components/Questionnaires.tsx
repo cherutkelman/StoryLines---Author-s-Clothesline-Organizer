@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { QuestionnaireEntry, Book, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
+import { QuestionnaireEntry, Book, CharacterEntry, DevelopmentStage, SpecialItem, UniquePower, SpecificLocation } from '../types';
 import {
   Plus, Trash2, User, MapPin, Clock, Wand2, Sparkles, Loader2, 
   Save, X, ChevronLeft, ChevronDown, UserRound, UserRoundSearch, FileText, 
@@ -47,18 +47,19 @@ import {
   resolveQuestionnaireNameOnBlur,
 } from './questionnaires/questionnaireNames';
 import { createCharacterEntry } from '../src/characters/characterFactory';
+import CharacterImportDialog from './questionnaires/CharacterImportDialog';
 
 interface QuestionnairesProps {
   allBooks: Book[];
   activeBookId: string;
-  characters: QuestionnaireEntry[];
+  characters: CharacterEntry[];
   places: QuestionnaireEntry[];
   periods: QuestionnaireEntry[];
   twists: QuestionnaireEntry[];
   fantasyWorlds: QuestionnaireEntry[];
   backgrounds: QuestionnaireEntry[];
   relationships: any[];
-  onUpdateCharacters: (entries: QuestionnaireEntry[]) => void;
+  onUpdateCharacters: (entries: CharacterEntry[]) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
@@ -97,7 +98,7 @@ const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[
 };
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
-  characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
+  allBooks, activeBookId, characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
   onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
@@ -108,6 +109,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [isCategoriesVisible, setIsCategoriesVisible] = useState(false);
   const [mode, setMode] = useState<'edit' | 'view'>('view');
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isCharacterAddMenuOpen, setIsCharacterAddMenuOpen] = useState(false);
+  const [isCharacterImportOpen, setIsCharacterImportOpen] = useState(false);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const { categoryTopRef, scrollToCategoryTop } = useScrollToQuestionnaireCategoryTop<HTMLDivElement>();
   const accordionCategoryAnchorsRef = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -354,10 +357,21 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
     updateEntry({ imageUrl: undefined });
   };
 
+  const createNewCharacter = () => {
+    const newEntry = createCharacterEntry();
+    onUpdateCharacters([...characters, newEntry]);
+    handleEntrySelect(newEntry.id);
+    setMode('edit');
+    setIsCharacterAddMenuOpen(false);
+  };
+
   const addEntry = () => {
-    const newEntry: QuestionnaireEntry = activeTab === 'characters'
-      ? createCharacterEntry()
-      : {
+    if (activeTab === 'characters') {
+      setIsCharacterAddMenuOpen(true);
+      return;
+    }
+
+    const newEntry: QuestionnaireEntry = {
           id: `q-${Date.now()}`,
           name: activeTab === 'places' ? 'מקום חדש' : activeTab === 'periods' ? 'תקופה חדשה' : activeTab === 'twists' ? 'טוויסט חדש' : 'עולם פנטזיה חדש',
           data: activeTab === 'places'
@@ -1879,6 +1893,67 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           )}
         </div>
       </div>
+
+      {isCharacterAddMenuOpen && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4"
+          dir="rtl"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setIsCharacterAddMenuOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="character-add-title"
+            className="w-full max-w-sm rounded-3xl border border-[var(--theme-border)]/50 bg-[var(--theme-card)] p-5 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 id="character-add-title" className="text-lg font-bold text-[var(--theme-primary)]">הוספת דמות</h2>
+              <button
+                type="button"
+                aria-label="סגירת פעולות הוספת דמות"
+                onClick={() => setIsCharacterAddMenuOpen(false)}
+                className="rounded-xl p-2 hover:bg-[var(--theme-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/20"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={createNewCharacter}
+                className="min-h-12 rounded-2xl bg-[var(--theme-primary)] px-4 font-bold text-[var(--theme-card)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/25"
+              >
+                יצירת דמות חדשה
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCharacterAddMenuOpen(false);
+                  setIsCharacterImportOpen(true);
+                }}
+                className="min-h-12 rounded-2xl border border-[var(--theme-border)] px-4 font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/20"
+              >
+                ייבוא דמות מספר אחר
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <CharacterImportDialog
+        isOpen={isCharacterImportOpen}
+        sourceBooks={allBooks}
+        activeBookId={activeBookId}
+        targetCharacters={characters}
+        onUpdateCharacters={onUpdateCharacters}
+        onSelectCharacter={characterId => {
+          handleEntrySelect(characterId);
+          setMode('edit');
+        }}
+        onClose={() => setIsCharacterImportOpen(false)}
+      />
     </div>
   );
 };   
