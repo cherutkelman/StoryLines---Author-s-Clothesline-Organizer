@@ -1588,6 +1588,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           <QuestionnaireFields
                             questions={filteredQuestions}
                             data={selectedEntry.data}
+                            promoteMultilineTextValues={activeTab === 'characters'}
                             onChange={(questionId, value) => updateEntry({
                               data: { ...selectedEntry.data, [questionId]: value },
                             })}
