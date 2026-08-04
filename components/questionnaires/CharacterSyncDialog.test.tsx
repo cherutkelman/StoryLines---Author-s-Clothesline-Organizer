@@ -5,10 +5,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Book, CharacterEntry } from '../../types';
 import { buildCharacterSyncPlan } from '../../src/characters/characterSync';
 import CharacterSyncDialog, {
+  buildCombinedCharacterSyncValue,
   buildCharacterSyncResolutionsFromChoices,
   createInitialCharacterSyncChoices,
   getActionableCharacterSyncFields,
   getCharacterSyncFieldLabel,
+  selectManualCharacterSyncChoice,
 } from './CharacterSyncDialog';
 
 const entityId = uuidv4();
@@ -134,6 +136,84 @@ describe('CharacterSyncDialog states', () => {
 });
 
 describe('sync choice translation', () => {
+  it('builds a manual conflict value with the active book first and the remaining books in order', () => {
+    const result = buildCharacterSyncPlan([
+      book('first', [character({ data: { traits: 'First value' } })]),
+      book('active', [character({ data: { traits: 'Active value' } })]),
+      book('third', [character({ data: { traits: 'Third value' } })]),
+    ], entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    const traits = result.plan.fields.find(field => field.field === 'data.traits');
+    expect(traits).toBeDefined();
+    expect(buildCombinedCharacterSyncValue(traits!, 'active')).toBe(
+      'Active value\n\nFirst value\n\nThird value'
+    );
+  });
+
+  it('deduplicates matching values with surrounding whitespace and keeps the active original', () => {
+    const result = buildCharacterSyncPlan([
+      book('empty', [character({ data: { traits: '' } })]),
+      book('active', [character({ data: { traits: 'Shared value' } })]),
+      book('duplicate', [character({ data: { traits: ' Shared value ' } })]),
+      book('other', [character({ data: { traits: 'Other value' } })]),
+    ], entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    const traits = result.plan.fields.find(field => field.field === 'data.traits');
+    expect(traits).toBeDefined();
+    expect(buildCombinedCharacterSyncValue(traits!, 'active')).toBe('Shared value\n\nOther value');
+  });
+
+  it('deduplicates CRLF and LF variants while preserving the active original text', () => {
+    const result = buildCharacterSyncPlan([
+      book('first', [character({ data: { traits: 'Line one\nLine two' } })]),
+      book('active', [character({ data: { traits: 'Line one\r\nLine two' } })]),
+      book('other', [character({ data: { traits: 'Other' } })]),
+    ], entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    const traits = result.plan.fields.find(field => field.field === 'data.traits');
+    expect(traits).toBeDefined();
+    expect(buildCombinedCharacterSyncValue(traits!, 'active')).toBe('Line one\r\nLine two\n\nOther');
+  });
+
+  it('keeps the first original by book order when the active book value is empty', () => {
+    const result = buildCharacterSyncPlan([
+      book('active', [character({ data: { traits: '   ' } })]),
+      book('first', [character({ data: { traits: ' First version ' } })]),
+      book('duplicate', [character({ data: { traits: 'First version' } })]),
+      book('other', [character({ data: { traits: 'Second version' } })]),
+    ], entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    const traits = result.plan.fields.find(field => field.field === 'data.traits');
+    expect(traits).toBeDefined();
+    expect(buildCombinedCharacterSyncValue(traits!, 'active')).toBe(' First version \n\nSecond version');
+  });
+
+  it('preserves an existing manual edit when switching away and back', () => {
+    const result = buildCharacterSyncPlan([
+      book('active', [character({ data: { traits: 'Active' } })]),
+      book('other', [character({ data: { traits: 'Other' } })]),
+    ], entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    const traits = result.plan.fields.find(field => field.field === 'data.traits');
+    expect(traits).toBeDefined();
+    const choiceAfterSwitch = { mode: 'value', value: 'Other', manualValue: 'Edited draft' } as const;
+    expect(selectManualCharacterSyncChoice(traits!, 'active', choiceAfterSwitch)).toEqual({
+      mode: 'manual',
+      value: 'Edited draft',
+      manualValue: 'Edited draft',
+    });
+  });
+
   it('defaults fillable to its suggestion and conflict to skip', () => {
     const result = buildCharacterSyncPlan([
       book('a', [character({ data: { age: '30', traits: 'A' } })]),

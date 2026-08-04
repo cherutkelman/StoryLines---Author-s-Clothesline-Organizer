@@ -96,7 +96,7 @@ export type CharacterSyncApplyResult =
       issues: CharacterSyncResolutionIssue[];
     };
 
-const normalizeForComparison = (value: unknown): string => {
+export const normalizeCharacterSyncValueForComparison = (value: unknown): string => {
   if (typeof value !== 'string') return '';
   return value.replace(/\r\n?/g, '\n').trim();
 };
@@ -197,7 +197,7 @@ const buildFieldPlan = (
 ): CharacterSyncFieldPlan => {
   const appearanceValues = appearances.map(appearance => {
     const value = getSharedCharacterFieldValue(appearance.character, field);
-    const normalizedValue = normalizeForComparison(value);
+      const normalizedValue = normalizeCharacterSyncValueForComparison(value);
     return {
       bookId: appearance.bookId,
       bookTitle: appearance.bookTitle,
@@ -275,7 +275,7 @@ export const validateCharacterSyncResolutions = (
       return;
     }
     if (resolution.action === 'use_value'
-      && (typeof resolution.value !== 'string' || normalizeForComparison(resolution.value) === '')) {
+      && (typeof resolution.value !== 'string' || normalizeCharacterSyncValueForComparison(resolution.value) === '')) {
       issues.push({ code: 'invalid_value', field });
     }
   });

@@ -4,6 +4,7 @@ import type { Book, CharacterEntry } from '../../types';
 import {
   applyCharacterSyncResolutions,
   buildCharacterSyncPlan,
+  normalizeCharacterSyncValueForComparison,
   type CharacterSyncFieldPlan,
   type CharacterSyncPlan,
   type CharacterSyncResolution,
@@ -24,6 +25,7 @@ interface CharacterSyncDialogProps {
 export interface CharacterSyncChoice {
   mode: 'skip' | 'value' | 'manual';
   value: string;
+  manualValue?: string;
 }
 
 export const getCharacterSyncFieldLabel = (field: SharedCharacterFieldPath): string => {
@@ -47,6 +49,40 @@ export const getActionableCharacterSyncFields = (
   plan: CharacterSyncPlan
 ): CharacterSyncFieldPlan[] => plan.fields.filter(field => field.status !== 'unchanged');
 
+export const buildCombinedCharacterSyncValue = (
+  field: CharacterSyncFieldPlan,
+  activeBookId: string
+): string => {
+  if (field.status !== 'conflict' || field.field === 'imageUrl') return '';
+
+  const orderedValues = [
+    ...field.appearanceValues.filter(item => item.bookId === activeBookId),
+    ...field.appearanceValues.filter(item => item.bookId !== activeBookId),
+  ];
+  const seenValues = new Set<string>();
+
+  return orderedValues
+    .filter(item => {
+      if (item.isEmpty || typeof item.value !== 'string') return false;
+      const normalizedValue = normalizeCharacterSyncValueForComparison(item.value);
+      if (!normalizedValue || seenValues.has(normalizedValue)) return false;
+      seenValues.add(normalizedValue);
+      return true;
+    })
+    .map(item => item.value as string)
+    .join('\n\n');
+};
+
+export const selectManualCharacterSyncChoice = (
+  field: CharacterSyncFieldPlan,
+  activeBookId: string,
+  choice: CharacterSyncChoice
+): CharacterSyncChoice => {
+  const manualValue = choice.manualValue
+    ?? (choice.mode === 'manual' ? choice.value : buildCombinedCharacterSyncValue(field, activeBookId));
+  return { mode: 'manual', value: manualValue, manualValue };
+};
+
 export const buildCharacterSyncResolutionsFromChoices = (
   fields: CharacterSyncFieldPlan[],
   choices: Record<string, CharacterSyncChoice>
@@ -69,7 +105,7 @@ export const buildCharacterSyncResolutionsFromChoices = (
 const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
   isOpen,
   books,
-  activeBookId: _activeBookId,
+  activeBookId,
   character,
   onClose,
   onApplyBooks,
@@ -208,6 +244,7 @@ const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
                       key={field.field}
                       field={field}
                       plan={plan}
+                      activeBookId={activeBookId}
                       choice={choices[field.field] || { mode: 'skip', value: '' }}
                       onChange={choice => updateChoice(field.field, choice)}
                       brokenImages={brokenImages}
@@ -237,13 +274,14 @@ const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
 interface SyncFieldCardProps {
   field: CharacterSyncFieldPlan;
   plan: CharacterSyncPlan;
+  activeBookId: string;
   choice: CharacterSyncChoice;
   onChange: (choice: CharacterSyncChoice) => void;
   brokenImages: Set<string>;
   onImageError: (value: string) => void;
 }
 
-const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, choice, onChange, brokenImages, onImageError }) => {
+const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, activeBookId, choice, onChange, brokenImages, onImageError }) => {
   const emptyBooks = field.appearanceValues.filter(item => item.isEmpty).map(item => item.bookTitle);
   const bookNamesForOption = (option: CharacterSyncFieldPlan['options'][number]) =>
     option.appearances.map(appearance =>
@@ -270,7 +308,7 @@ const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, choice, onCh
           return (
             <label key={option.normalizedValue} className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-[var(--theme-border)]/40 p-3 hover:bg-[var(--theme-secondary)]/30">
               <input type="radio" name={optionName} checked={checked}
-                onChange={() => onChange({ mode: 'value', value: option.value })}
+                onChange={() => onChange({ mode: 'value', value: option.value, manualValue: choice.manualValue })}
                 className="mt-1 h-5 w-5 accent-[var(--theme-primary)]" />
               <span className="min-w-0 flex-1">
                 {field.field === 'imageUrl' ? (
@@ -295,12 +333,12 @@ const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, choice, onCh
           <div className="rounded-2xl border border-[var(--theme-border)]/40 p-3">
             <label className="flex min-h-11 cursor-pointer items-center gap-3 font-bold text-[var(--theme-primary)]">
               <input type="radio" name={optionName} checked={choice.mode === 'manual'}
-                onChange={() => onChange({ mode: 'manual', value: choice.mode === 'manual' ? choice.value : '' })}
+                onChange={() => onChange(selectManualCharacterSyncChoice(field, activeBookId, choice))}
                 className="h-5 w-5 accent-[var(--theme-primary)]" />
               ערך משולב או ערוך ידנית
             </label>
             {choice.mode === 'manual' && (
-              <textarea value={choice.value} onChange={event => onChange({ mode: 'manual', value: event.target.value })}
+              <textarea value={choice.value} onChange={event => onChange({ mode: 'manual', value: event.target.value, manualValue: event.target.value })}
                 aria-label={`ערך ידני עבור ${getCharacterSyncFieldLabel(field.field)}`}
                 className="mt-3 min-h-24 w-full resize-y rounded-xl border border-[var(--theme-border)]/50 bg-[var(--theme-secondary)]/20 p-3 text-sm outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/20" />
             )}
@@ -308,7 +346,7 @@ const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, choice, onCh
         )}
 
         <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--theme-border)]/40 p-3 font-bold text-[var(--theme-text)]/70">
-          <input type="radio" name={optionName} checked={choice.mode === 'skip'} onChange={() => onChange({ mode: 'skip', value: '' })}
+          <input type="radio" name={optionName} checked={choice.mode === 'skip'} onChange={() => onChange({ mode: 'skip', value: '', manualValue: choice.manualValue })}
             className="h-5 w-5 accent-[var(--theme-primary)]" />
           דלגי על השדה
         </label>
