@@ -27,9 +27,9 @@ export interface CharacterSyncChoice {
 }
 
 export const getCharacterSyncFieldLabel = (field: SharedCharacterFieldPath): string => {
-  if (field === 'name') return 'שם הדמות';
+  if (field === 'name') return 'שם הדמות בספר';
   if (field === 'imageUrl') return 'תמונת הדמות';
-  if (field === 'data.name') return 'שם — תשובת השאלון';
+  if (field === 'data.name') return 'השם המלא';
   const questionId = field.slice(5);
   return FEMALE_QUESTIONS_CONFIG.find(question => question.id === questionId)?.question || questionId;
 };
@@ -110,9 +110,6 @@ const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
 
   const duplicateDiagnostic = plan?.diagnostics.find(
     diagnostic => diagnostic.code === 'duplicate_character_record_in_book'
-  );
-  const nameMismatch = plan?.diagnostics.some(
-    diagnostic => diagnostic.code === 'name_data_name_mismatch'
   );
   const unchangedCount = plan?.fields.filter(field => field.status === 'unchanged').length || 0;
 
@@ -197,9 +194,6 @@ const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
 
               {duplicateDiagnostic && (
                 <WarningMessage>נמצאו בספר אחד שתי רשומות המקושרות לאותה דמות. יש לפתור את הכפילות לפני הסנכרון.</WarningMessage>
-              )}
-              {nameMismatch && (
-                <WarningMessage>שם הדמות ושדה השם בתוך השאלון אינם זהים.</WarningMessage>
               )}
               <p className="text-sm text-[var(--theme-text)]/60">
                 {unchangedCount} שדות כבר מסונכרנים · {actionableFields.length} שדות דורשים בדיקה

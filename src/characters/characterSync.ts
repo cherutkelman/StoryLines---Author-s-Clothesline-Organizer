@@ -18,11 +18,6 @@ export interface CharacterAppearance {
 
 export type CharacterSyncDiagnostic =
   | {
-      code: 'name_data_name_mismatch';
-      bookId: string;
-      characterId: string;
-    }
-  | {
       code: 'duplicate_character_record_in_book';
       bookId: string;
       characterIds: string[];
@@ -167,16 +162,6 @@ const buildDiagnostics = (
         bookId: appearance.bookId,
         characterId: appearance.characterId,
         value: entityId,
-      });
-    }
-
-    const topName = normalizeForComparison(appearance.character.name);
-    const dataName = normalizeForComparison(appearance.character.data.name);
-    if (topName && dataName && topName !== dataName) {
-      diagnostics.push({
-        code: 'name_data_name_mismatch',
-        bookId: appearance.bookId,
-        characterId: appearance.characterId,
       });
     }
 

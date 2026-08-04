@@ -86,7 +86,7 @@ describe('CharacterSyncDialog states', () => {
     expect(html).toContain('Brave');
   });
 
-  it('shows name mismatch separately and blocks duplicate records', () => {
+  it('shows name and data.name separately without a mismatch warning and blocks duplicate records', () => {
     const first = character({ id: 'one', name: 'Top', data: { name: 'Questionnaire' } });
     const duplicate = character({ id: 'two' });
     const html = renderDialog([
@@ -94,11 +94,33 @@ describe('CharacterSyncDialog states', () => {
       book('b', [character()]),
     ], first);
 
-    expect(getCharacterSyncFieldLabel('name')).toBe('שם הדמות');
-    expect(getCharacterSyncFieldLabel('data.name')).toBe('שם — תשובת השאלון');
-    expect(html).toContain('שם הדמות ושדה השם בתוך השאלון אינם זהים.');
+    expect(getCharacterSyncFieldLabel('name')).toBe('שם הדמות בספר');
+    expect(getCharacterSyncFieldLabel('data.name')).toBe('השם המלא');
+    expect(html).not.toContain('שם הדמות ושדה השם בתוך השאלון אינם זהים.');
     expect(html).toContain('יש לפתור את הכפילות לפני הסנכרון.');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>סנכרון מידע<\/button>/);
+  });
+
+  it('renders independent conflicts for name and data.name', () => {
+    const books = [
+      book('a', [character({ name: 'Display A', data: { name: 'Full A' } })]),
+      book('b', [character({ name: 'Display B', data: { name: 'Full B' } })]),
+    ];
+    const result = buildCharacterSyncPlan(books, entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+
+    expect(getActionableCharacterSyncFields(result.plan).map(field => field.field)).toEqual([
+      'name',
+      'data.name',
+    ]);
+    const html = renderDialog(books);
+    expect(html).toContain('שם הדמות בספר');
+    expect(html).toContain('השם המלא');
+    expect(html).toContain('Display A');
+    expect(html).toContain('Display B');
+    expect(html).toContain('Full A');
+    expect(html).toContain('Full B');
   });
 
   it('renders distinct image options without exposing them as primary text', () => {

@@ -203,21 +203,33 @@ describe('character sync plan', () => {
     expect(traits.appearanceValues[0].value).toBe(' Line one\r\nLine two ');
   });
 
-  it('reports name/data.name mismatch and duplicate records without fixing them', () => {
+  it('allows name and data.name to differ within an appearance and reports only duplicate records', () => {
     const first = character({ id: 'first', name: 'Top', data: { name: 'Data' } });
     const duplicate = character({ id: 'second' });
     const plan = readyPlan([book('a', [first, duplicate]), book('b', [character()])]);
 
-    expect(plan.diagnostics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'name_data_name_mismatch', characterId: 'first' }),
+    expect(plan.diagnostics).toEqual([
       expect.objectContaining({
         code: 'duplicate_character_record_in_book',
         bookId: 'a',
         characterIds: ['first', 'second'],
       }),
-    ]));
+    ]);
     expect(first.name).toBe('Top');
     expect(first.data.name).toBe('Data');
+  });
+
+  it('plans name and data.name independently across books without mismatch diagnostics', () => {
+    const plan = readyPlan([
+      book('a', [character({ name: 'Display A', data: { name: 'Full A' } })]),
+      book('b', [character({ name: 'Display B', data: { name: 'Full B' } })]),
+    ]);
+
+    expect(plan.diagnostics).toEqual([]);
+    expect(field(plan.fields, 'name')).toMatchObject({ status: 'conflict' });
+    expect(field(plan.fields, 'data.name')).toMatchObject({ status: 'conflict' });
+    expect(field(plan.fields, 'name').options.map(option => option.value)).toEqual(['Display A', 'Display B']);
+    expect(field(plan.fields, 'data.name').options.map(option => option.value)).toEqual(['Full A', 'Full B']);
   });
 
   it('reports a legacy non-string shared value and does not coerce it', () => {
@@ -251,6 +263,31 @@ describe('sync resolution validation', () => {
 });
 
 describe('applying character sync resolutions', () => {
+  it('can synchronize name and data.name independently', () => {
+    const books = [
+      book('a', [character({ name: 'Display A', data: { name: 'Full A' } })]),
+      book('b', [character({ name: 'Display B', data: { name: 'Full B' } })]),
+    ];
+
+    const nameResult = applyCharacterSyncResolutions(books, entityId, [
+      { field: 'name', action: 'use_value', value: 'Shared display' },
+      { field: 'data.name', action: 'skip' },
+    ], 100);
+    expect(nameResult.status).toBe('updated');
+    if (nameResult.status !== 'updated') return;
+    expect(nameResult.books.map(item => item.characters![0].name)).toEqual(['Shared display', 'Shared display']);
+    expect(nameResult.books.map(item => item.characters![0].data.name)).toEqual(['Full A', 'Full B']);
+
+    const fullNameResult = applyCharacterSyncResolutions(nameResult.books, entityId, [
+      { field: 'name', action: 'skip' },
+      { field: 'data.name', action: 'use_value', value: 'Shared full name' },
+    ], 200);
+    expect(fullNameResult.status).toBe('updated');
+    if (fullNameResult.status !== 'updated') return;
+    expect(fullNameResult.books.map(item => item.characters![0].name)).toEqual(['Shared display', 'Shared display']);
+    expect(fullNameResult.books.map(item => item.characters![0].data.name)).toEqual(['Shared full name', 'Shared full name']);
+  });
+
   it('updates every appearance in old and current books and preserves local data', () => {
     const first = character({ id: 'first', name: 'Old A', role: 'main', data: { traits: 'A', unknown: 'first' } });
     const other = character({ id: 'other', characterEntityId: uuidv4(), name: 'Other' });
