@@ -251,6 +251,10 @@ export interface QuestionnaireEntry {
   loreItems?: LoreItem[]; // For background lore items
 }
 
+// Backward-compatible character type. Characters still use the existing
+// QuestionnaireEntry storage shape at this infrastructure stage.
+export type CharacterEntry = QuestionnaireEntry;
+
 export interface CharacterMapConnection {
   id: string;
   fromId: string;
@@ -365,7 +369,7 @@ export interface Project {
   plotlines: Plotline[];
   scenes: Scene[];
   summary?: string;
-  characters?: QuestionnaireEntry[];
+  characters?: CharacterEntry[];
   places?: QuestionnaireEntry[];
   periods?: QuestionnaireEntry[];
   twists?: QuestionnaireEntry[];

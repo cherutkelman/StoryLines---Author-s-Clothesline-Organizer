@@ -46,6 +46,7 @@ import {
   getQuestionnaireDisplayName,
   resolveQuestionnaireNameOnBlur,
 } from './questionnaires/questionnaireNames';
+import { createCharacterEntry } from '../src/characters/characterFactory';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -354,18 +355,16 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   };
 
   const addEntry = () => {
-    const newEntry: QuestionnaireEntry = {
-      id: `q-${Date.now()}`,
-      name: activeTab === 'characters' ? 'דמות חדשה' : activeTab === 'places' ? 'מקום חדש' : activeTab === 'periods' ? 'תקופה חדשה' : activeTab === 'twists' ? 'טוויסט חדש' : 'עולם פנטזיה חדש',
-      x: activeTab === 'characters' ? 200 : undefined,
-      y: activeTab === 'characters' ? 200 : undefined,
-      data: activeTab === 'characters' 
-        ? { gender: 'female' } 
-        : activeTab === 'places' 
-          ? { placeType: 'macro' } 
-          : {},
-      customFields: []
-    };
+    const newEntry: QuestionnaireEntry = activeTab === 'characters'
+      ? createCharacterEntry()
+      : {
+          id: `q-${Date.now()}`,
+          name: activeTab === 'places' ? 'מקום חדש' : activeTab === 'periods' ? 'תקופה חדשה' : activeTab === 'twists' ? 'טוויסט חדש' : 'עולם פנטזיה חדש',
+          data: activeTab === 'places'
+            ? { placeType: 'macro' }
+            : {},
+          customFields: []
+        };
     updateFn([...entries, newEntry]);
     handleEntrySelect(newEntry.id);
     setMode('edit');

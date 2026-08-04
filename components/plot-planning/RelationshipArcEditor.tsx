@@ -75,11 +75,10 @@ const RelationshipArcEditor: React.FC<RelationshipArcEditorProps> = ({
                 onChange={(e) => {
                   const newName = e.target.value;
                   if (!rel.char1Id) {
-                      const newCharId = `char-${Date.now()}-1`;
-                      const newChar = createPlanningCharacter(newCharId, newName);
+                      const newChar = createPlanningCharacter(newName);
                       onUpdateCharacters([...characters, newChar]);
                       const newRels = [...relationships];
-                      newRels[relIndex].char1Id = newCharId;
+                      newRels[relIndex].char1Id = newChar.id;
                       onUpdateRelationships(newRels);
                   } else {
                       const newChars = characters.map(c => c.id === rel.char1Id ? { ...c, name: newName } : c);
@@ -113,11 +112,10 @@ const RelationshipArcEditor: React.FC<RelationshipArcEditorProps> = ({
                 onChange={(e) => {
                   const newName = e.target.value;
                   if (!rel.char2Id) {
-                      const newCharId = `char-${Date.now()}-2`;
-                      const newChar = createPlanningCharacter(newCharId, newName);
+                      const newChar = createPlanningCharacter(newName);
                       onUpdateCharacters([...characters, newChar]);
                       const newRels = [...relationships];
-                      newRels[relIndex].char2Id = newCharId;
+                      newRels[relIndex].char2Id = newChar.id;
                       onUpdateRelationships(newRels);
                   } else {
                       const newChars = characters.map(c => c.id === rel.char2Id ? { ...c, name: newName } : c);
@@ -181,4 +179,3 @@ const RelationshipArcEditor: React.FC<RelationshipArcEditorProps> = ({
 );
 
 export default RelationshipArcEditor;
-

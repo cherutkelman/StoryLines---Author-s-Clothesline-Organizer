@@ -1,15 +1,10 @@
 import React from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import type { QuestionnaireEntry, Scene } from '../../types';
+import { createCharacterEntry } from '../../src/characters/characterFactory';
 
-export const createPlanningCharacter = (id: string, name: string): QuestionnaireEntry => ({
-  id,
-  name,
-  x: 200,
-  y: 200,
-  data: { gender: 'female' },
-  customFields: []
-});
+export const createPlanningCharacter = (name: string): QuestionnaireEntry =>
+  createCharacterEntry({ name });
 
 interface RelationshipDynamicsTableProps {
   rel: any;
@@ -135,13 +130,12 @@ const RelationshipDynamicsTable: React.FC<RelationshipDynamicsTableProps> = ({
   const handleRenameCharacter = (charId: string, newName: string, relIndex?: number, charNum?: 1 | 2) => {
     if (!charId && relIndex !== undefined && charNum !== undefined) {
       // Create new character if typing in an empty field
-      const newCharId = `char-${Date.now()}`;
-      const newChar = createPlanningCharacter(newCharId, newName);
+      const newChar = createPlanningCharacter(newName);
       onUpdateCharacters([...characters, newChar]);
       
       const newRels = [...relationships];
-      if (charNum === 1) newRels[relIndex].char1Id = newCharId;
-      else newRels[relIndex].char2Id = newCharId;
+      if (charNum === 1) newRels[relIndex].char1Id = newChar.id;
+      else newRels[relIndex].char2Id = newChar.id;
       onUpdateRelationships(newRels);
       return;
     }

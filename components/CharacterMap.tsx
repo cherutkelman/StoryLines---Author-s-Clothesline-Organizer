@@ -1,19 +1,29 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Link as LinkIcon, Trash2, User, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
+import { Plus, Link as LinkIcon, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, Grab } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { compressImageFile } from '../src/image-utils';
+import { createCharacterEntry } from '../src/characters/characterFactory';
 
 interface CharacterMapProps {
   characters: QuestionnaireEntry[];
+  bookCharacters: QuestionnaireEntry[];
   connections: CharacterMapConnection[];
   onUpdateCharacters: (chars: QuestionnaireEntry[]) => void;
   onUpdateConnections: (connections: CharacterMapConnection[]) => void;
+  onAddExistingCharacters: (characterIds: string[]) => void;
 }
 
-const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, onUpdateCharacters, onUpdateConnections }) => {
+const CharacterMap: React.FC<CharacterMapProps> = ({
+  characters,
+  bookCharacters,
+  connections,
+  onUpdateCharacters,
+  onUpdateConnections,
+  onAddExistingCharacters,
+}) => {
   const [tool, setTool] = useState<'move' | 'link' | 'pan'>('move');
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -23,6 +33,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExistingCharacterDialogOpen, setIsExistingCharacterDialogOpen] = useState(false);
+  const [selectedExistingCharacterIds, setSelectedExistingCharacterIds] = useState<string[]>([]);
   const [exportBounds, setExportBounds] = useState<{
     minX: number;
     minY: number;
@@ -170,14 +182,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   };
 
   const addNode = (e: React.MouseEvent) => {
-    const newNode: QuestionnaireEntry = {
-      id: `char-${Date.now()}`,
-      name: 'דמות חדשה',
-      x: 200,
-      y: 200,
-      data: { gender: 'female' },
-      customFields: []
-    };
+    const newNode = createCharacterEntry();
     onUpdateCharacters([...characters, newNode]);
     setSelectedNodeId(newNode.id);
   };
@@ -527,12 +532,46 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
   };
 
   const selectedNode = characters.find(n => n.id === selectedNodeId);
+  const mapCharacterIds = useMemo(() => new Set(characters.map(character => character.id)), [characters]);
+  const availableCharacters = useMemo(
+    () => bookCharacters.filter(character => !mapCharacterIds.has(character.id)),
+    [bookCharacters, mapCharacterIds]
+  );
+
+  useEffect(() => {
+    if (!isExistingCharacterDialogOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsExistingCharacterDialogOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExistingCharacterDialogOpen]);
+
+  const openExistingCharacterDialog = () => {
+    setSelectedExistingCharacterIds([]);
+    setIsExistingCharacterDialogOpen(true);
+  };
+
+  const toggleExistingCharacter = (characterId: string) => {
+    setSelectedExistingCharacterIds(current =>
+      current.includes(characterId)
+        ? current.filter(id => id !== characterId)
+        : [...current, characterId]
+    );
+  };
+
+  const confirmExistingCharacters = () => {
+    if (selectedExistingCharacterIds.length === 0) return;
+    onAddExistingCharacters(selectedExistingCharacterIds);
+    setIsExistingCharacterDialogOpen(false);
+    setSelectedExistingCharacterIds([]);
+  };
 
   return (
     <div className="h-full flex flex-col relative select-none bg-[var(--theme-bg)]">
       {/* Tool Bar */}
       {!isExporting && (
-        <div className="character-map-toolbar absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2">
+        <div className="character-map-toolbar absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100vw-1rem)] overflow-x-auto bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-[var(--theme-border)] flex items-center gap-2 whitespace-nowrap">
           <button 
             onClick={() => setTool('move')}
             className={`hidden md:flex p-3 rounded-xl transition-all items-center gap-2 ${tool === 'move' ? 'bg-[var(--theme-primary)] text-[var(--theme-card)] shadow-md' : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)]'}`}
@@ -591,6 +630,14 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             <Plus size={18} />
             <span className="text-xs font-bold">דמות חדשה</span>
           </button>
+          <button
+            onClick={openExistingCharacterDialog}
+            className="p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl hover:opacity-90 transition-all flex items-center gap-2 min-h-11"
+            aria-label="הוספת דמות קיימת"
+          >
+            <UserPlus size={18} />
+            <span className="text-xs font-bold">הוספת דמות קיימת</span>
+          </button>
           <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
             onClick={exportAsImage}
@@ -600,6 +647,91 @@ const CharacterMap: React.FC<CharacterMapProps> = ({ characters, connections, on
             <Download size={18} />
             <span className="text-xs font-bold">ייצוא תמונה</span>
           </button>
+        </div>
+      )}
+
+      {isExistingCharacterDialogOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setIsExistingCharacterDialogOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="existing-character-dialog-title"
+            dir="rtl"
+            className="w-full max-w-xl max-h-[85vh] bg-[var(--theme-card)] rounded-[2rem] border border-[var(--theme-border)] shadow-2xl flex flex-col overflow-hidden text-right select-text"
+          >
+            <div className="flex items-center justify-between gap-4 p-5 sm:p-7 border-b border-[var(--theme-border)]/50">
+              <div>
+                <h2 id="existing-character-dialog-title" className="text-xl sm:text-2xl font-bold text-[var(--theme-primary)]">הוספת דמות קיימת</h2>
+                <p className="mt-1 text-xs text-[var(--theme-primary)]/60">בחרי דמות אחת או כמה דמויות להצבה במפה הזאת.</p>
+              </div>
+              <button
+                onClick={() => setIsExistingCharacterDialogOpen(false)}
+                className="p-3 rounded-xl text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] min-w-11 min-h-11 flex items-center justify-center"
+                aria-label="סגירת חלון הוספת דמות קיימת"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {bookCharacters.length === 0 ? (
+                <p className="py-12 text-center font-bold text-[var(--theme-primary)]/55">עדיין אין דמויות שאפשר להוסיף.</p>
+              ) : availableCharacters.length === 0 ? (
+                <p className="py-12 text-center font-bold text-[var(--theme-primary)]/55">כל הדמויות בספר כבר נמצאות במפה הזאת.</p>
+              ) : (
+                <div className="space-y-3">
+                  {availableCharacters.map(character => {
+                    const isSelected = selectedExistingCharacterIds.includes(character.id);
+                    return (
+                      <button
+                        key={character.id}
+                        type="button"
+                        onClick={() => toggleExistingCharacter(character.id)}
+                        aria-pressed={isSelected}
+                        className={`w-full min-h-16 p-3 rounded-2xl border-2 flex items-center gap-4 text-right transition-all ${isSelected ? 'border-[var(--theme-primary)] bg-[var(--theme-secondary)]' : 'border-[var(--theme-border)]/50 hover:border-[var(--theme-primary)]/40'}`}
+                      >
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--theme-secondary)] flex items-center justify-center shrink-0 border border-[var(--theme-border)]">
+                          {character.imageUrl ? (
+                            <img src={character.imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <User size={24} className="text-[var(--theme-primary)]/35" />
+                          )}
+                        </div>
+                        <span className="flex-1 font-bold text-[var(--theme-primary)] truncate">{character.name}</span>
+                        <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-[var(--theme-primary)] border-[var(--theme-primary)] text-[var(--theme-card)]' : 'border-[var(--theme-border)]'}`}>
+                          {isSelected && <Check size={17} />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 sm:p-6 border-t border-[var(--theme-border)]/50 flex flex-col-reverse sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExistingCharacterDialogOpen(false)}
+                className="px-5 py-3 min-h-11 rounded-xl border border-[var(--theme-border)] text-[var(--theme-primary)] font-bold hover:bg-[var(--theme-secondary)]"
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={confirmExistingCharacters}
+                disabled={selectedExistingCharacterIds.length === 0}
+                className="flex-1 px-5 py-3 min-h-11 rounded-xl bg-[var(--theme-primary)] text-[var(--theme-card)] font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+              >
+                הוספת {selectedExistingCharacterIds.length || ''} דמויות למפה
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

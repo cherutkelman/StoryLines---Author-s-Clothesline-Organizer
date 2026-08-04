@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CopyPlus, X } from 'lucide-react';
 import { Book, CharacterDiagram, MindMap, QuestionnaireEntry, WorldMap } from '../../types';
 import { ImportMapCategory } from './mapsDefinitions';
+import { createCharacterEntry } from '../../src/characters/characterFactory';
 
 interface MapsImportDialogProps {
   isOpen: boolean;
@@ -76,9 +77,9 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
     const characterIdMap: Record<string, string> = {};
     if (importCategory === 'characterMaps') {
       const importedCharacters = (sourceBook.characters || []).map(character => {
-        const newId = `char-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-        characterIdMap[character.id] = newId;
-        return { ...character, id: newId, x: undefined, y: undefined };
+        const importedCharacter = createCharacterEntry({ ...character, x: undefined, y: undefined });
+        characterIdMap[character.id] = importedCharacter.id;
+        return importedCharacter;
       });
       onUpdateCharacters([...characters, ...importedCharacters]);
     }

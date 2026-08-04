@@ -2,6 +2,10 @@ import React from 'react';
 import { CopyPlus, Plus, Trash2, Users } from 'lucide-react';
 import { CharacterDiagram, QuestionnaireEntry } from '../../types';
 import CharacterMap from '../CharacterMap';
+import {
+  addExistingCharactersToMap,
+  getCharacterMapMemberIds,
+} from '../../src/characters/characterMapMembership';
 
 interface CharacterMapsWorkspaceProps {
   maps: CharacterDiagram[];
@@ -50,17 +54,20 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
 
   const mapCharacters = currentMap
     ? (() => {
-        const inferredCharacterIds = new Set([
-          ...Object.keys(currentMap.positions || {}),
-          ...(currentMap.connections || []).flatMap(connection => [connection.fromId, connection.toId]),
-        ]);
-        const characterIds = currentMap.characterIds?.length ? new Set(currentMap.characterIds) : inferredCharacterIds;
+        const characterIds = new Set(getCharacterMapMemberIds(currentMap));
         return characters.filter(character => characterIds.has(character.id)).map(character => {
-        const position = currentMap.positions[character.id];
-        return position ? { ...character, ...position } : { ...character, x: undefined, y: undefined };
+          const position = currentMap.positions[character.id];
+          return position ? { ...character, ...position } : { ...character, x: undefined, y: undefined };
         });
       })()
     : characters;
+
+  const addExistingCharacters = (characterIds: string[]) => {
+    if (!currentMap) return;
+    const updatedMap = addExistingCharactersToMap(currentMap, characterIds);
+    if (updatedMap === currentMap) return;
+    onUpdateMaps(maps.map(map => map.id === currentMap.id ? updatedMap : map));
+  };
 
   const updateCharacters = (updatedCharacters: QuestionnaireEntry[]) => {
     const positions = Object.fromEntries(
@@ -146,9 +153,11 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
       ) : currentMap ? (
         <CharacterMap
           characters={mapCharacters}
+          bookCharacters={characters}
           connections={currentMap.connections}
           onUpdateCharacters={updateCharacters}
           onUpdateConnections={connections => updateCurrentMap({ connections })}
+          onAddExistingCharacters={addExistingCharacters}
         />
       ) : null}
     </div>
