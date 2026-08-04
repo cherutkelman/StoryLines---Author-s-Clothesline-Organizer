@@ -29,12 +29,13 @@ describe('character identity infrastructure wiring', () => {
     expect(characterCreationSources).not.toMatch(/`char-\$\{Date\.now\(\)/);
   });
 
-  it('keeps map creation, removal, and rename connected to the book character list', () => {
+  it('keeps map creation and rename connected to the book list while removal changes only membership', () => {
     const characterMap = read('components/CharacterMap.tsx');
     const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
 
     expect(characterMap).toContain('onUpdateCharacters([...characters, newNode])');
-    expect(characterMap).toContain('onUpdateCharacters(characters.filter(n => n.id !== id))');
+    expect(characterMap).toContain('onRemoveCharacterFromMap(id)');
+    expect(characterMap).not.toContain('onUpdateCharacters(characters.filter(n => n.id !== id))');
     expect(characterMap).toContain("updateNode(node.id, { name: e.target.value })");
     expect(workspace).toContain('if (!updated) return character;');
     expect(workspace).toContain('onUpdateCharacters([');

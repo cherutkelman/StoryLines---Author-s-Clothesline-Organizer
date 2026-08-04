@@ -5,6 +5,7 @@ import CharacterMap from '../CharacterMap';
 import {
   addExistingCharactersToMap,
   getCharacterMapMemberIds,
+  removeCharacterFromMap,
 } from '../../src/characters/characterMapMembership';
 
 interface CharacterMapsWorkspaceProps {
@@ -66,6 +67,12 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
     if (!currentMap) return;
     const updatedMap = addExistingCharactersToMap(currentMap, characterIds);
     if (updatedMap === currentMap) return;
+    onUpdateMaps(maps.map(map => map.id === currentMap.id ? updatedMap : map));
+  };
+
+  const removeCharacter = (characterId: string) => {
+    if (!currentMap) return;
+    const updatedMap = removeCharacterFromMap(currentMap, characterId);
     onUpdateMaps(maps.map(map => map.id === currentMap.id ? updatedMap : map));
   };
 
@@ -158,6 +165,7 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
           onUpdateCharacters={updateCharacters}
           onUpdateConnections={connections => updateCurrentMap({ connections })}
           onAddExistingCharacters={addExistingCharacters}
+          onRemoveCharacterFromMap={removeCharacter}
         />
       ) : null}
     </div>

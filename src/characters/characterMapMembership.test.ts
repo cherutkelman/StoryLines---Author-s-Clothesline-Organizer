@@ -4,6 +4,7 @@ import {
   addExistingCharactersToMap,
   getAvailableCharactersForMap,
   getCharacterMapMemberIds,
+  removeCharacterFromMap,
 } from './characterMapMembership';
 
 const character = (id: string, name = id): CharacterEntry => ({
@@ -65,11 +66,51 @@ describe('character map membership', () => {
     const bookCharacters = [character('a')];
     const first = addExistingCharactersToMap(diagram({ id: 'first' }), ['a']);
     const second = addExistingCharactersToMap(diagram({ id: 'second' }), ['a']);
-    const firstAfterRemoval = { ...first, characterIds: [], positions: {} };
+    const firstAfterRemoval = removeCharacterFromMap(first, 'a');
 
     expect(getAvailableCharactersForMap(bookCharacters, firstAfterRemoval).map(item => item.id)).toEqual(['a']);
     expect(second.characterIds).toEqual(['a']);
     expect(bookCharacters).toHaveLength(1);
+  });
+
+  it('removes membership, position, and every connected edge without mutating the map', () => {
+    const original = diagram({
+      characterIds: ['a', 'b', 'c'],
+      positions: { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } },
+      connections: [
+        { id: 'from', fromId: 'a', toId: 'b', description: '' },
+        { id: 'to', fromId: 'c', toId: 'a', description: '' },
+        { id: 'other', fromId: 'b', toId: 'c', description: '' },
+      ],
+    });
+
+    const result = removeCharacterFromMap(original, 'a');
+
+    expect(result.characterIds).toEqual(['b', 'c']);
+    expect(result.positions).toEqual({ b: { x: 3, y: 4 } });
+    expect(result.connections.map(connection => connection.id)).toEqual(['other']);
+    expect(original.characterIds).toEqual(['a', 'b', 'c']);
+    expect(original.positions.a).toEqual({ x: 1, y: 2 });
+  });
+
+  it('keeps an explicit empty membership authoritative after removing the last character', () => {
+    const result = removeCharacterFromMap(diagram({
+      characterIds: ['a'],
+      positions: { a: { x: 1, y: 2 } },
+    }), 'a');
+
+    expect(result.characterIds).toEqual([]);
+    expect(getCharacterMapMemberIds(result)).toEqual([]);
+  });
+
+  it('materializes inferred legacy membership before removing a character', () => {
+    const result = removeCharacterFromMap(diagram({
+      characterIds: undefined,
+      positions: { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } },
+    }), 'a');
+
+    expect(result.characterIds).toEqual(['b']);
+    expect(result.positions).toEqual({ b: { x: 3, y: 4 } });
   });
 
   it('infers legacy membership from positions and connections when characterIds are absent', () => {

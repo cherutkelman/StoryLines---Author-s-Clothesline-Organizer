@@ -96,6 +96,7 @@ import {
   renameChapterInBookSequence,
 } from './src/book-sequence';
 import { normalizeBookCharacterIdentities } from './src/characters/characterIdentity';
+import { deleteCharacterFromBook } from './src/characters/characterDeletion';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -1584,6 +1585,18 @@ const App: React.FC = () => {
     updateActiveBook({ [category]: entries });
   };
 
+  const deleteCharacterFromActiveBook = (characterId: string) => {
+    if (!activeBookId) return;
+    setBooks(previousBooks => previousBooks.map(book => {
+      if (book.id !== activeBookId) return book;
+      return {
+        ...deleteCharacterFromBook(book, characterId),
+        updatedAt: Date.now(),
+        pendingSync: true,
+      };
+    }));
+  };
+
   const applyCharacterSyncBooks = (nextBooks: Book[]) => {
     setBooks(nextBooks);
   };
@@ -2662,6 +2675,7 @@ const App: React.FC = () => {
                     backgrounds={activeBook.backgrounds || []}
                     relationships={activeBook.relationships || []}
                     onUpdateCharacters={(e) => updateEntries('characters', e)}
+                    onDeleteCharacter={deleteCharacterFromActiveBook}
                     onUpdatePlaces={(e) => updateEntries('places', e)}
                     onUpdatePeriods={(e) => updateEntries('periods', e)}
                     onUpdateTwists={(e) => updateEntries('twists', e)}

@@ -5,8 +5,26 @@ export const getCharacterMapMemberIds = (map: CharacterDiagram): string[] => {
     ...Object.keys(map.positions || {}),
     ...(map.connections || []).flatMap(connection => [connection.fromId, connection.toId]),
   ];
-  const sourceIds = map.characterIds?.length ? map.characterIds : inferredIds;
+  const sourceIds = Array.isArray(map.characterIds) ? map.characterIds : inferredIds;
   return Array.from(new Set(sourceIds));
+};
+
+export const removeCharacterFromMap = (
+  map: CharacterDiagram,
+  characterId: string
+): CharacterDiagram => {
+  const characterIds = getCharacterMapMemberIds(map).filter(id => id !== characterId);
+  const positions = { ...(map.positions || {}) };
+  delete positions[characterId];
+
+  return {
+    ...map,
+    characterIds,
+    positions,
+    connections: (map.connections || []).filter(
+      connection => connection.fromId !== characterId && connection.toId !== characterId
+    ),
+  };
 };
 
 export const getAvailableCharactersForMap = (

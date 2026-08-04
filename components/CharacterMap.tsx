@@ -14,6 +14,7 @@ interface CharacterMapProps {
   onUpdateCharacters: (chars: QuestionnaireEntry[]) => void;
   onUpdateConnections: (connections: CharacterMapConnection[]) => void;
   onAddExistingCharacters: (characterIds: string[]) => void;
+  onRemoveCharacterFromMap: (characterId: string) => void;
 }
 
 const CharacterMap: React.FC<CharacterMapProps> = ({
@@ -23,6 +24,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   onUpdateCharacters,
   onUpdateConnections,
   onAddExistingCharacters,
+  onRemoveCharacterFromMap,
 }) => {
   const [tool, setTool] = useState<'move' | 'link' | 'pan'>('move');
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -372,8 +374,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   };
 
   const deleteNode = (id: string) => {
-    onUpdateCharacters(characters.filter(n => n.id !== id));
-    onUpdateConnections(connections.filter(c => c.fromId !== id && c.toId !== id));
+    if (!confirm('להסיר את הדמות מהמפה? הדמות תישאר ברשימת הדמויות של הספר.')) return;
+    onRemoveCharacterFromMap(id);
     if (selectedNodeId === id) setSelectedNodeId(null);
   };
 
@@ -930,7 +932,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
                 <button 
                   onClick={() => deleteNode(node.id)}
                   className="p-2 bg-white text-red-500 rounded-full shadow-lg hover:bg-red-50 border border-red-100 transition-colors"
-                  title="מחיקת דמות"
+                  title="הסרת דמות מהמפה"
+                  aria-label="הסרת דמות מהמפה"
                 >
                   <Trash2 size={16} />
                 </button>

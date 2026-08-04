@@ -65,7 +65,7 @@ describe('maps architecture', () => {
     expect(importer).toContain('remappedCharacterIds');
     expect(importer).toContain('characterIdMap[connection.fromId] && characterIdMap[connection.toId]');
     expect(workspace).toContain('getCharacterMapMemberIds(currentMap)');
-    expect(membership).toContain('map.characterIds?.length ? map.characterIds : inferredIds');
+    expect(membership).toContain('Array.isArray(map.characterIds) ? map.characterIds : inferredIds');
     expect(workspace).toContain('characters.filter(character => characterIds.has(character.id))');
     expect(workspace).toContain('mergedCharacters');
   });

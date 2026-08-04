@@ -62,6 +62,7 @@ interface QuestionnairesProps {
   backgrounds: QuestionnaireEntry[];
   relationships: any[];
   onUpdateCharacters: (entries: CharacterEntry[]) => void;
+  onDeleteCharacter: (characterId: string) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
@@ -102,7 +103,7 @@ const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
   allBooks, activeBookId, characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
-  onUpdateCharacters, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
+  onUpdateCharacters, onDeleteCharacter, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
   onApplyCharacterSyncBooks,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
@@ -164,6 +165,28 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const entries = rawEntries.map(entry => normalizeEntryForTab(entry, activeTab));
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
+
+  const deleteEntry = (entryId: string, genericConfirmation: string, clearGenericSelectionOnCancel = false) => {
+    const confirmation = activeTab === 'characters'
+      ? 'למחוק את הדמות מהספר? הדמות תוסר גם מכל מפות הדמויות בספר.'
+      : genericConfirmation;
+    if (!confirm(confirmation)) {
+      if (activeTab !== 'characters' && clearGenericSelectionOnCancel && selectedEntryId === entryId) {
+        handleEntrySelect(null);
+      }
+      return;
+    }
+
+    if (activeTab === 'characters') {
+      onDeleteCharacter(entryId);
+      setIsCharacterSyncOpen(false);
+      setCharacterSyncFeedback('');
+      setMode('view');
+    } else {
+      updateFn(entries.filter(entry => entry.id !== entryId));
+    }
+    if (selectedEntryId === entryId) handleEntrySelect(null);
+  };
   const selectedCharacter = activeTab === 'characters'
     ? characters.find(character => character.id === selectedEntryId)
     : undefined;
@@ -837,7 +860,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                           <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{getQuestionnaireDisplayName(entry.name, activeTab)}</span>
                         </div>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                          onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                           className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
                         >
                           <Trash2 size={14} />
@@ -865,7 +888,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{getQuestionnaireDisplayName(entry.name, activeTab)}</span>
                   </div>
                   <button 
-                    onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                    onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                     className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
                   >
                     <Trash2 size={14} />
@@ -888,7 +911,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                     <span className={`font-bold text-sm truncate ${selectedEntryId === entry.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]/70'}`}>{getQuestionnaireDisplayName(entry.name, activeTab)}</span>
                   </div>
                   <button 
-                    onClick={(e) => { e.stopPropagation(); if(confirm('למחוק?')) updateFn(entries.filter(ent => ent.id !== entry.id)); if(selectedEntryId === entry.id) handleEntrySelect(null); }}
+                    onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id, 'למחוק?', true); }}
                     className="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 transition-all"
                   >
                     <Trash2 size={14} />
@@ -1053,7 +1076,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         </button>
                       </div>
                       <button
-                        onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                        onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                         className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
                         title="מחיקת פריט"
                       >
@@ -1105,7 +1128,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                       </button>
                       {renderCharacterSyncButton()}
                       <button
-                        onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                        onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                         className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
                         title="מחיקת פריט"
                       >
@@ -1211,7 +1234,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                   <div className="flex items-center gap-2">
 
                     <button 
-                      onClick={() => { if(confirm('למחוק את כל הפריט?')) { updateFn(entries.filter(e => e.id !== selectedEntry.id)); handleEntrySelect(null); } }}
+                      onClick={() => deleteEntry(selectedEntry.id, 'למחוק את כל הפריט?')}
                       className="p-2.5 bg-[var(--theme-card)] border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm"
                       title="מחיקת פריט"
                     >
