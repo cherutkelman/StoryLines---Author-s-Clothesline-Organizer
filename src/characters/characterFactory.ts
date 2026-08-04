@@ -8,6 +8,7 @@ export const createCharacterEntry = (
 ): CharacterEntry => {
   const {
     id: _ignoredId,
+    characterEntityId: _ignoredCharacterEntityId,
     data: dataOverrides,
     customFields,
     ...entryOverrides
@@ -15,6 +16,7 @@ export const createCharacterEntry = (
 
   return {
     id: createCharacterId(),
+    characterEntityId: createCharacterId(),
     name: 'דמות חדשה',
     x: 200,
     y: 200,

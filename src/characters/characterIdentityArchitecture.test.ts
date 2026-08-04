@@ -47,4 +47,25 @@ describe('character identity infrastructure wiring', () => {
     expect(importer).toContain('characterIdMap[character.id] = importedCharacter.id');
     expect(importer).toContain('onUpdateCharacters([...characters, ...importedCharacters])');
   });
+
+  it('normalizes identities in the shared load path and backup import path', () => {
+    const app = read('App.tsx');
+
+    expect(app).toContain('const normalizeLoadedBooks = async');
+    expect(app).toContain('normalizeBookCharacterIdentities(sceneNormalizedBook, now).book');
+    expect(app).toContain('normalizeLoadedBooks(await loadBooks())');
+    expect(app).toContain('normalizeLoadedBooks(syncResult.updatedBooks)');
+    expect(app).toContain('normalizeBookCharacterIdentities(parsed as Book).book');
+  });
+
+  it('keeps existing map and relationship references on book-local character ids', () => {
+    const types = read('types.ts');
+
+    expect(types).toContain('characterIds?: string[]');
+    expect(types).toContain('fromId: string');
+    expect(types).toContain('toId: string');
+    expect(types).toContain('char1Id: string');
+    expect(types).toContain('char2Id: string');
+    expect(types).not.toContain('characterEntityIds?: string[]');
+  });
 });

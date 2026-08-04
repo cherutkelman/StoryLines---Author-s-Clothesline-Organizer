@@ -95,6 +95,7 @@ import {
   normalizeBookSequence,
   renameChapterInBookSequence,
 } from './src/book-sequence';
+import { normalizeBookCharacterIdentities } from './src/characters/characterIdentity';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -126,22 +127,23 @@ const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: stri
   { id: 'chapters', icon: Rows, label: 'פרקים' },
 ];
 
-const normalizeLoadedBooksSceneHistory = async (loadedBooks: Book[]): Promise<Book[]> => {
+const normalizeLoadedBooks = async (loadedBooks: Book[]): Promise<Book[]> => {
   const legacyBookIds = new Set(
     loadedBooks
       .filter(book => Array.isArray((book as Book & { sceneVersions?: SceneVersion[] }).sceneVersions))
       .map(book => book.id)
   );
 
-  if (legacyBookIds.size === 0) return deduplicateBooks(loadedBooks);
-
-  const migratedBooks = await sceneVersionStorage.migrateLegacySceneVersionsFromBooks(loadedBooks);
+  const migratedBooks = legacyBookIds.size > 0
+    ? await sceneVersionStorage.migrateLegacySceneVersionsFromBooks(loadedBooks)
+    : loadedBooks;
   const now = Date.now();
-  return deduplicateBooks(migratedBooks.map(book =>
-    legacyBookIds.has(book.id)
+  return deduplicateBooks(migratedBooks.map(book => {
+    const sceneNormalizedBook = legacyBookIds.has(book.id)
       ? { ...book, updatedAt: now, pendingSync: true }
-      : book
-  ));
+      : book;
+    return normalizeBookCharacterIdentities(sceneNormalizedBook, now).book;
+  }));
 };
 
 const App: React.FC = () => {
@@ -213,7 +215,7 @@ const App: React.FC = () => {
               uid: shortUid(firebaseUser.uid),
             });
             try {
-              const cloudBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
+              const cloudBooks = await normalizeLoadedBooks(await loadBooks());
               if (isCancelled) return;
               setBooks(cloudBooks);
               setHasLoadedBooks(true);
@@ -248,7 +250,7 @@ const App: React.FC = () => {
             try {
               setIsSyncing(true);
               const syncResult = await syncService.sync();
-              const updatedBooks = await normalizeLoadedBooksSceneHistory(syncResult.updatedBooks);
+               const updatedBooks = await normalizeLoadedBooks(syncResult.updatedBooks);
               if (isCancelled) return;
               console.log(`App: Initial sync complete. Found ${updatedBooks.length} books.`);
               setBooks(updatedBooks);
@@ -261,7 +263,7 @@ const App: React.FC = () => {
             } catch (error: any) {
               if (isCancelled) return;
               console.error("App: Initial sync failed", error);
-              const localFallbackBooks = await normalizeLoadedBooksSceneHistory(await storageManager.getLocalProvider().loadBooks());
+               const localFallbackBooks = await normalizeLoadedBooks(await storageManager.getLocalProvider().loadBooks());
               if (isCancelled) return;
               console.warn(`App: Initial sync failed. Falling back to ${localFallbackBooks.length} local books.`);
               setBooks(localFallbackBooks);
@@ -300,7 +302,7 @@ const App: React.FC = () => {
             logAuthDebugEvent('Book loading started', {
               source: 'local',
             });
-            const loadedBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
+             const loadedBooks = await normalizeLoadedBooks(await loadBooks());
             if (isCancelled) return;
             setBooks(loadedBooks);
             setHasLoadedBooks(true);
@@ -1494,17 +1496,19 @@ const App: React.FC = () => {
           return;
         }
 
+        const normalizedImport = normalizeBookCharacterIdentities(parsed as Book).book;
+
         setBooks(prev => {
-          const exists = prev.find(b => b.id === parsed.id);
+          const exists = prev.find(b => b.id === normalizedImport.id);
           if (exists) {
             if (!confirm('ספר זה כבר קיים בספריה. האם לעדכן אותו?')) {
               return prev;
             }
-            return prev.map(b => b.id === parsed.id ? parsed : b);
+            return prev.map(b => b.id === normalizedImport.id ? normalizedImport : b);
           }
-          return [...prev, parsed];
+          return [...prev, normalizedImport];
         });
-        setActiveBookId(parsed.id);
+        setActiveBookId(normalizedImport.id);
       } catch (err) {
         console.error('Failed to import backup', err);
         alert('שגיאה בטעינת הקובץ. ייתכן שהקובץ פגום.');
@@ -1597,8 +1601,8 @@ const App: React.FC = () => {
       const savedBooks = await saveBooks(currentBooks);
 
       if (isWeb) {
-        const cloudBooks = await normalizeLoadedBooksSceneHistory(await loadBooks());
-        const normalizedSavedBooks = await normalizeLoadedBooksSceneHistory(savedBooks);
+        const cloudBooks = await normalizeLoadedBooks(await loadBooks());
+        const normalizedSavedBooks = await normalizeLoadedBooks(savedBooks);
         setBooks(cloudBooks.length > 0 ? cloudBooks : normalizedSavedBooks);
         setLastCloudSaved(new Date());
         setCloudError(null);
@@ -1618,7 +1622,7 @@ const App: React.FC = () => {
       
       console.log("[App] Calling syncService.sync()...");
       const syncResult = await syncService.sync();
-      const updatedBooks = await normalizeLoadedBooksSceneHistory(syncResult.updatedBooks);
+      const updatedBooks = await normalizeLoadedBooks(syncResult.updatedBooks);
       setLastCloudSaved(new Date());
       setCloudError(null);
       

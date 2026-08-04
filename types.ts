@@ -251,9 +251,11 @@ export interface QuestionnaireEntry {
   loreItems?: LoreItem[]; // For background lore items
 }
 
-// Backward-compatible character type. Characters still use the existing
-// QuestionnaireEntry storage shape at this infrastructure stage.
-export type CharacterEntry = QuestionnaireEntry;
+// Backward-compatible character type. The book-local id remains the target of
+// all existing links; characterEntityId is the stable cross-book identity.
+export interface CharacterEntry extends QuestionnaireEntry {
+  characterEntityId?: string;
+}
 
 export interface CharacterMapConnection {
   id: string;

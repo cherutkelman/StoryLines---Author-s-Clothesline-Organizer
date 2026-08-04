@@ -14,13 +14,18 @@ describe('characterFactory', () => {
   });
 
   it('creates a character with the existing defaults', () => {
-    expect(createCharacterEntry()).toMatchObject({
+    const character = createCharacterEntry();
+
+    expect(character).toMatchObject({
       name: 'דמות חדשה',
       x: 200,
       y: 200,
       data: { gender: 'female' },
       customFields: [],
     });
+    expect(character.id).toMatch(UUID_V4_PATTERN);
+    expect(character.characterEntityId).toMatch(UUID_V4_PATTERN);
+    expect(character.id).not.toBe(character.characterEntityId);
   });
 
   it('preserves entry overrides and merges data with defaults', () => {
@@ -42,10 +47,23 @@ describe('characterFactory', () => {
     });
   });
 
-  it('always creates a new identity instead of accepting an existing id', () => {
-    const character = createCharacterEntry({ id: 'legacy-character-id' });
+  it('always creates new identities instead of accepting identity overrides', () => {
+    const character = createCharacterEntry({
+      id: 'legacy-character-id',
+      characterEntityId: 'legacy-entity-id',
+    });
 
     expect(character.id).not.toBe('legacy-character-id');
+    expect(character.characterEntityId).not.toBe('legacy-entity-id');
     expect(character.id).toMatch(UUID_V4_PATTERN);
+    expect(character.characterEntityId).toMatch(UUID_V4_PATTERN);
+  });
+
+  it('creates four unique identities for two new characters', () => {
+    const first = createCharacterEntry();
+    const second = createCharacterEntry();
+    const identities = [first.id, first.characterEntityId, second.id, second.characterEntityId];
+
+    expect(new Set(identities).size).toBe(4);
   });
 });
