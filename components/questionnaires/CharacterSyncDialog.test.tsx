@@ -126,6 +126,21 @@ describe('CharacterSyncDialog states', () => {
     expect(html).toContain('Full B');
   });
 
+  it('preserves multiline option text with safe wrapping CSS', () => {
+    const multilineValue = 'First version\n\nSecond version\nThird line';
+    const html = renderDialog([
+      book('a', [character({ data: { traits: multilineValue } })]),
+      book('b', [character({ data: { traits: 'Another version' } })]),
+    ]);
+
+    expect(html).toContain(multilineValue);
+    expect(html).toContain('white-space:pre-wrap');
+    expect(html).toContain('overflow-wrap:anywhere');
+    expect(html).toContain('whitespace-pre-wrap');
+    expect(html).toContain('break-words');
+    expect(html).not.toContain('dangerouslySetInnerHTML');
+  });
+
   it('renders distinct image options without exposing them as primary text', () => {
     const html = renderDialog([
       book('a', [character({ imageUrl: 'data:image/png;base64,one' })]),

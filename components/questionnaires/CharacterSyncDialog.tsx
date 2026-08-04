@@ -357,7 +357,12 @@ const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, activeBookId
                     <img src={option.value} alt="אפשרות לתמונת הדמות" onError={() => onImageError(option.value)} className="h-20 w-20 rounded-xl object-cover" />
                   )
                 ) : (
-                  <span className="block whitespace-pre-wrap break-words text-sm text-[var(--theme-text)]">{option.value}</span>
+                  <span
+                    className="block min-w-0 max-w-full whitespace-pre-wrap break-words text-sm text-[var(--theme-text)]"
+                    style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                  >
+                    {option.value}
+                  </span>
                 )}
                 <span className="mt-1 block text-xs text-[var(--theme-text)]/50">קיים בספרים: {bookNamesForOption(option)}</span>
                 {field.status === 'fillable' && (
