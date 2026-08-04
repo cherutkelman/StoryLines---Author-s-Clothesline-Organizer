@@ -15,6 +15,7 @@ import {
 import { WorldMap, MapElement, QuestionnaireEntry, PixelEraserStroke } from '../types';
 import useImage from 'use-image';
 import { getDefaultMapIconSize, getMapIconBrushSpacing, ICON_COMPONENTS, MAP_TEXT_FONT, WorldMapTool } from './maps/worldMapDefinitions';
+import mountainBrushImage from '../src/assets/maps/mountain-brush-01.png';
 
 interface WorldMapEditorProps {
   map: WorldMap;
@@ -198,6 +199,9 @@ const ErasableElement = ({
 const MapImage = ({ el, tool, onDblClick, onDragStart, onDragMove, onDragEnd }: any) => {
   const [image] = useImage(el.imageUrl || '');
   if (!image) return null;
+  const width = el.width || image.width;
+  const height = el.height || image.height;
+  const isBrushMountain = el.iconType === 'mountain';
   
   return (
     <ErasableElement
@@ -210,10 +214,10 @@ const MapImage = ({ el, tool, onDblClick, onDragStart, onDragMove, onDragEnd }: 
     >
       <KonvaImage
         image={image}
-        x={0}
-        y={0}
-        width={image.width}
-        height={image.height}
+        x={isBrushMountain ? -width / 2 : 0}
+        y={isBrushMountain ? -height / 2 : 0}
+        width={width}
+        height={height}
         name="image"
       />
     </ErasableElement>
@@ -719,13 +723,18 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
       const id = `el-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const newElement: MapElement = {
         id,
-        type: 'icon',
+        type: selectedIcon === 'mountain' ? 'image' : 'icon',
         iconType: selectedIcon,
         x: pos.x,
         y: pos.y,
         fill: getIconFill(selectedIcon),
         iconSize: brushSettings.size,
-        rotation: brushSettings.rotation
+        rotation: brushSettings.rotation,
+        ...(selectedIcon === 'mountain' ? {
+          imageUrl: mountainBrushImage,
+          width: brushSettings.size,
+          height: brushSettings.size
+        } : {})
       };
 
       if (iconCategory === 'nature' || iconCategory === 'construction') {
@@ -805,13 +814,18 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
           const distanceFromLast = spacing * (index + 1);
           return {
             id: `el-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`,
-            type: 'icon',
+            type: selectedIcon === 'mountain' ? 'image' : 'icon',
             iconType: selectedIcon,
             x: lastPlacedPos.x + (dx / dist) * distanceFromLast,
             y: lastPlacedPos.y + (dy / dist) * distanceFromLast,
             fill: getIconFill(selectedIcon),
             iconSize: brushSettings.size,
-            rotation: brushSettings.rotation
+            rotation: brushSettings.rotation,
+            ...(selectedIcon === 'mountain' ? {
+              imageUrl: mountainBrushImage,
+              width: brushSettings.size,
+              height: brushSettings.size
+            } : {})
           };
         });
         setLocalElements(prev => {
@@ -1765,7 +1779,7 @@ const WorldMapEditor: React.FC<WorldMapEditorProps> = ({ map, places = [], onUpd
                 >
                   {icon === 'tree' && <span className="text-lg">🌳</span>}
                   {icon === 'trees' && <span className="text-lg">🌲🌲</span>}
-                  {icon === 'mountain' && <span className="text-lg">⛰️</span>}
+                  {icon === 'mountain' && <img src={mountainBrushImage} alt="הר" className="w-7 h-7 object-contain" />}
                   {icon === 'valley' && <div className="rotate-180"><Mountain size={18} /></div>}
                   {icon === 'flower' && <span className="text-lg">🌹</span>}
                   {icon === 'wave' && <span className="text-lg">🌊</span>}
