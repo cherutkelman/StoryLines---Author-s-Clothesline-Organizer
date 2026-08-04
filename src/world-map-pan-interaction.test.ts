@@ -78,6 +78,28 @@ describe('character map pan interaction', () => {
     expect(characterMap).toContain('handleRemoveImage(node.id)');
     expect(characterMap).toContain('deleteNode(node.id)');
   });
+
+  it('uses mobile taps to select, connect, move, and clear the selection', () => {
+    expect(characterMap).toMatch(/if \(selectedNodeId === id\) \{\s+setDraggingNodeId\(id\);/);
+    expect(characterMap).toMatch(/if \(selectedNodeId\) \{\s+connectSelectedNodeTo\(id\);/);
+    expect(characterMap).toContain("if (!target.closest('[data-character-map-element]'))");
+    expect(characterMap).toMatch(/setSelectedNodeId\(null\);\s+setMovingNodeId\(null\);/);
+  });
+
+  it('offers new and existing characters from one responsive add menu', () => {
+    expect(characterMap).toContain('>הוספת דמות</span>');
+    expect(characterMap).toContain('aria-label="אפשרויות הוספת דמות"');
+    expect(characterMap).toContain('>דמות חדשה</span>');
+    expect(characterMap).toContain('>דמות קיימת</span>');
+    expect(characterMap).toContain('onClick={addNode}');
+    expect(characterMap).toContain('onClick={openExistingCharacterDialog}');
+    expect(characterMap).toContain('ref={addCharacterButtonRef}');
+    expect(characterMap).toContain('top: rect.bottom + 6');
+    expect(characterMap).toContain('left: rect.left');
+    expect(characterMap).toContain('width: rect.width');
+    expect(characterMap).toContain('style={addCharacterMenuRect}');
+    expect(characterMap.match(/>הוספת דמות קיימת<\/span>/g) ?? []).toHaveLength(0);
+  });
 });
 
 describe('mind map pan interaction', () => {

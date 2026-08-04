@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
-import { Plus, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { isElectron, openDesktopImageDialog } from '../src/platform';
 import { compressImageFile } from '../src/image-utils';
@@ -37,6 +37,8 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   const [zoom, setZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [isExistingCharacterDialogOpen, setIsExistingCharacterDialogOpen] = useState(false);
+  const [isAddCharacterMenuOpen, setIsAddCharacterMenuOpen] = useState(false);
+  const [addCharacterMenuRect, setAddCharacterMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [selectedExistingCharacterIds, setSelectedExistingCharacterIds] = useState<string[]>([]);
   const [exportBounds, setExportBounds] = useState<{
     minX: number;
@@ -47,6 +49,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     contentHeight: number;
   } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const addCharacterButtonRef = useRef<HTMLButtonElement>(null);
   const nodeClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchGestureRef = useRef<{
     mode: 'pan' | 'pinch' | null;
@@ -194,11 +197,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     setMovingNodeId(null);
   };
 
-  const addNode = (e: React.MouseEvent) => {
+  const addNode = () => {
     const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });
     onUpdateCharacters([...characters, newNode]);
     setSelectedNodeId(newNode.id);
     setMovingNodeId(newNode.id);
+    setIsAddCharacterMenuOpen(false);
   };
 
   const connectSelectedNodeTo = (id: string) => {
@@ -278,6 +282,14 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     e.stopPropagation();
     if (e.touches.length !== 1) return;
     e.preventDefault();
+    if (selectedNodeId === id) {
+      setDraggingNodeId(id);
+      return;
+    }
+    if (selectedNodeId) {
+      connectSelectedNodeTo(id);
+      return;
+    }
     selectNode(id);
   };
 
@@ -379,6 +391,10 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
 
     if (e.touches.length === 1) {
       e.preventDefault();
+      if (!target.closest('[data-character-map-element]')) {
+        setSelectedNodeId(null);
+        setMovingNodeId(null);
+      }
       touchGestureRef.current = {
         ...touchGestureRef.current,
         mode: 'pan',
@@ -604,6 +620,26 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   }, [isExistingCharacterDialogOpen]);
 
   useEffect(() => {
+    if (!isAddCharacterMenuOpen) return;
+    const updateMenuRect = () => {
+      const rect = addCharacterButtonRef.current?.getBoundingClientRect();
+      if (rect) setAddCharacterMenuRect({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAddCharacterMenuOpen(false);
+    };
+    updateMenuRect();
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', updateMenuRect);
+    window.addEventListener('scroll', updateMenuRect, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updateMenuRect);
+      window.removeEventListener('scroll', updateMenuRect, true);
+    };
+  }, [isAddCharacterMenuOpen]);
+
+  useEffect(() => {
     if (tool !== 'pan') return;
     const leavePanOnButtonClick = (event: PointerEvent) => {
       const target = event.target;
@@ -615,6 +651,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   }, [tool]);
 
   const openExistingCharacterDialog = () => {
+    setIsAddCharacterMenuOpen(false);
     setSelectedExistingCharacterIds([]);
     setIsExistingCharacterDialogOpen(true);
   };
@@ -667,20 +704,20 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
             </button>
           </div>
           <div className="hidden md:block w-px h-6 bg-[var(--theme-border)] mx-1" />
-          <button 
-            onClick={addNode}
-            className="p-3 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-xl hover:opacity-80 transition-all flex items-center gap-2"
+          <button
+            ref={addCharacterButtonRef}
+            onClick={() => {
+              const rect = addCharacterButtonRef.current?.getBoundingClientRect();
+              if (rect) setAddCharacterMenuRect({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+              setIsAddCharacterMenuOpen(current => !current);
+            }}
+            className="p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl hover:opacity-90 transition-all flex items-center gap-2 min-h-11"
+            aria-haspopup="menu"
+            aria-expanded={isAddCharacterMenuOpen}
           >
             <Plus size={18} />
-            <span className="text-xs font-bold">דמות חדשה</span>
-          </button>
-          <button
-            onClick={openExistingCharacterDialog}
-            className="p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl hover:opacity-90 transition-all flex items-center gap-2 min-h-11"
-            aria-label="הוספת דמות קיימת"
-          >
-            <UserPlus size={18} />
-            <span className="text-xs font-bold">הוספת דמות קיימת</span>
+            <span className="text-xs font-bold">הוספת דמות</span>
+            <ChevronDown size={14} aria-hidden="true" />
           </button>
           <div className="w-px h-6 bg-[var(--theme-border)] mx-1" />
           <button 
@@ -691,6 +728,42 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
             <Download size={18} />
             <span className="text-xs font-bold">ייצוא תמונה</span>
           </button>
+        </div>
+      )}
+
+      {!isExporting && isAddCharacterMenuOpen && addCharacterMenuRect && (
+        <div
+          className="fixed inset-0 z-[80]"
+          role="presentation"
+          onPointerDown={() => setIsAddCharacterMenuOpen(false)}
+        >
+          <div
+            role="menu"
+            dir="rtl"
+            aria-label="אפשרויות הוספת דמות"
+            className="fixed rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 shadow-2xl"
+            style={addCharacterMenuRect}
+            onPointerDown={event => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={addNode}
+              className="w-full min-h-12 px-4 py-3 rounded-xl flex items-center gap-3 text-right text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-colors"
+            >
+              <Plus size={18} />
+              <span className="font-bold text-sm">דמות חדשה</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={openExistingCharacterDialog}
+              className="w-full min-h-12 px-4 py-3 rounded-xl flex items-center gap-3 text-right text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-colors"
+            >
+              <UserPlus size={18} />
+              <span className="font-bold text-sm">דמות קיימת</span>
+            </button>
+          </div>
         </div>
       )}
 
