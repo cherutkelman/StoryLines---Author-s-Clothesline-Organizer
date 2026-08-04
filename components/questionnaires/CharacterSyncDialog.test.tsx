@@ -11,6 +11,7 @@ import CharacterSyncDialog, {
   getActionableCharacterSyncFields,
   getCharacterSyncFieldLabel,
   selectManualCharacterSyncChoice,
+  submitCharacterSyncDialog,
 } from './CharacterSyncDialog';
 
 const entityId = uuidv4();
@@ -226,6 +227,91 @@ describe('sync choice translation', () => {
 
     expect(choices['data.age']).toEqual({ mode: 'value', value: '30' });
     expect(choices['data.traits']).toEqual({ mode: 'skip', value: '' });
+  });
+
+  it('renders an independent neutral skip option for every conflict field', () => {
+    const books = [
+      book('a', [character({ data: { traits: 'A', residence: 'One' } })]),
+      book('b', [character({ data: { traits: 'B', residence: 'Two' } })]),
+    ];
+    const html = renderDialog(books);
+
+    expect(html.match(/לא לסנכרן את השדה הפעם/g)).toHaveLength(2);
+    expect(html).not.toMatch(/(?:^|[\s>])דלגי(?:[\s<]|$)/);
+    expect(html).not.toMatch(/(?:^|[\s>])בחרי(?:[\s<]|$)/);
+    expect(html).not.toMatch(/(?:^|[\s>])ערכי(?:[\s<]|$)/);
+  });
+
+  it('keeps choices independent and applies one field while skipping another', () => {
+    const books = [
+      book('a', [character({ data: { traits: 'A', residence: 'One' } })]),
+      book('b', [character({ data: { traits: 'B', residence: 'Two' } })]),
+    ];
+    const result = buildCharacterSyncPlan(books, entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    const fields = getActionableCharacterSyncFields(result.plan);
+    const onApplyBooks = vi.fn();
+    const status = submitCharacterSyncDialog({
+      fields,
+      choices: {
+        'data.traits': { mode: 'value', value: 'A' },
+        'data.residence': { mode: 'skip', value: '' },
+      },
+      books,
+      characterEntityId: entityId,
+      onApplyBooks,
+      onSuccess: vi.fn(),
+      onClose: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    expect(status).toBe('updated');
+    expect(onApplyBooks).toHaveBeenCalledOnce();
+    const updatedBooks = onApplyBooks.mock.calls[0][0] as Book[];
+    expect(updatedBooks.map(item => item.characters![0].data.traits)).toEqual(['A', 'A']);
+    expect(updatedBooks.map(item => item.characters![0].data.residence)).toEqual(['One', 'Two']);
+    expect(books.map(item => item.characters![0].data.residence)).toEqual(['One', 'Two']);
+  });
+
+  it('treats all-skip confirmation as a successful no-op and leaves conflicts available', () => {
+    const books = [
+      book('a', [character({ data: { traits: 'A', residence: 'One' } })]),
+      book('b', [character({ data: { traits: 'B', residence: 'Two' } })]),
+    ];
+    const result = buildCharacterSyncPlan(books, entityId);
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    const fields = getActionableCharacterSyncFields(result.plan);
+    const choices = createInitialCharacterSyncChoices(fields);
+    const onApplyBooks = vi.fn();
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    const onError = vi.fn();
+    const html = renderDialog(books);
+    const syncButton = html.match(/<button[^>]*>סנכרון מידע<\/button>/)?.[0];
+
+    expect(syncButton).toBeDefined();
+    expect(syncButton).not.toContain(' disabled=');
+    expect(submitCharacterSyncDialog({
+      fields,
+      choices,
+      books,
+      characterEntityId: entityId,
+      onApplyBooks,
+      onSuccess,
+      onClose,
+      onError,
+    })).toBe('skipped_all');
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onApplyBooks).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(buildCharacterSyncPlan(books, entityId)).toEqual(result);
+    expect(getActionableCharacterSyncFields(result.plan).map(field => field.field)).toEqual([
+      'data.residence',
+      'data.traits',
+    ]);
   });
 
   it('creates one valid resolution per field and supports manual text', () => {

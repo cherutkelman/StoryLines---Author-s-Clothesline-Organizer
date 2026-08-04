@@ -102,6 +102,59 @@ export const buildCharacterSyncResolutionsFromChoices = (
   return { resolutions };
 };
 
+interface SubmitCharacterSyncDialogOptions {
+  fields: CharacterSyncFieldPlan[];
+  choices: Record<string, CharacterSyncChoice>;
+  books: Book[];
+  characterEntityId: string;
+  onApplyBooks: (books: Book[]) => void;
+  onSuccess?: () => void;
+  onClose: () => void;
+  onError: (message: string) => void;
+}
+
+export const submitCharacterSyncDialog = ({
+  fields,
+  choices,
+  books,
+  characterEntityId,
+  onApplyBooks,
+  onSuccess,
+  onClose,
+  onError,
+}: SubmitCharacterSyncDialogOptions): string => {
+  const resolutionResult = buildCharacterSyncResolutionsFromChoices(fields, choices);
+  if (!resolutionResult.resolutions) {
+    onError(resolutionResult.error || 'לא ניתן להכין את החלטות הסנכרון.');
+    return 'invalid_choices';
+  }
+
+  if (resolutionResult.resolutions.every(resolution => resolution.action === 'skip')) {
+    onClose();
+    return 'skipped_all';
+  }
+
+  const result = applyCharacterSyncResolutions(
+    books,
+    characterEntityId,
+    resolutionResult.resolutions
+  );
+  if (result.status === 'updated') {
+    onApplyBooks(result.books);
+    onSuccess?.();
+    onClose();
+  } else if (result.status === 'no_changes') {
+    onError('לא נבחרו שינויים לסנכרון.');
+  } else if (result.status === 'invalid_resolutions') {
+    onError('אחת מהחלטות הסנכרון אינה תקינה. בדקי את הערכים שנבחרו.');
+  } else if (result.status === 'invalid_character_entity_id') {
+    onError('לא ניתן לסנכרן את הדמות משום שזהותה אינה תקינה.');
+  } else {
+    onError('לא נמצאו רשומות של הדמות בספרים הטעונים.');
+  }
+  return result.status;
+};
+
 const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
   isOpen,
   books,
@@ -156,30 +209,16 @@ const CharacterSyncDialog: React.FC<CharacterSyncDialogProps> = ({
 
   const handleApply = () => {
     if (!plan || duplicateDiagnostic || actionableFields.length === 0) return;
-    const resolutionResult = buildCharacterSyncResolutionsFromChoices(actionableFields, choices);
-    if (!resolutionResult.resolutions) {
-      setErrorMessage(resolutionResult.error || 'לא ניתן להכין את החלטות הסנכרון.');
-      return;
-    }
-
-    const result = applyCharacterSyncResolutions(
+    submitCharacterSyncDialog({
+      fields: actionableFields,
+      choices,
       books,
-      character.characterEntityId || '',
-      resolutionResult.resolutions
-    );
-    if (result.status === 'updated') {
-      onApplyBooks(result.books);
-      onSuccess?.();
-      onClose();
-    } else if (result.status === 'no_changes') {
-      setErrorMessage('לא נבחרו שינויים לסנכרון.');
-    } else if (result.status === 'invalid_resolutions') {
-      setErrorMessage('אחת מהחלטות הסנכרון אינה תקינה. בדקי את הערכים שנבחרו.');
-    } else if (result.status === 'invalid_character_entity_id') {
-      setErrorMessage('לא ניתן לסנכרן את הדמות משום שזהותה אינה תקינה.');
-    } else {
-      setErrorMessage('לא נמצאו רשומות של הדמות בספרים הטעונים.');
-    }
+      characterEntityId: character.characterEntityId || '',
+      onApplyBooks,
+      onSuccess,
+      onClose,
+      onError: setErrorMessage,
+    });
   };
 
   return (
@@ -348,7 +387,7 @@ const SyncFieldCard: React.FC<SyncFieldCardProps> = ({ field, plan, activeBookId
         <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--theme-border)]/40 p-3 font-bold text-[var(--theme-text)]/70">
           <input type="radio" name={optionName} checked={choice.mode === 'skip'} onChange={() => onChange({ mode: 'skip', value: '', manualValue: choice.manualValue })}
             className="h-5 w-5 accent-[var(--theme-primary)]" />
-          דלגי על השדה
+          לא לסנכרן את השדה הפעם
         </label>
       </div>
     </section>
