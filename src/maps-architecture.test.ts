@@ -63,7 +63,10 @@ describe('maps architecture', () => {
     expect(types).toContain('characterIds?: string[]');
     expect(importer).toContain('remappedPositions');
     expect(importer).toContain('remappedCharacterIds');
-    expect(importer).toContain('characterIdMap[connection.fromId] && characterIdMap[connection.toId]');
+    expect(importer).toContain('sourceMemberIdSet.has(connection.fromId)');
+    expect(importer).toContain('sourceMemberIdSet.has(connection.toId)');
+    expect(importer).toContain('characterIdMap[connection.fromId]');
+    expect(importer).toContain('characterIdMap[connection.toId]');
     expect(workspace).toContain('getCharacterMapMemberIds(currentMap)');
     expect(membership).toContain('Array.isArray(map.characterIds) ? map.characterIds : inferredIds');
     expect(workspace).toContain('characters.filter(character => characterIds.has(character.id))');

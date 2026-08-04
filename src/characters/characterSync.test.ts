@@ -289,9 +289,9 @@ describe('applying character sync resolutions', () => {
   });
 
   it('updates every appearance in old and current books and preserves local data', () => {
-    const first = character({ id: 'first', name: 'Old A', role: 'main', data: { traits: 'A', unknown: 'first' } });
+    const first = character({ id: 'first', name: 'Old A', role: 'main', questionnaireVisibility: 'visible', data: { traits: 'A', unknown: 'first' } });
     const other = character({ id: 'other', characterEntityId: uuidv4(), name: 'Other' });
-    const second = character({ id: 'second', name: 'Old B', role: 'friend', data: { traits: 'B', unknown: 'second' } });
+    const second = character({ id: 'second', name: 'Old B', role: 'friend', questionnaireVisibility: 'hidden', data: { traits: 'B', unknown: 'second' } });
     const firstBook = book('old', [first, other]);
     const secondBook = book('current', [second]);
     const unrelatedBook = book('unrelated', [character({ characterEntityId: uuidv4() })]);
@@ -319,6 +319,8 @@ describe('applying character sync resolutions', () => {
       id: 'second', characterEntityId: entityId, name: 'Unified', role: 'friend',
       data: { traits: 'Custom combined value', unknown: 'second' },
     });
+    expect(result.books[0].characters![0].questionnaireVisibility).toBe('visible');
+    expect(result.books[1].characters![0].questionnaireVisibility).toBe('hidden');
     expect(result.books[0].characters![1]).toBe(other);
     expect(result.books[0].characters![0].developmentStages).toBe(first.developmentStages);
     expect(result.books[0].characters![0].sceneIdsByQuestionId).toBe(first.sceneIdsByQuestionId);

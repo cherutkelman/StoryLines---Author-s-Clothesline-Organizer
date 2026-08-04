@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { CopyPlus, X } from 'lucide-react';
 import { Book, CharacterDiagram, MindMap, QuestionnaireEntry, WorldMap } from '../../types';
 import { ImportMapCategory } from './mapsDefinitions';
-import { createCharacterEntry } from '../../src/characters/characterFactory';
+import { getCharacterMapMemberIds } from '../../src/characters/characterMapMembership';
+import { prepareCharactersForImportedMaps } from '../../src/characters/characterImport';
 
 interface MapsImportDialogProps {
   isOpen: boolean;
@@ -41,6 +42,49 @@ const getBookMaps = (book: Book | undefined, category: ImportMapCategory): Array
   }];
 };
 
+export const getSourceCharacterIdsForImportedMaps = (maps: CharacterDiagram[]): string[] =>
+  Array.from(new Set(maps.flatMap(getCharacterMapMemberIds)));
+
+export const remapImportedCharacterMap = (
+  map: CharacterDiagram,
+  characterIdMap: Record<string, string>,
+  newId: string
+): CharacterDiagram => {
+  const sourceMemberIds = getCharacterMapMemberIds(map);
+  const sourceMemberIdSet = new Set(sourceMemberIds);
+  const remappedPositions = Object.fromEntries(
+    Object.entries(map.positions || {})
+      .filter(([characterId]) => sourceMemberIdSet.has(characterId) && characterIdMap[characterId])
+      .map(([characterId, position]) => [characterIdMap[characterId], position])
+  );
+  const remappedCharacterIds = Array.from(new Set(
+    sourceMemberIds.flatMap(characterId =>
+      characterIdMap[characterId] ? [characterIdMap[characterId]] : []
+    )
+  ));
+  const remappedConnections = (map.connections || [])
+    .filter(connection =>
+      sourceMemberIdSet.has(connection.fromId) &&
+      sourceMemberIdSet.has(connection.toId) &&
+      characterIdMap[connection.fromId] &&
+      characterIdMap[connection.toId]
+    )
+    .map(connection => ({
+      ...connection,
+      id: `conn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      fromId: characterIdMap[connection.fromId],
+      toId: characterIdMap[connection.toId],
+    }));
+
+  return {
+    ...map,
+    id: newId,
+    positions: remappedPositions,
+    connections: remappedConnections,
+    characterIds: remappedCharacterIds,
+  };
+};
+
 const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
   isOpen,
   category,
@@ -74,14 +118,16 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
     const itemsToImport = selectedImportIds.length === 0 ? sourceItems : sourceItems.filter((item: any) => selectedImportIds.includes(item.id));
     if (itemsToImport.length === 0) return;
 
-    const characterIdMap: Record<string, string> = {};
+    let characterIdMap: Record<string, string> = {};
     if (importCategory === 'characterMaps') {
-      const importedCharacters = (sourceBook.characters || []).map(character => {
-        const importedCharacter = createCharacterEntry({ ...character, x: undefined, y: undefined });
-        characterIdMap[character.id] = importedCharacter.id;
-        return importedCharacter;
-      });
-      onUpdateCharacters([...characters, ...importedCharacters]);
+      const sourceCharacterIds = getSourceCharacterIdsForImportedMaps(itemsToImport as CharacterDiagram[]);
+      const prepared = prepareCharactersForImportedMaps(
+        characters,
+        sourceBook.characters || [],
+        sourceCharacterIds
+      );
+      characterIdMap = prepared.characterIdMap;
+      if (prepared.addedCharacters.length > 0) onUpdateCharacters(prepared.characters);
     }
 
     const clonedItems = itemsToImport.map((item: any) => {
@@ -91,27 +137,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
         return { ...item, id: newId, elements: item.elements.map((element: any) => ({ ...element, id: `el-${Date.now()}-${Math.random()}` })) };
       }
       if (importCategory === 'characterMaps') {
-        const remappedPositions = Object.fromEntries(
-          Object.entries(item.positions || {})
-            .filter(([characterId]) => characterIdMap[characterId])
-            .map(([characterId, position]) => [characterIdMap[characterId], position])
-        );
-        const sourceCharacterIds = item.characterIds?.length
-          ? item.characterIds
-          : Array.from(new Set([
-              ...Object.keys(item.positions || {}),
-              ...(item.connections || []).flatMap((connection: any) => [connection.fromId, connection.toId]),
-            ]));
-        const remappedCharacterIds = sourceCharacterIds.flatMap((characterId: string) => characterIdMap[characterId] ? [characterIdMap[characterId]] : []);
-        const remappedConnections = (item.connections || [])
-          .filter((connection: any) => characterIdMap[connection.fromId] && characterIdMap[connection.toId])
-          .map((connection: any) => ({
-            ...connection,
-            id: `conn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            fromId: characterIdMap[connection.fromId],
-            toId: characterIdMap[connection.toId],
-          }));
-        return { ...item, id: newId, positions: remappedPositions, connections: remappedConnections, characterIds: remappedCharacterIds };
+        return remapImportedCharacterMap(item, characterIdMap, newId);
       }
       const idMap: Record<string, string> = {};
       const newNodes = item.nodes.map((node: any) => {

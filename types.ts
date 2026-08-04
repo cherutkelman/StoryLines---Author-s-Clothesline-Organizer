@@ -255,6 +255,7 @@ export interface QuestionnaireEntry {
 // all existing links; characterEntityId is the stable cross-book identity.
 export interface CharacterEntry extends QuestionnaireEntry {
   characterEntityId?: string;
+  questionnaireVisibility?: 'visible' | 'hidden';
 }
 
 export interface CharacterMapConnection {

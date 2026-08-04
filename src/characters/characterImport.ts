@@ -1,6 +1,6 @@
 import { validate as isUuid } from 'uuid';
 import type { CharacterEntry } from '../../types';
-import { createCharacterId } from './characterFactory';
+import { createCharacterEntry, createCharacterId } from './characterFactory';
 import { SHARED_CHARACTER_DATA_KEYS } from './characterSharedData';
 
 export {
@@ -32,6 +32,12 @@ export type CharacterImportResult =
       existingCharacter: CharacterEntry;
     }
   | { status: 'invalid_source_identity'; characters: CharacterEntry[] };
+
+export interface PreparedCharactersForImportedMaps {
+  characters: CharacterEntry[];
+  characterIdMap: Record<string, string>;
+  addedCharacters: CharacterEntry[];
+}
 
 const hasValidEntityId = (
   character: CharacterEntry
@@ -75,6 +81,7 @@ export const createLinkedCharacterImport = (
     character: {
       id: createCharacterId(),
       characterEntityId: source.characterEntityId,
+      questionnaireVisibility: 'visible',
       name: shared.name ?? '',
       ...(shared.imageUrl !== undefined ? { imageUrl: shared.imageUrl } : {}),
       data: { ...(shared.data || {}) },
@@ -135,4 +142,52 @@ export const importLinkedCharacterIntoBook = (
     characters: [...targetCharacters, imported.character],
     importedCharacter: imported.character,
   };
+};
+
+export const prepareCharactersForImportedMaps = (
+  targetCharacters: CharacterEntry[],
+  sourceCharacters: CharacterEntry[],
+  sourceCharacterIds: string[]
+): PreparedCharactersForImportedMaps => {
+  const characters = [...targetCharacters];
+  const characterIdMap: Record<string, string> = {};
+  const addedCharacters: CharacterEntry[] = [];
+  const sourceById = new Map(sourceCharacters.map(character => [character.id, character]));
+
+  Array.from(new Set(sourceCharacterIds)).forEach(sourceCharacterId => {
+    const source = sourceById.get(sourceCharacterId);
+    if (!source) return;
+
+    const availability = getCharacterImportAvailability(characters, source);
+    if (availability.status === 'already_exists') {
+      characterIdMap[source.id] = availability.existingCharacter.id;
+      return;
+    }
+
+    let importedCharacter: CharacterEntry;
+    if (availability.status === 'available') {
+      const linkedImport = createLinkedCharacterImport(source);
+      if (!linkedImport.ok) return;
+      importedCharacter = {
+        ...linkedImport.character,
+        questionnaireVisibility: 'hidden',
+      };
+    } else {
+      const shared = extractSharedCharacterData(source);
+      importedCharacter = createCharacterEntry({
+        name: shared.name,
+        ...(shared.imageUrl !== undefined ? { imageUrl: shared.imageUrl } : {}),
+        data: { ...(shared.data || {}) },
+        questionnaireVisibility: 'hidden',
+        x: undefined,
+        y: undefined,
+      });
+    }
+
+    characters.push(importedCharacter);
+    addedCharacters.push(importedCharacter);
+    characterIdMap[source.id] = importedCharacter.id;
+  });
+
+  return { characters, characterIdMap, addedCharacters };
 };

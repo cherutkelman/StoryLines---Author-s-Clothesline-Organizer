@@ -14,10 +14,10 @@ describe('character identity infrastructure wiring', () => {
     const mapImporter = read('components/maps/MapsImportDialog.tsx');
 
     expect(questionnaires).toContain('const newEntry = createCharacterEntry();');
-    expect(characterMap).toContain('const newNode = createCharacterEntry();');
+    expect(characterMap).toContain("const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });");
     expect(relationshipDynamics).toContain('createCharacterEntry({ name })');
     expect(relationshipArc).toContain('createPlanningCharacter(newName)');
-    expect(mapImporter).toContain('createCharacterEntry({ ...character, x: undefined, y: undefined })');
+    expect(mapImporter).toContain('prepareCharactersForImportedMaps(');
 
     const characterCreationSources = [
       questionnaires,
@@ -41,12 +41,14 @@ describe('character identity infrastructure wiring', () => {
     expect(workspace).toContain('onUpdateCharacters([');
   });
 
-  it('keeps map imports as copies while assigning factory identities', () => {
+  it('keeps map imports as map copies while reusing linked character identities', () => {
     const importer = read('components/maps/MapsImportDialog.tsx');
 
-    expect(importer).toContain('(sourceBook.characters || []).map');
-    expect(importer).toContain('characterIdMap[character.id] = importedCharacter.id');
-    expect(importer).toContain('onUpdateCharacters([...characters, ...importedCharacters])');
+    expect(importer).toContain('getSourceCharacterIdsForImportedMaps(itemsToImport as CharacterDiagram[])');
+    expect(importer).toContain('prepareCharactersForImportedMaps(');
+    expect(importer).toContain('remapImportedCharacterMap(item, characterIdMap, newId)');
+    expect(importer).toContain('if (prepared.addedCharacters.length > 0) onUpdateCharacters(prepared.characters)');
+    expect(importer).not.toContain('(sourceBook.characters || []).map');
   });
 
   it('normalizes identities in the shared load path and backup import path', () => {

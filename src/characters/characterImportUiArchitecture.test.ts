@@ -35,7 +35,7 @@ describe('linked character import UI wiring', () => {
     expect(app).toContain('allBooks={books}');
     expect(app).toContain('activeBookId={activeBookId}');
     expect(questionnaires).toContain('sourceBooks={allBooks}');
-    expect(mapImporter).toContain('createCharacterEntry({ ...character, x: undefined, y: undefined })');
+    expect(mapImporter).toContain('prepareCharactersForImportedMaps(');
     expect(mapImporter).not.toContain('createLinkedCharacterImport');
   });
 

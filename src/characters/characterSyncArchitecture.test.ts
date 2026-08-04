@@ -31,7 +31,7 @@ describe('character sync architecture', () => {
     const mapImporter = read('components/maps/MapsImportDialog.tsx');
 
     expect(characterImporter).toContain('importLinkedCharacterIntoBook');
-    expect(mapImporter).toContain('createCharacterEntry({ ...character, x: undefined, y: undefined })');
+    expect(mapImporter).toContain('prepareCharactersForImportedMaps(');
     expect(mapImporter).not.toContain('characterSync');
   });
 });

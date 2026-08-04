@@ -9,6 +9,7 @@ import {
   findCharacterByEntityId,
   getCharacterImportAvailability,
   importLinkedCharacterIntoBook,
+  prepareCharactersForImportedMaps,
 } from './characterImport';
 
 const sourceCharacter = (overrides: Partial<CharacterEntry> = {}): CharacterEntry => ({
@@ -161,6 +162,19 @@ describe('target book import safety', () => {
     expect(result.characters[0]).toBe(existing);
     expect(target).toEqual(targetSnapshot);
     expect(source).toEqual(sourceSnapshot);
+    if (result.status === 'imported') {
+      expect(result.importedCharacter.questionnaireVisibility).toBe('visible');
+    }
+  });
+
+  it('does not copy a hidden questionnaire state into a direct import', () => {
+    const source = sourceCharacter({ questionnaireVisibility: 'hidden' });
+    const result = importLinkedCharacterIntoBook([], source);
+
+    expect(result.status).toBe('imported');
+    if (result.status !== 'imported') return;
+    expect(result.importedCharacter.questionnaireVisibility).toBe('visible');
+    expect(source.questionnaireVisibility).toBe('hidden');
   });
 
   it('returns the original array for invalid source identities', () => {
@@ -181,5 +195,90 @@ describe('identity creation boundaries', () => {
     const fresh = createCharacterEntry({ characterEntityId: source.characterEntityId });
 
     expect(fresh.characterEntityId).not.toBe(source.characterEntityId);
+  });
+});
+
+describe('character preparation for imported maps', () => {
+  it('reuses an existing target entity without changing its local data or visibility', () => {
+    const entityId = uuidv4();
+    const source = sourceCharacter({ id: 'source', characterEntityId: entityId, name: 'Source name', questionnaireVisibility: 'hidden' });
+    const existing = sourceCharacter({
+      id: 'target', characterEntityId: entityId, name: 'Local name', imageUrl: 'local-image',
+      questionnaireVisibility: 'visible', data: { age: '99', local: 'keep' },
+    });
+    const result = prepareCharactersForImportedMaps([existing], [source], [source.id]);
+
+    expect(result.characters).toEqual([existing]);
+    expect(result.characters[0]).toBe(existing);
+    expect(result.addedCharacters).toEqual([]);
+    expect(result.characterIdMap).toEqual({ source: 'target' });
+    expect(existing).toMatchObject({ name: 'Local name', imageUrl: 'local-image', questionnaireVisibility: 'visible', data: { age: '99', local: 'keep' } });
+  });
+
+  it.each([undefined, 'hidden'] as const)('preserves an existing target visibility of %s', visibility => {
+    const entityId = uuidv4();
+    const source = sourceCharacter({ id: 'source', characterEntityId: entityId });
+    const existing = sourceCharacter({ id: 'target', characterEntityId: entityId, questionnaireVisibility: visibility });
+    const result = prepareCharactersForImportedMaps([existing], [source], ['source']);
+
+    expect(result.characters[0]).toBe(existing);
+    expect(result.characters[0].questionnaireVisibility).toBe(visibility);
+  });
+
+  it('does not match by name or by a coincidentally equal local id', () => {
+    const target = sourceCharacter({ id: 'same-local-id', characterEntityId: uuidv4(), name: 'Same name' });
+    const sameName = sourceCharacter({ id: 'source-name', characterEntityId: uuidv4(), name: 'Same name' });
+    const sameLocalId = sourceCharacter({ id: 'same-local-id', characterEntityId: uuidv4(), name: 'Different' });
+    const result = prepareCharactersForImportedMaps([target], [sameName, sameLocalId], [sameName.id, sameLocalId.id]);
+
+    expect(result.addedCharacters).toHaveLength(2);
+    expect(result.characterIdMap[sameName.id]).not.toBe(target.id);
+    expect(result.characterIdMap[sameLocalId.id]).not.toBe(target.id);
+  });
+
+  it('creates one hidden linked appearance per entity and keeps the source identity', () => {
+    const entityId = uuidv4();
+    const firstSource = sourceCharacter({ id: 'first-source', characterEntityId: entityId });
+    const secondSource = sourceCharacter({ id: 'second-source', characterEntityId: entityId });
+    const result = prepareCharactersForImportedMaps([], [firstSource, secondSource], [firstSource.id, secondSource.id]);
+
+    expect(result.addedCharacters).toHaveLength(1);
+    expect(result.addedCharacters[0]).toMatchObject({ characterEntityId: entityId, questionnaireVisibility: 'hidden' });
+    expect(result.characterIdMap[firstSource.id]).toBe(result.addedCharacters[0].id);
+    expect(result.characterIdMap[secondSource.id]).toBe(result.addedCharacters[0].id);
+  });
+
+  it('processes only requested source ids and does not mutate inputs', () => {
+    const included = sourceCharacter({ id: 'included' });
+    const excluded = sourceCharacter({ id: 'excluded' });
+    const sources = [included, excluded];
+    const snapshot = structuredClone(sources);
+    const result = prepareCharactersForImportedMaps([], sources, ['included', 'included']);
+
+    expect(result.addedCharacters).toHaveLength(1);
+    expect(result.characterIdMap).toHaveProperty('included');
+    expect(result.characterIdMap).not.toHaveProperty('excluded');
+    expect(sources).toEqual(snapshot);
+  });
+
+  it('falls back to a fresh hidden identity for an invalid source identity without matching by name', () => {
+    const existing = sourceCharacter({ id: 'target', name: 'Same name' });
+    const invalid = sourceCharacter({ id: 'invalid-source', characterEntityId: undefined, name: 'Same name' });
+    const result = prepareCharactersForImportedMaps([existing], [invalid], [invalid.id]);
+
+    expect(result.addedCharacters).toHaveLength(1);
+    expect(result.addedCharacters[0].id).not.toBe(existing.id);
+    expect(result.addedCharacters[0].characterEntityId).not.toBe(existing.characterEntityId);
+    expect(result.addedCharacters[0].questionnaireVisibility).toBe('hidden');
+  });
+
+  it('reuses a previously imported entity on a repeated import', () => {
+    const source = sourceCharacter({ id: 'source' });
+    const first = prepareCharactersForImportedMaps([], [source], [source.id]);
+    const second = prepareCharactersForImportedMaps(first.characters, [source], [source.id]);
+
+    expect(second.addedCharacters).toEqual([]);
+    expect(second.characters).toEqual(first.characters);
+    expect(second.characterIdMap[source.id]).toBe(first.addedCharacters[0].id);
   });
 });

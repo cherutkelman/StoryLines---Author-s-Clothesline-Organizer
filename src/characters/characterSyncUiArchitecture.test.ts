@@ -48,6 +48,6 @@ describe('character sync UI wiring', () => {
     const mapImport = read('components/maps/MapsImportDialog.tsx');
 
     expect(characterImport).toContain('importLinkedCharacterIntoBook');
-    expect(mapImport).toContain('createCharacterEntry({ ...character, x: undefined, y: undefined })');
+    expect(mapImport).toContain('prepareCharactersForImportedMaps(');
   });
 });

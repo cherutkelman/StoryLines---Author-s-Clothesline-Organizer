@@ -26,6 +26,13 @@ describe('characterFactory', () => {
     expect(character.id).toMatch(UUID_V4_PATTERN);
     expect(character.characterEntityId).toMatch(UUID_V4_PATTERN);
     expect(character.id).not.toBe(character.characterEntityId);
+    expect(character.questionnaireVisibility).not.toBe('hidden');
+  });
+
+  it('allows map creation to request a hidden questionnaire state', () => {
+    const character = createCharacterEntry({ questionnaireVisibility: 'hidden' });
+
+    expect(character.questionnaireVisibility).toBe('hidden');
   });
 
   it('preserves entry overrides and merges data with defaults', () => {

@@ -50,6 +50,8 @@ import {
 import { createCharacterEntry } from '../src/characters/characterFactory';
 import CharacterImportDialog from './questionnaires/CharacterImportDialog';
 import CharacterSyncDialog from './questionnaires/CharacterSyncDialog';
+import ExistingCharacterQuestionnaireDialog from './questionnaires/ExistingCharacterQuestionnaireDialog';
+import { isCharacterVisibleInQuestionnaire } from '../src/characters/characterQuestionnaireVisibility';
 
 interface QuestionnairesProps {
   allBooks: Book[];
@@ -63,6 +65,7 @@ interface QuestionnairesProps {
   relationships: any[];
   onUpdateCharacters: (entries: CharacterEntry[]) => void;
   onDeleteCharacter: (characterId: string) => void;
+  onRestoreCharacterToQuestionnaire: (characterId: string) => void;
   onUpdatePlaces: (entries: QuestionnaireEntry[]) => void;
   onUpdatePeriods: (entries: QuestionnaireEntry[]) => void;
   onUpdateTwists: (entries: QuestionnaireEntry[]) => void;
@@ -103,7 +106,7 @@ const getRelationshipLabel = (relationship: any, characters: QuestionnaireEntry[
 
 const Questionnaires: React.FC<QuestionnairesProps> = ({ 
   allBooks, activeBookId, characters, places, periods, twists, fantasyWorlds, backgrounds, relationships,
-  onUpdateCharacters, onDeleteCharacter, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
+  onUpdateCharacters, onDeleteCharacter, onRestoreCharacterToQuestionnaire, onUpdatePlaces, onUpdatePeriods, onUpdateTwists, onUpdateFantasyWorlds, onUpdateBackgrounds, onUpdateRelationships,
   onApplyCharacterSyncBooks,
   initialTab, initialSelectedEntryId, onTabChange, onEntrySelect
 }) => {
@@ -116,6 +119,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isCharacterAddMenuOpen, setIsCharacterAddMenuOpen] = useState(false);
   const [isCharacterImportOpen, setIsCharacterImportOpen] = useState(false);
+  const [isExistingCharacterQuestionnaireOpen, setIsExistingCharacterQuestionnaireOpen] = useState(false);
   const [isCharacterSyncOpen, setIsCharacterSyncOpen] = useState(false);
   const [characterSyncFeedback, setCharacterSyncFeedback] = useState('');
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
@@ -161,7 +165,8 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
   };
 
   const isRelationshipsTab = activeTab === 'relationships';
-  const rawEntries = activeTab === 'characters' ? characters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
+  const questionnaireCharacters = characters.filter(isCharacterVisibleInQuestionnaire);
+  const rawEntries = activeTab === 'characters' ? questionnaireCharacters : activeTab === 'places' ? places : activeTab === 'periods' ? periods : activeTab === 'twists' ? twists : activeTab === 'fantasyWorlds' ? fantasyWorlds : backgrounds;
   const entries = rawEntries.map(entry => normalizeEntryForTab(entry, activeTab));
   const updateFn = activeTab === 'characters' ? onUpdateCharacters : activeTab === 'places' ? onUpdatePlaces : activeTab === 'periods' ? onUpdatePeriods : activeTab === 'twists' ? onUpdateTwists : activeTab === 'fantasyWorlds' ? onUpdateFantasyWorlds : onUpdateBackgrounds;
   const selectedEntry = entries.find(e => e.id === selectedEntryId);
@@ -453,7 +458,13 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
   const updateEntry = (updates: Partial<QuestionnaireEntry>) => {
     if (!selectedEntryId) return;
-    updateFn(entries.map(e => e.id === selectedEntryId ? { ...e, ...updates } : e));
+    if (activeTab === 'characters') {
+      onUpdateCharacters(characters.map(character =>
+        character.id === selectedEntryId ? { ...character, ...updates } : character
+      ));
+      return;
+    }
+    updateFn(entries.map(entry => entry.id === selectedEntryId ? { ...entry, ...updates } : entry));
   };
 
   const handleEntryNameBlur = () => {
@@ -1990,6 +2001,19 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
               >
                 ייבוא דמות מספר אחר
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCharacterAddMenuOpen(false);
+                  setIsExistingCharacterQuestionnaireOpen(true);
+                }}
+                className="min-h-12 rounded-2xl border border-[var(--theme-border)] px-4 py-3 text-right font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--theme-primary)]/20"
+              >
+                <span className="block">פתיחת שאלון לדמות קיימת</span>
+                <span className="mt-1 block text-xs font-normal leading-relaxed text-[var(--theme-text)]/60">
+                  בחירת דמות שכבר קיימת בספר אך אינה מופיעה בשאלון הדמויות.
+                </span>
+              </button>
             </div>
           </section>
         </div>
@@ -2006,6 +2030,19 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
           setMode('edit');
         }}
         onClose={() => setIsCharacterImportOpen(false)}
+      />
+
+      <ExistingCharacterQuestionnaireDialog
+        isOpen={isExistingCharacterQuestionnaireOpen}
+        characters={characters}
+        onRestoreCharacter={characterId => {
+          onRestoreCharacterToQuestionnaire(characterId);
+          handleEntrySelect(characterId);
+          setMode('edit');
+          setIsExistingCharacterQuestionnaireOpen(false);
+          setIsCharacterAddMenuOpen(false);
+        }}
+        onClose={() => setIsExistingCharacterQuestionnaireOpen(false)}
       />
 
       {selectedCharacter && (

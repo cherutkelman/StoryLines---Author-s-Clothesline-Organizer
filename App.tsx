@@ -97,6 +97,7 @@ import {
 } from './src/book-sequence';
 import { normalizeBookCharacterIdentities } from './src/characters/characterIdentity';
 import { deleteCharacterFromBook } from './src/characters/characterDeletion';
+import { restoreCharacterInListToQuestionnaire } from './src/characters/characterQuestionnaireVisibility';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SHARED_FIELDS = [
@@ -1597,6 +1598,19 @@ const App: React.FC = () => {
     }));
   };
 
+  const restoreCharacterToActiveQuestionnaire = (characterId: string) => {
+    if (!activeBookId) return;
+    setBooks(previousBooks => previousBooks.map(book => {
+      if (book.id !== activeBookId) return book;
+      return {
+        ...book,
+        characters: restoreCharacterInListToQuestionnaire(book.characters || [], characterId),
+        updatedAt: Date.now(),
+        pendingSync: true,
+      };
+    }));
+  };
+
   const applyCharacterSyncBooks = (nextBooks: Book[]) => {
     setBooks(nextBooks);
   };
@@ -2676,6 +2690,7 @@ const App: React.FC = () => {
                     relationships={activeBook.relationships || []}
                     onUpdateCharacters={(e) => updateEntries('characters', e)}
                     onDeleteCharacter={deleteCharacterFromActiveBook}
+                    onRestoreCharacterToQuestionnaire={restoreCharacterToActiveQuestionnaire}
                     onUpdatePlaces={(e) => updateEntries('places', e)}
                     onUpdatePeriods={(e) => updateEntries('periods', e)}
                     onUpdateTwists={(e) => updateEntries('twists', e)}

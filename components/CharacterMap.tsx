@@ -184,7 +184,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   };
 
   const addNode = (e: React.MouseEvent) => {
-    const newNode = createCharacterEntry();
+    const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });
     onUpdateCharacters([...characters, newNode]);
     setSelectedNodeId(newNode.id);
   };
