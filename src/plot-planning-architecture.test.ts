@@ -27,6 +27,7 @@ describe('plot planning architecture', () => {
     expect(coordinator).toContain('<CharacterArcEditor');
     expect(coordinator).toContain('<RelationshipArcEditor');
     expect(coordinator).toContain('<ConflictEditor');
+    expect(coordinator).toContain('<TwistPlanningEditor');
     expect(coordinator).not.toContain('const MultiScenePicker');
     expect(coordinator).not.toContain('const RelationshipDynamicsTable');
     expect(coordinator).not.toContain('מבנה שלוש המערכות');
@@ -39,9 +40,12 @@ describe('plot planning architecture', () => {
     const structureEditor = read('components/plot-planning/PlotStructureEditor.tsx');
     const characterArcEditor = read('components/plot-planning/CharacterArcEditor.tsx');
     const conflictEditor = read('components/plot-planning/ConflictEditor.tsx');
+    const twistEditor = read('components/plot-planning/TwistPlanningEditor.tsx');
     expect(structureEditor).toContain('STRUCTURES.map');
     expect(characterArcEditor).toContain('<MultiScenePicker');
     expect(conflictEditor).toContain('<MultiScenePicker');
+    expect(twistEditor).toContain('<TwistQuestionnaire');
+    expect(read('components/questionnaires/TwistQuestionnaire.tsx')).toContain('<MultiScenePicker');
   });
 
   it('keeps one coordinator-owned callback path to the book state', () => {
@@ -54,6 +58,7 @@ describe('plot planning architecture', () => {
       'components/plot-planning/PlotStructureEditor.tsx',
       'components/plot-planning/CharacterArcEditor.tsx',
       'components/plot-planning/ConflictEditor.tsx',
+      'components/plot-planning/TwistPlanningEditor.tsx',
       'components/plot-planning/plotPlanningDefinitions.ts',
     ].map(read).join('\n');
 
@@ -61,6 +66,7 @@ describe('plot planning architecture', () => {
     expect(app).toContain('onUpdateArcs=');
     expect(app).toContain('onUpdateRelationships=');
     expect(app).toContain('onUpdateConflicts=');
+    expect(app).toContain('onUpdateTwists=');
     expect(extractedFiles).not.toContain('updateActiveBook');
   });
 });

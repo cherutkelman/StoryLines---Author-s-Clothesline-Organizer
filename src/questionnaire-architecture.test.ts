@@ -25,11 +25,11 @@ describe('questionnaire architecture', () => {
       'CharacterQuestionnaire',
       'PlaceQuestionnaire',
       'PeriodQuestionnaire',
-      'TwistQuestionnaire',
       'FantasyWorldQuestionnaire',
       'BackgroundQuestionnaire',
       'RelationshipQuestionnaire',
     ].forEach(component => expect(coordinator).toContain(component));
+    expect(coordinator).not.toContain('TwistQuestionnaire');
   });
 
   it('keeps accordion markup in the shared questionnaire infrastructure', () => {

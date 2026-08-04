@@ -37,7 +37,6 @@ import {
   UNIQUE_POWER_QUESTIONS,
 } from './questionnaires/questionnaireDefinitions';
 import PeriodQuestionnaire from './questionnaires/PeriodQuestionnaire';
-import TwistQuestionnaire from './questionnaires/TwistQuestionnaire';
 import CharacterQuestionnaire from './questionnaires/CharacterQuestionnaire';
 import PlaceQuestionnaire from './questionnaires/PlaceQuestionnaire';
 import FantasyWorldQuestionnaire from './questionnaires/FantasyWorldQuestionnaire';
@@ -1214,8 +1213,7 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
 
             <div ref={categoryTopRef} className="flex-none overflow-visible p-4 sm:p-8 scroll-mt-24">
                 {mode === 'edit' ? (
-                  activeTab === 'periods' || activeTab === 'twists' ? (
-                    activeTab === 'periods' ? (
+                  activeTab === 'periods' ? (
                       <PeriodQuestionnaire
                         entry={selectedEntry}
                         categories={categories}
@@ -1233,25 +1231,6 @@ const Questionnaires: React.FC<QuestionnairesProps> = ({
                         onAddCustomQuestion={addCustomQuestion}
                         onRemoveCustomQuestion={removeCustomQuestion}
                       />
-                    ) : (
-                      <TwistQuestionnaire
-                        entry={selectedEntry}
-                        categories={categories}
-                        activeCategoryIndex={currentCategoryIndex}
-                        activeCategory={currentCategory}
-                        questions={filteredQuestions}
-                        customQuestions={customQuestions}
-                        newQuestionLabel={newQuestionLabel}
-                        onSelectCategory={handleCategorySelect}
-                        onRegisterCategoryAnchor={(category, element) => {
-                          accordionCategoryAnchorsRef.current[category] = element;
-                        }}
-                        onUpdateAnswer={(questionId, value) => updateEntry({ data: { ...selectedEntry.data, [questionId]: value } })}
-                        onNewQuestionLabelChange={setNewQuestionLabel}
-                        onAddCustomQuestion={addCustomQuestion}
-                        onRemoveCustomQuestion={removeCustomQuestion}
-                      />
-                    )
                   ) : (
                   renderQuestionnaireContent(<>
                     {currentCategory === "פיתוח דמות" ? (

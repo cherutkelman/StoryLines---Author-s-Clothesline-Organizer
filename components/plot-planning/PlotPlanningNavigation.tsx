@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Share2, TrendingUp, X } from 'lucide-react';
+import { Layout, Share2, TrendingUp, X, Zap } from 'lucide-react';
 import type { PlotStructureSubView } from '../../types';
 
 interface PlotPlanningNavigationProps {
@@ -12,6 +12,7 @@ const items: Array<{ id: PlotStructureSubView; label: string; icon: React.Elemen
   { id: 'relationships', label: 'מערכת יחסים', icon: Share2 },
   { id: 'arc', label: 'קשת התפתחות', icon: TrendingUp },
   { id: 'conflicts', label: 'מניע ומטרה', icon: X },
+  { id: 'twists', label: 'טוויסטים', icon: Zap },
 ];
 
 const PlotPlanningNavigation: React.FC<PlotPlanningNavigationProps> = ({ activeSubView, onChange }) => (

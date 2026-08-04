@@ -55,7 +55,8 @@ import {
   RefreshCw,
   Cloud,
   AlertCircle,
-  Menu
+  Menu,
+  Zap
 } from 'lucide-react';
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot, BoardVersion } from './types';
 import Board from './components/Board';
@@ -117,6 +118,7 @@ const PLOT_STRUCTURE_NAV_ITEMS: { id: PlotStructureSubView; icon: React.ElementT
   { id: 'arc', icon: TrendingUp, label: 'קשת התפתחות' },
   { id: 'relationships', icon: Share2, label: 'מערכות יחסים' },
   { id: 'conflicts', icon: X, label: 'קונפליקטים' },
+  { id: 'twists', icon: Zap, label: 'טוויסטים' },
 ];
 
 const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: string }[] = [
@@ -2508,6 +2510,8 @@ const App: React.FC = () => {
                     onUpdateRelationships={(rels) => updateActiveBook({ relationships: rels })}
                     conflicts={(activeBook as any).conflicts || []}
                     onUpdateConflicts={(conflicts) => updateActiveBook({ conflicts } as Partial<Book>)}
+                    twists={activeBook.twists || []}
+                    onUpdateTwists={(twists) => updateEntries('twists', twists)}
                     initialSubView={activeUI.plotStructureActiveSubView}
                     onSubViewChange={handlePlotStructureSubViewChange}
                     isLibrarySidebarCollapsed={isSidebarCollapsed}

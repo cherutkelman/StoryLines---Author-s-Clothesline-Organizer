@@ -19,6 +19,7 @@ export interface StandardAccordionQuestionnaireProps {
   onNewQuestionLabelChange: (value: string) => void;
   onAddCustomQuestion: () => void;
   onRemoveCustomQuestion: (questionId: string) => void;
+  renderAfterQuestion?: (question: QuestionnaireQuestion) => React.ReactNode;
 }
 
 const StandardAccordionQuestionnaire: React.FC<StandardAccordionQuestionnaireProps> = ({
@@ -36,6 +37,7 @@ const StandardAccordionQuestionnaire: React.FC<StandardAccordionQuestionnairePro
   onNewQuestionLabelChange,
   onAddCustomQuestion,
   onRemoveCustomQuestion,
+  renderAfterQuestion,
 }) => (
   <QuestionnaireAccordion
     enabled
@@ -49,6 +51,7 @@ const StandardAccordionQuestionnaire: React.FC<StandardAccordionQuestionnairePro
       questions={questions}
       data={entry.data}
       onChange={onUpdateAnswer}
+      renderAfterQuestion={renderAfterQuestion}
     />
     {activeCategory === 'שאלות נוספות' && customQuestions.map(question => (
       <div key={question.id} className="group space-y-3 animate-in fade-in duration-500 relative">
@@ -66,6 +69,7 @@ const StandardAccordionQuestionnaire: React.FC<StandardAccordionQuestionnairePro
           className="w-full bg-[var(--color-secondary)]/20 border-2 border-[var(--color-border)]/50 rounded-2xl p-5 text-sm focus:ring-4 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/50 transition-all outline-none min-h-[120px] leading-relaxed shadow-inner"
           placeholder="תשובה לשאלה המותאמת..."
         />
+        {renderAfterQuestion?.({ id: question.id, category: activeCategory, question: question.label, type: 'textarea' })}
       </div>
     ))}
     {activeCategory === 'שאלות נוספות' && (

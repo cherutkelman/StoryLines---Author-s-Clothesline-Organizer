@@ -242,6 +242,7 @@ export interface QuestionnaireEntry {
   y?: number; // Spatial Y for character map
   parentId?: string; // For nested entries (e.g., micro places within macro)
   data: Record<string, string>; // Questions and their answers
+  sceneIdsByQuestionId?: Record<string, string[]>; // Optional scene links per answer
   customFields?: { id: string; label: string }[]; // User-defined questions
   developmentStages?: DevelopmentStage[]; // For character development tracking
   specialItems?: SpecialItem[]; // For fantasy world special items
@@ -442,7 +443,7 @@ export interface BookUIState {
   mapsSelectedMindMapId?: string | null;
 }
 
-export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts';
+export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts' | 'twists';
 export type BoardViewMode = 'plotlines' | 'chapters';
 
 export interface Book extends Project {

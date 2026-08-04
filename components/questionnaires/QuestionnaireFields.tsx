@@ -11,9 +11,10 @@ interface QuestionnaireFieldsProps {
   questions: QuestionnaireQuestion[];
   data: Record<string, string>;
   onChange: (questionId: string, value: string) => void;
+  renderAfterQuestion?: (question: QuestionnaireQuestion) => React.ReactNode;
 }
 
-const QuestionnaireFields: React.FC<QuestionnaireFieldsProps> = ({ questions, data, onChange }) => (
+const QuestionnaireFields: React.FC<QuestionnaireFieldsProps> = ({ questions, data, onChange, renderAfterQuestion }) => (
   <>
     {questions.map(question => (
       <div key={question.id} className="group space-y-3 animate-in fade-in duration-500">
@@ -40,6 +41,7 @@ const QuestionnaireFields: React.FC<QuestionnaireFieldsProps> = ({ questions, da
             placeholder="כתוב כאן..."
           />
         )}
+        {renderAfterQuestion?.(question)}
       </div>
     ))}
   </>

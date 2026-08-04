@@ -6,6 +6,7 @@ import { PlotStructureProps } from './plot-planning/plotPlanningTypes';
 import PlotStructureEditor from './plot-planning/PlotStructureEditor';
 import ConflictEditor from './plot-planning/ConflictEditor';
 import CharacterArcEditor from './plot-planning/CharacterArcEditor';
+import TwistPlanningEditor from './plot-planning/TwistPlanningEditor';
 
 const PlotStructure: React.FC<PlotStructureProps> = ({ 
   selectedStructure, 
@@ -22,6 +23,8 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   onUpdateCharacters,
   conflicts = [],
   onUpdateConflicts,
+  twists = [],
+  onUpdateTwists,
   initialSubView,
   onSubViewChange,
   isLibrarySidebarCollapsed = false,
@@ -72,13 +75,15 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             onUpdateRelationships={onUpdateRelationships}
             onUpdateCharacters={onUpdateCharacters}
           />
-        ) : (
+        ) : activeSubView === 'conflicts' ? (
           <ConflictEditor
             conflicts={conflicts}
             onUpdateConflicts={onUpdateConflicts}
             scenes={scenes}
             isLibrarySidebarCollapsed={isLibrarySidebarCollapsed}
           />
+        ) : (
+          <TwistPlanningEditor twists={twists} scenes={scenes} onUpdateTwists={onUpdateTwists} />
         )}
       </div>
     </div>

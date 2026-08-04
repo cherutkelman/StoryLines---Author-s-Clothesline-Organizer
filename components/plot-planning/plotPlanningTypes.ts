@@ -1,4 +1,4 @@
-import { PlotStructureSubView, Scene } from '../../types';
+import { PlotStructureSubView, QuestionnaireEntry, Scene } from '../../types';
 
 export interface PlotStructureProps {
   selectedStructure: string | undefined;
@@ -36,6 +36,8 @@ export interface PlotStructureProps {
   onUpdateCharacters: (chars: any[]) => void;
   conflicts: any[];
   onUpdateConflicts: (conflicts: any[]) => void;
+  twists: QuestionnaireEntry[];
+  onUpdateTwists: (twists: QuestionnaireEntry[]) => void;
   initialSubView?: PlotStructureSubView;
   onSubViewChange?: (subView: PlotStructureSubView) => void;
   isLibrarySidebarCollapsed?: boolean;
