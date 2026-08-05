@@ -1,8 +1,7 @@
 import React from 'react';
-import { Diamond, Hexagon, Plus, Trash2, X } from 'lucide-react';
+import { Info, Plus, Trash2 } from 'lucide-react';
 import { Scene } from '../../types';
 import MultiScenePicker from './MultiScenePicker';
-import { TrapezoidIcon } from './PlotPlanningIcons';
 
 interface ConflictEditorProps {
   conflicts: any[];
@@ -11,252 +10,237 @@ interface ConflictEditorProps {
   isLibrarySidebarCollapsed: boolean;
 }
 
-const createConflictRow = (id = `row-${Date.now()}`) => ({ id, goal: '', goalScenes: [], needReason: '', needReasonScenes: [], obstacle: '', obstacleScenes: [], resolution: '', resolutionScenes: [] });
-const createConflict = () => ({ id: `conflict-${Date.now()}`, title: '', characterName: '', rows: [createConflictRow()] });
+const uniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const createConflictRow = (id = uniqueId('row')) => ({
+  id,
+  goal: '',
+  goalScenes: [],
+  needReason: '',
+  needReasonScenes: [],
+  obstacle: '',
+  obstacleScenes: [],
+  resolution: '',
+  resolutionScenes: [],
+});
+const createResult = (id = uniqueId('result')) => ({ id, text: '', scenes: [] });
+const createConflict = () => ({
+  id: uniqueId('conflict'),
+  title: '',
+  characterName: '',
+  rows: [createConflictRow()],
+  finalGoal: '',
+  finalGoalScenes: [],
+  results: [createResult()],
+});
+
+const getRows = (conflict: any) => conflict.rows?.length ? conflict.rows : [createConflictRow(`row-${conflict.id}-default`)];
+const getResults = (conflict: any) => conflict.results?.length ? conflict.results : [createResult(`result-${conflict.id}-default`)];
 
 const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConflicts, scenes, isLibrarySidebarCollapsed }) => {
-  const flattenedConflictRows = (conflicts || []).flatMap((conflict: any, conflictIndex: number) => {
-    const rows = conflict.rows?.length ? conflict.rows : [createConflictRow(`row-${conflict.id}-empty`)];
-    return rows.map((row: any, rowIndex: number) => ({ conflict, conflictIndex, row, rowIndex }));
+  const items = conflicts || [];
+  const inputClass = 'w-full bg-white/70 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none resize-y min-h-16';
+
+  const updateConflict = (conflictIndex: number, updater: (conflict: any) => void) => {
+    const next = [...items];
+    const conflict = {
+      ...next[conflictIndex],
+      rows: [...getRows(next[conflictIndex])],
+      results: [...getResults(next[conflictIndex])],
+      finalGoalScenes: [...(next[conflictIndex].finalGoalScenes || [])],
+    };
+    updater(conflict);
+    next[conflictIndex] = conflict;
+    onUpdateConflicts(next);
+  };
+
+  const updateRow = (conflictIndex: number, rowIndex: number, updates: Record<string, unknown>) => updateConflict(conflictIndex, conflict => {
+    conflict.rows[rowIndex] = { ...conflict.rows[rowIndex], ...updates };
   });
-  const conflictRows = flattenedConflictRows.length > 0 ? flattenedConflictRows : [{ conflict: { id: 'draft-conflict', title: '', characterName: '', rows: [createConflictRow('draft-conflict-row')] }, conflictIndex: -1, row: createConflictRow('draft-conflict-row'), rowIndex: 0 }];
-  const updateConflictRow = (rowRef: { conflictIndex: number; rowIndex: number }, updater: (conflict: any, rowIndex: number) => void) => {
-    if (rowRef.conflictIndex < 0) {
-      const newConflict = createConflict();
-      updater(newConflict, 0);
-      onUpdateConflicts([...(conflicts || []), newConflict]);
-      return;
-    }
-    const newConflicts = [...(conflicts || [])];
-    const conflict = { ...newConflicts[rowRef.conflictIndex], rows: [...(newConflicts[rowRef.conflictIndex].rows || [])] };
-    while (!conflict.rows[rowRef.rowIndex]) conflict.rows.push(createConflictRow());
-    updater(conflict, rowRef.rowIndex);
-    newConflicts[rowRef.conflictIndex] = conflict;
-    onUpdateConflicts(newConflicts);
-  };
-  const updateConflictRowField = (rowRef: { conflictIndex: number; rowIndex: number }, field: 'goal' | 'needReason' | 'obstacle' | 'resolution', value: string) =>
-    updateConflictRow(rowRef, (conflict, rowIndex) => { conflict.rows[rowIndex] = { ...conflict.rows[rowIndex], [field]: value }; });
-  const updateConflictSceneLinks = (rowRef: { conflictIndex: number; rowIndex: number }, field: 'needReasonScenes' | 'obstacleScenes' | 'resolutionScenes', links: any[]) =>
-    updateConflictRow(rowRef, (conflict, rowIndex) => { conflict.rows[rowIndex] = { ...conflict.rows[rowIndex], [field]: links }; });
-  const conflictSceneSummaryRows = conflictRows.flatMap((flatRow: any, rowNumber: number) => [
-    { type: 'needReason' as const, links: flatRow.row.needReasonScenes ?? flatRow.row.goalScenes ?? [] },
-    { type: 'obstacle' as const, links: flatRow.row.obstacleScenes || [] },
-    { type: 'resolution' as const, links: flatRow.row.resolutionScenes || [] },
-  ].flatMap(({ type, links }) => links.filter((link: any) => link.sceneId).map((link: any) => {
-    const scene = scenes.find(candidate => candidate.id === link.sceneId);
-    return scene ? { scene, type, rowNumber: rowNumber + 1, linkId: link.id } : null;
-  }).filter(Boolean))).sort((a: any, b: any) => a.scene.position !== b.scene.position ? a.scene.position - b.scene.position : (a.scene.title || '').localeCompare(b.scene.title || ''));
-  const deleteConflictRow = (rowRef: { conflictIndex: number; rowIndex: number }) => {
-    if (rowRef.conflictIndex < 0) return;
-    const newConflicts = [...(conflicts || [])], conflict = newConflicts[rowRef.conflictIndex], rows = conflict.rows || [];
-    if (rows.length <= 1) {
-      onUpdateConflicts(newConflicts.filter((_: any, index: number) => index !== rowRef.conflictIndex));
-      return;
-    }
-    newConflicts[rowRef.conflictIndex] = { ...conflict, rows: rows.filter((_: any, index: number) => index !== rowRef.rowIndex) };
-    onUpdateConflicts(newConflicts);
-  };
+
+  const addReasonGroup = (conflictIndex: number) => updateConflict(conflictIndex, conflict => conflict.rows.push(createConflictRow()));
+  const deleteReasonGroup = (conflictIndex: number, rowIndex: number) => updateConflict(conflictIndex, conflict => {
+    if (conflict.rows.length > 1) conflict.rows = conflict.rows.filter((_: any, index: number) => index !== rowIndex);
+  });
+  const addResult = (conflictIndex: number) => updateConflict(conflictIndex, conflict => conflict.results.push(createResult()));
+  const deleteResult = (conflictIndex: number, resultIndex: number) => updateConflict(conflictIndex, conflict => {
+    if (conflict.results.length > 1) conflict.results = conflict.results.filter((_: any, index: number) => index !== resultIndex);
+  });
+
+  const picker = (links: any[], onUpdate: (links: any[]) => void) => (
+    <MultiScenePicker links={links || []} onUpdate={onUpdate} scenes={scenes} placeholder="בחירת סצנה..." />
+  );
+
+  const sceneSummary = items.flatMap((conflict: any) => {
+    const rows = getRows(conflict);
+    const firstRow = rows[0];
+    const entries: any[] = [
+      { label: 'מטרה בתחילת הספר', links: firstRow.goalScenes || [] },
+      ...rows.flatMap((row: any, index: number) => [
+        { label: `סיבה ${index + 1}`, links: row.needReasonScenes || [] },
+        { label: `בעיה ${index + 1}`, links: row.obstacleScenes || [] },
+        { label: `פתרון ${index + 1}`, links: row.resolutionScenes || [] },
+      ]),
+      { label: 'המטרה שהושגה בסוף הספר', links: conflict.finalGoalScenes || [] },
+      ...getResults(conflict).map((result: any, index: number) => ({ label: `תוצאה ${index + 1}`, links: result.scenes || [] })),
+    ];
+    return entries.flatMap(entry => entry.links.map((link: any) => {
+      const scene = scenes.find(candidate => candidate.id === link.sceneId);
+      return scene ? { scene, label: entry.label, conflict, linkId: link.id } : null;
+    }).filter(Boolean));
+  }).sort((a: any, b: any) => a.scene.position - b.scene.position);
+
   return (
-<div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-   {/* Explanation Space */}
-   <div className="bg-[var(--theme-accent)]/5 p-8 rounded-[2rem] border border-[var(--theme-accent)]/20 [&>div:nth-child(3)]:hidden">
-     <div className="flex items-center gap-3 mb-4 text-[var(--theme-accent)] [&>h3:last-child]:hidden">
-       <X size={20} />
-       <h3 className="text-xl font-bold handwritten text-3xl">מטרות, בעיות והישגים</h3>
-       <h3 className="text-xl font-bold handwritten text-3xl">ניהול קונפליקטים</h3>
-     </div>
-     <div className="text-[var(--theme-primary)]/70 leading-relaxed italic">
-       קונפליקט הוא המנוע של הדרמה. כאן תוכלו לרכז את כל המכשולים, הבעיות והעימותים שיש לדמויות שלכם.
-       <br />
-       לכל קונפליקט, תוכלו למפות את המטרה, המכשול והפתרון - ולשייך לכל אחד מהם את הסצנות הרלוונטיות.
-     </div>
-   </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="bg-[var(--theme-accent)]/5 p-8 rounded-[2rem] border border-[var(--theme-accent)]/20">
+        <div className="flex items-center gap-3 mb-4 text-[var(--theme-accent)]">
+          <Info size={20} />
+          <h3 className="text-xl font-bold handwritten text-3xl">מניע ומטרה</h3>
+        </div>
+        <p className="text-[var(--theme-primary)]/70 leading-relaxed italic">
+          הגדירו את מטרת הדמות בתחילת הספר, את הסיבות שמניעות אותה, את הבעיות והפתרונות שבדרך, ולבסוף את המטרה שהושגה ואת תוצאותיה.
+        </p>
+      </div>
 
-   <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/30 shadow-inner bg-white/50" dir="rtl">
-     <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[1120px]' : 'min-w-[960px]'}`}>
-       <colgroup>
-         <col className="w-14" />
-         <col style={{ width: 'calc((100% - 3.5rem) / 4)' }} />
-         <col style={{ width: 'calc((100% - 3.5rem) / 4)' }} />
-         <col style={{ width: 'calc((100% - 3.5rem) / 4)' }} />
-         <col style={{ width: 'calc((100% - 3.5rem) / 4)' }} />
-       </colgroup>
-       <thead>
-         <tr className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">#</th>
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center">המטרה של X - שם הדמות</th>
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
-             <div className="flex flex-col items-center gap-1">
-               <Diamond size={14} className="text-purple-500 fill-purple-500/20" />
-               <span>טיעונים - למה היא נצרכת</span>
-             </div>
-           </th>
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center leading-tight">
-             <div className="flex flex-col items-center gap-1">
-               <TrapezoidIcon size={14} className="text-rose-500" />
-               <span>בעיה - מה מפריע להשגת המטרה</span>
-             </div>
-           </th>
-           <th className="p-3 border-b border-[var(--theme-border)]/30 text-center leading-tight">
-             <div className="flex flex-col items-center gap-1">
-               <Hexagon size={14} className="text-cyan-500 fill-cyan-500/20" />
-               <span>הישג - השלבים בדרך לפתרון ולהצלחה</span>
-             </div>
-           </th>
-         </tr>
-       </thead>
-       <tbody>
-         {conflictRows.map((flatRow: any, flatIndex: number) => {
-           const characterName = flatRow.conflict.characterName ?? flatRow.conflict.title ?? '';
-           const needReasonScenes = flatRow.row.needReasonScenes ?? flatRow.row.goalScenes ?? [];
+      {items.map((conflict: any, conflictIndex: number) => {
+        const rows = getRows(conflict);
+        const results = getResults(conflict);
+        const firstRow = rows[0];
+        const characterName = conflict.characterName ?? conflict.title ?? '';
+        return (
+          <div key={conflict.id} className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/40 bg-white/50 shadow-sm" dir="rtl">
+            <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[900px]' : 'min-w-[760px]'}`}>
+              <colgroup>
+                <col className="w-[14%]" />
+                <col className="w-[70%]" />
+                <col className="w-[16%]" />
+              </colgroup>
+              <thead className="bg-[var(--theme-secondary)]/30 text-sm font-black text-[var(--theme-primary)]/70">
+                <tr>
+                  <th className="p-3 border-b border-l border-[var(--theme-border)]/40">שם הדמות</th>
+                  <th className="p-3 border-b border-l border-[var(--theme-border)]/40">
+                    <div className="flex items-center gap-2">
+                      <input value={characterName} onChange={event => updateConflict(conflictIndex, next => { next.characterName = event.target.value; })} className="w-full bg-white/70 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold outline-none" placeholder="שם הדמות" />
+                      <button onClick={() => onUpdateConflicts(items.filter((_: any, index: number) => index !== conflictIndex))} className="p-2 text-red-300 hover:text-red-500" title="מחיקת טבלת מטרה"><Trash2 size={16} /></button>
+                    </div>
+                  </th>
+                  <th className="p-3 border-b border-[var(--theme-border)]/40">באיזו סצנה זה מופיע</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="p-3 border-b border-l border-[var(--theme-border)]/30 font-black text-[var(--theme-accent)]">מטרה בתחילת הספר</td>
+                  <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                    <textarea value={firstRow.goal || ''} onChange={event => updateRow(conflictIndex, 0, { goal: event.target.value })} className={inputClass} placeholder="מה המטרה של הדמות?" />
+                  </td>
+                  <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">{picker(firstRow.goalScenes || [], links => updateRow(conflictIndex, 0, { goalScenes: links }))}</td>
+                </tr>
 
-           return (
-             <React.Fragment key={`${flatRow.conflict.id}-${flatRow.row.id}-${flatRow.rowIndex}`}>
-               <tr className="group hover:bg-[var(--theme-accent)]/5 transition-colors">
-                 <td className="p-2 border-b border-l border-[var(--theme-border)]/30 text-center align-middle font-bold text-[var(--theme-primary)]/40">
-                   <div className="flex flex-col items-center gap-1">
-                     <span>{flatIndex + 1}</span>
-                     <button
-                       onClick={() => deleteConflictRow(flatRow)}
-                       className="text-red-200 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-1"
-                       title="מחיקת שורה"
-                     >
-                       <Trash2 size={13} />
-                     </button>
-                   </div>
-                 </td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top bg-[var(--theme-accent)]/5">
-                   <div className="space-y-3">
-                     {characterName && (
-                       <p className="text-[10px] font-black text-[var(--theme-primary)]/45">המטרה של {characterName}</p>
-                     )}
-                     <input
-                       value={characterName}
-                       onChange={(e) => updateConflictRow(flatRow, (conflict) => { conflict.characterName = e.target.value; })}
-                       className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none"
-                       placeholder="שם הדמות..."
-                     />
-                     <textarea
-                       value={flatRow.row.goal || ''}
-                       onChange={(e) => updateConflictRowField(flatRow, 'goal', e.target.value)}
-                       placeholder="מה המטרה שלה?"
-                       className="w-full bg-white/60 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none resize-none h-24 scrollbar-hide"
-                     />
-                   </div>
-                 </td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
-                   <textarea
-                     value={flatRow.row.needReason || ''}
-                     onChange={(e) => updateConflictRowField(flatRow, 'needReason', e.target.value)}
-                     placeholder="למה המטרה חשובה או נצרכת לדמות?"
-                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
-                   />
-                 </td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
-                   <textarea
-                     value={flatRow.row.obstacle || ''}
-                     onChange={(e) => updateConflictRowField(flatRow, 'obstacle', e.target.value)}
-                     placeholder="מה מפריע להשגת המטרה?"
-                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
-                   />
-                 </td>
-                 <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
-                   <textarea
-                     value={flatRow.row.resolution || ''}
-                     onChange={(e) => updateConflictRowField(flatRow, 'resolution', e.target.value)}
-                     placeholder="אילו הישגים ושלבים מובילים לפתרון?"
-                     className="w-full bg-transparent border-none focus:ring-0 text-sm p-0 resize-none h-28 scrollbar-hide"
-                   />
-                 </td>
-               </tr>
-               <tr className="bg-[var(--theme-secondary)]/10">
-                 <td className="p-2 border-b border-l border-[var(--theme-border)]/30"></td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-[11px] font-bold text-[var(--theme-primary)]/45 align-top"></td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
-                   <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
-                   <MultiScenePicker
-                     links={needReasonScenes}
-                     onUpdate={(links) => updateConflictSceneLinks(flatRow, 'needReasonScenes', links)}
-                     scenes={scenes}
-                     placeholder="בחירת סצנה קיימת..."
-                   />
-                 </td>
-                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 align-top">
-                   <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
-                   <MultiScenePicker
-                     links={flatRow.row.obstacleScenes || []}
-                     onUpdate={(links) => updateConflictSceneLinks(flatRow, 'obstacleScenes', links)}
-                     scenes={scenes}
-                     placeholder="בחירת סצנה קיימת..."
-                   />
-                 </td>
-                 <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
-                   <p className="text-[10px] font-black text-[var(--theme-primary)]/45 mb-2">באילו סצנות זה מתרחש?</p>
-                   <MultiScenePicker
-                     links={flatRow.row.resolutionScenes || []}
-                     onUpdate={(links) => updateConflictSceneLinks(flatRow, 'resolutionScenes', links)}
-                     scenes={scenes}
-                     placeholder="בחירת סצנה קיימת..."
-                   />
-                 </td>
-               </tr>
-             </React.Fragment>
-           );
-         })}
-       </tbody>
-     </table>
-   </div>
+                {rows.map((row: any, rowIndex: number) => (
+                  <tr key={row.id}>
+                    <td className="p-0 border-b border-l border-[var(--theme-border)]/30 font-bold text-[var(--theme-primary)]/70">
+                      <div className="grid grid-cols-[2.5rem_1fr] min-h-60">
+                        <div className="row-span-3 flex items-center justify-center border-l border-[var(--theme-border)]/30 text-lg font-black">{rowIndex + 1}</div>
+                        <div className="flex items-center justify-between gap-1 px-2 py-3 border-b border-[var(--theme-border)]/30">
+                          <span>סיבה</span>
+                          {rows.length > 1 && <button onClick={() => deleteReasonGroup(conflictIndex, rowIndex)} className="p-1 text-red-300 hover:text-red-500" title="מחיקת הקבוצה"><Trash2 size={14} /></button>}
+                        </div>
+                        <div className="px-2 py-3 border-b border-[var(--theme-border)]/30">בעיה</div>
+                        <div className="px-2 py-3">פתרון</div>
+                      </div>
+                    </td>
+                    <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                      <div className="grid grid-rows-3 gap-3">
+                        <textarea value={row.needReason || ''} onChange={event => updateRow(conflictIndex, rowIndex, { needReason: event.target.value })} className={inputClass} placeholder="למה המטרה חשובה לדמות?" />
+                        <textarea value={row.obstacle || ''} onChange={event => updateRow(conflictIndex, rowIndex, { obstacle: event.target.value })} className={inputClass} placeholder="מה מפריע להשגת המטרה?" />
+                        <textarea value={row.resolution || ''} onChange={event => updateRow(conflictIndex, rowIndex, { resolution: event.target.value })} className={inputClass} placeholder="איך הדמות מתגברת על הבעיה?" />
+                      </div>
+                    </td>
+                    <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">
+                      <div className="grid grid-rows-3 gap-3">
+                        <div>{picker(row.needReasonScenes || row.goalScenes || [], links => updateRow(conflictIndex, rowIndex, { needReasonScenes: links }))}</div>
+                        <div>{picker(row.obstacleScenes || [], links => updateRow(conflictIndex, rowIndex, { obstacleScenes: links }))}</div>
+                        <div>{picker(row.resolutionScenes || [], links => updateRow(conflictIndex, rowIndex, { resolutionScenes: links }))}</div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
 
-   <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 bg-white/40 shadow-sm" dir="rtl">
-     <table className="w-full border-collapse">
-       <thead className="bg-[var(--theme-secondary)]/30 text-[10px] font-black uppercase tracking-wider text-[var(--theme-primary)]/60">
-         <tr>
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right">סצנות</th>
-           <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-center w-36">צורה</th>
-           <th className="p-3 border-b border-[var(--theme-border)]/30 text-center w-28">שורה</th>
-         </tr>
-       </thead>
-       <tbody>
-         {conflictSceneSummaryRows.length > 0 ? (
-           conflictSceneSummaryRows.map((item: any) => (
-             <tr key={`${item.scene.id}-${item.type}-${item.rowNumber}-${item.linkId}`} className="hover:bg-[var(--theme-accent)]/5 transition-colors">
-               <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold text-[var(--theme-primary)]">
-                 {item.scene.title}
-               </td>
-               <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
-                 <div className="flex items-center justify-center">
-                   {item.type === 'needReason' && <Diamond size={18} className="text-purple-500 fill-purple-500/20" />}
-                   {item.type === 'obstacle' && <TrapezoidIcon size={18} className="text-rose-500" />}
-                   {item.type === 'resolution' && <Hexagon size={18} className="text-cyan-500 fill-cyan-500/20" />}
-                 </div>
-               </td>
-               <td className="p-3 border-b border-[var(--theme-border)]/30 text-center text-sm font-black text-[var(--theme-primary)]/70">
-                 {item.rowNumber}
-               </td>
-             </tr>
-           ))
-         ) : (
-           <tr>
-             <td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">
-               עדיין לא שויכו סצנות למניע ומטרה.
-             </td>
-           </tr>
-         )}
-       </tbody>
-     </table>
-   </div>
+                <tr className="bg-[var(--theme-secondary)]/10">
+                  <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                    <button onClick={() => addReasonGroup(conflictIndex)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-xs font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]"><Plus size={15} /> הוספת סיבה, בעיה ופתרון</button>
+                  </td>
+                  <td className="border-b border-l border-[var(--theme-border)]/30" />
+                  <td className="border-b border-[var(--theme-border)]/30" />
+                </tr>
 
-   <div className="flex justify-center">
-     <button
-       onClick={() => onUpdateConflicts([...(conflicts || []), createConflict()])}
-       className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-accent)] text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-all"
-     >
-       <Plus size={18} />
-       הוספת שורת מטרה
-     </button>
-   </div>
+                <tr className="bg-[var(--theme-accent)]/5">
+                  <td className="p-3 border-b border-l border-[var(--theme-border)]/30 font-black text-[var(--theme-accent)]">המטרה שהושגה בסוף הספר</td>
+                  <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                    <textarea value={conflict.finalGoal || ''} onChange={event => updateConflict(conflictIndex, next => { next.finalGoal = event.target.value; })} className={inputClass} placeholder="מה השיגה הדמות בסוף הספר?" />
+                  </td>
+                  <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">{picker(conflict.finalGoalScenes || [], links => updateConflict(conflictIndex, next => { next.finalGoalScenes = links; }))}</td>
+                </tr>
 
-</div>
+                {results.map((result: any, resultIndex: number) => (
+                  <tr key={result.id}>
+                    <td className="p-0 border-b border-l border-[var(--theme-border)]/30 font-bold text-[var(--theme-primary)]/70">
+                      <div className="grid grid-cols-[2.5rem_1fr] min-h-20">
+                        <div className="flex items-center justify-center border-l border-[var(--theme-border)]/30 text-lg font-black">{resultIndex + 1}</div>
+                        <div className="flex items-center justify-between gap-1 px-2 py-3">
+                          <span>תוצאה</span>
+                          {results.length > 1 && <button onClick={() => deleteResult(conflictIndex, resultIndex)} className="p-1 text-red-300 hover:text-red-500" title="מחיקת תוצאה"><Trash2 size={14} /></button>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 border-b border-l border-[var(--theme-border)]/30">
+                      <textarea value={result.text || ''} onChange={event => updateConflict(conflictIndex, next => { next.results[resultIndex] = { ...next.results[resultIndex], text: event.target.value }; })} className={inputClass} placeholder="מה התוצאה?" />
+                    </td>
+                    <td className="p-3 border-b border-[var(--theme-border)]/30 align-top">{picker(result.scenes || [], links => updateConflict(conflictIndex, next => { next.results[resultIndex] = { ...next.results[resultIndex], scenes: links }; }))}</td>
+                  </tr>
+                ))}
+
+                <tr className="bg-[var(--theme-secondary)]/10">
+                  <td className="p-3 border-l border-[var(--theme-border)]/30">
+                    <button onClick={() => addResult(conflictIndex)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-sm font-bold text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)]"><Plus size={16} /> הוספת תוצאה</button>
+                  </td>
+                  <td className="border-l border-[var(--theme-border)]/30" />
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+
+      {items.length === 0 && <div className="rounded-2xl border-2 border-dashed border-[var(--theme-border)]/40 p-10 text-center text-[var(--theme-primary)]/45">עדיין לא נוצרה טבלת מטרה.</div>}
+
+      <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)]/30 bg-white/40 shadow-sm" dir="rtl">
+        <table className="w-full border-collapse">
+          <thead className="bg-[var(--theme-secondary)]/30 text-sm font-black text-[var(--theme-primary)]/60">
+            <tr>
+              <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right">סצנה</th>
+              <th className="p-3 border-b border-l border-[var(--theme-border)]/30 text-right">שלב במטרה</th>
+              <th className="p-3 border-b border-[var(--theme-border)]/30 text-right">דמות</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sceneSummary.length ? sceneSummary.map((item: any) => (
+              <tr key={`${item.linkId}-${item.scene.id}`}>
+                <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold">{item.scene.title}</td>
+                <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm">{item.label}</td>
+                <td className="p-3 border-b border-[var(--theme-border)]/30 text-sm">{item.conflict.characterName || item.conflict.title || 'ללא שם'}</td>
+              </tr>
+            )) : <tr><td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">עדיין לא שויכו סצנות למניע ולמטרה.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex justify-center">
+        <button onClick={() => onUpdateConflicts([...items, createConflict()])} className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-accent)] text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-all">
+          <Plus size={18} /> הוספת טבלת מטרה
+        </button>
+      </div>
+    </div>
   );
 };
 

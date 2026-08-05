@@ -393,6 +393,7 @@ export interface Project {
     characterName: string;
     falseBelief?: string;
     finalGoal?: string;
+    evidences?: { id: string; text: string }[];
     steps: {
       id: string;
       text: string;
@@ -406,7 +407,7 @@ export interface Project {
       sceneName?: string;
       summary?: string;
       stepNumber?: number;
-      type?: 'argument' | 'validation' | 'contradiction';
+      type?: 'belief' | 'argument' | 'validation' | 'contradiction' | 'newBelief';
     }[];
   }[];
   relationships?: Relationship[];
@@ -414,6 +415,13 @@ export interface Project {
     id: string;
     title: string;
     characterName?: string;
+    finalGoal?: string;
+    finalGoalScenes?: { id: string; sceneId?: string; sceneName?: string }[];
+    results?: {
+      id: string;
+      text: string;
+      scenes: { id: string; sceneId?: string; sceneName?: string }[];
+    }[];
     rows: {
       id: string;
       goal: string;

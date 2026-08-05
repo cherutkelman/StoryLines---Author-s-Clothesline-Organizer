@@ -13,6 +13,7 @@ export interface PlotStructureProps {
     characterName: string;
     falseBelief?: string;
     finalGoal?: string;
+    evidences?: { id: string; text: string }[];
     steps: {
       id: string;
       text: string;
@@ -26,7 +27,7 @@ export interface PlotStructureProps {
       sceneName?: string;
       summary?: string;
       stepNumber?: number;
-      type?: 'argument' | 'validation' | 'contradiction';
+      type?: 'belief' | 'argument' | 'validation' | 'contradiction' | 'newBelief';
     }[];
   }[];
   onUpdateArcs: (arcs: any[]) => void;
