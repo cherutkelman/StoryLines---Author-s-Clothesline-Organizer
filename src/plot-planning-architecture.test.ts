@@ -53,6 +53,8 @@ describe('plot planning architecture', () => {
     const extractedFiles = [
       'components/plot-planning/PlotPlanningNavigation.tsx',
       'components/plot-planning/MultiScenePicker.tsx',
+      'components/plot-planning/CharacterLinkSelect.tsx',
+      'components/plot-planning/characterLinkedRow.ts',
       'components/plot-planning/RelationshipDynamicsTable.tsx',
       'components/plot-planning/RelationshipArcEditor.tsx',
       'components/plot-planning/PlotStructureEditor.tsx',

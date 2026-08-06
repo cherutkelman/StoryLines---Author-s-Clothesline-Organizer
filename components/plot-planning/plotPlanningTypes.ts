@@ -10,7 +10,8 @@ export interface PlotStructureProps {
   onUpdateCustomPoints: (points: { id: string; label: string; x: number; y: number }[]) => void;
   characterArcs: {
     id: string;
-    characterName: string;
+    characterId?: string;
+    characterName?: string;
     falseBelief?: string;
     finalGoal?: string;
     evidences?: { id: string; text: string }[];

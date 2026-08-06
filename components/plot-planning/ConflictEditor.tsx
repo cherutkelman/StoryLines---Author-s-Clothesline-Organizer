@@ -1,12 +1,15 @@
 import React from 'react';
 import { Info, Plus, Trash2 } from 'lucide-react';
-import { Scene } from '../../types';
+import { CharacterEntry, Scene } from '../../types';
 import MultiScenePicker from './MultiScenePicker';
+import CharacterLinkSelect from './CharacterLinkSelect';
+import { getCharacterLinkedRowDisplayName, normalizeCharacterLinkOnEdit } from './characterLinkedRow';
 
 interface ConflictEditorProps {
   conflicts: any[];
   onUpdateConflicts: (conflicts: any[]) => void;
   scenes: Scene[];
+  characters: CharacterEntry[];
   isLibrarySidebarCollapsed: boolean;
 }
 
@@ -36,14 +39,14 @@ const createConflict = () => ({
 const getRows = (conflict: any) => conflict.rows?.length ? conflict.rows : [createConflictRow(`row-${conflict.id}-default`)];
 const getResults = (conflict: any) => conflict.results?.length ? conflict.results : [createResult(`result-${conflict.id}-default`)];
 
-const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConflicts, scenes, isLibrarySidebarCollapsed }) => {
+const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConflicts, scenes, characters, isLibrarySidebarCollapsed }) => {
   const items = conflicts || [];
   const inputClass = 'w-full bg-white/70 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm text-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-accent)]/30 outline-none resize-y min-h-16';
 
   const updateConflict = (conflictIndex: number, updater: (conflict: any) => void) => {
     const next = [...items];
     const conflict = {
-      ...next[conflictIndex],
+      ...normalizeCharacterLinkOnEdit(next[conflictIndex], characters),
       rows: [...getRows(next[conflictIndex])],
       results: [...getResults(next[conflictIndex])],
       finalGoalScenes: [...(next[conflictIndex].finalGoalScenes || [])],
@@ -105,7 +108,6 @@ const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConf
         const rows = getRows(conflict);
         const results = getResults(conflict);
         const firstRow = rows[0];
-        const characterName = conflict.characterName ?? conflict.title ?? '';
         return (
           <div key={conflict.id} className="overflow-x-auto rounded-2xl border border-[var(--theme-border)]/40 bg-white/50 shadow-sm" dir="rtl">
             <table className={`w-full table-fixed border-collapse ${isLibrarySidebarCollapsed ? 'min-w-[900px]' : 'min-w-[760px]'}`}>
@@ -119,7 +121,18 @@ const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConf
                   <th className="p-3 border-b border-l border-[var(--theme-border)]/40">שם הדמות</th>
                   <th className="p-3 border-b border-l border-[var(--theme-border)]/40">
                     <div className="flex items-center gap-2">
-                      <input value={characterName} onChange={event => updateConflict(conflictIndex, next => { next.characterName = event.target.value; })} className="w-full bg-white/70 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold outline-none" placeholder="שם הדמות" />
+                      <CharacterLinkSelect
+                        row={conflict}
+                        characters={characters}
+                        onChange={characterId => updateConflict(conflictIndex, next => {
+                          if (characterId) next.characterId = characterId;
+                          else {
+                            delete next.characterId;
+                            next.characterName = '';
+                          }
+                        })}
+                        ariaLabel="בחירת דמות לטבלת המטרות"
+                      />
                       <button onClick={() => onUpdateConflicts(items.filter((_: any, index: number) => index !== conflictIndex))} className="p-2 text-red-300 hover:text-red-500" title="מחיקת טבלת מטרה"><Trash2 size={16} /></button>
                     </div>
                   </th>
@@ -228,7 +241,7 @@ const ConflictEditor: React.FC<ConflictEditorProps> = ({ conflicts, onUpdateConf
               <tr key={`${item.linkId}-${item.scene.id}`}>
                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold">{item.scene.title}</td>
                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm">{item.label}</td>
-                <td className="p-3 border-b border-[var(--theme-border)]/30 text-sm">{item.conflict.characterName || item.conflict.title || 'ללא שם'}</td>
+                <td className="p-3 border-b border-[var(--theme-border)]/30 text-sm">{getCharacterLinkedRowDisplayName(item.conflict, characters)}</td>
               </tr>
             )) : <tr><td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">עדיין לא שויכו סצנות למניע ולמטרה.</td></tr>}
           </tbody>

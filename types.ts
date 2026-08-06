@@ -390,7 +390,8 @@ export interface Project {
   customPlotPoints?: { id: string; label: string; x: number; y: number }[];
   characterArcs?: {
     id: string;
-    characterName: string;
+    characterId?: string;
+    characterName?: string;
     falseBelief?: string;
     finalGoal?: string;
     evidences?: { id: string; text: string }[];
@@ -414,6 +415,7 @@ export interface Project {
   conflicts?: {
     id: string;
     title: string;
+    characterId?: string;
     characterName?: string;
     finalGoal?: string;
     finalGoalScenes?: { id: string; sceneId?: string; sceneName?: string }[];

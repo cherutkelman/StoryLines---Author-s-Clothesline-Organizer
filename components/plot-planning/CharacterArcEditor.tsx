@@ -1,12 +1,15 @@
 import React from 'react';
 import { Info, Plus, Trash2 } from 'lucide-react';
-import { Scene } from '../../types';
+import { CharacterEntry, Scene } from '../../types';
 import MultiScenePicker from './MultiScenePicker';
+import CharacterLinkSelect from './CharacterLinkSelect';
+import { getCharacterLinkedRowDisplayName, normalizeCharacterLinkOnEdit } from './characterLinkedRow';
 
 interface CharacterArcEditorProps {
   characterArcs: any[];
   onUpdateArcs: (arcs: any[]) => void;
   scenes: Scene[];
+  characters: CharacterEntry[];
   isLibrarySidebarCollapsed: boolean;
 }
 
@@ -45,6 +48,7 @@ const CharacterArcEditor: React.FC<CharacterArcEditorProps> = ({
   characterArcs,
   onUpdateArcs,
   scenes,
+  characters,
   isLibrarySidebarCollapsed,
 }) => {
   const arcs = characterArcs || [];
@@ -52,7 +56,7 @@ const CharacterArcEditor: React.FC<CharacterArcEditorProps> = ({
   const updateArc = (arcIndex: number, updater: (arc: any) => void) => {
     const nextArcs = [...arcs];
     const arc = {
-      ...nextArcs[arcIndex],
+      ...normalizeCharacterLinkOnEdit(nextArcs[arcIndex], characters),
       steps: [...getSteps(nextArcs[arcIndex])],
       evidences: [...getEvidences(nextArcs[arcIndex])],
       sceneLinks: [...(nextArcs[arcIndex].sceneLinks || [])],
@@ -162,11 +166,17 @@ const CharacterArcEditor: React.FC<CharacterArcEditorProps> = ({
                   <th className="p-3 border-b border-l border-[var(--theme-border)]/40">שם הדמות</th>
                   <th className="p-3 border-b border-l border-[var(--theme-border)]/40">
                     <div className="flex items-center gap-2">
-                      <input
-                        value={arc.characterName || ''}
-                        onChange={event => updateArc(arcIndex, next => { next.characterName = event.target.value; })}
-                        className="w-full bg-white/70 border border-[var(--theme-border)]/30 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                        placeholder="שם הדמות"
+                      <CharacterLinkSelect
+                        row={arc}
+                        characters={characters}
+                        onChange={characterId => updateArc(arcIndex, next => {
+                          if (characterId) next.characterId = characterId;
+                          else {
+                            delete next.characterId;
+                            next.characterName = '';
+                          }
+                        })}
+                        ariaLabel="בחירת דמות לקשת ההתפתחות"
                       />
                       <button onClick={() => onUpdateArcs(arcs.filter((_: any, index: number) => index !== arcIndex))} className="p-2 text-red-300 hover:text-red-500" title="מחיקת קשת">
                         <Trash2 size={16} />
@@ -288,7 +298,7 @@ const CharacterArcEditor: React.FC<CharacterArcEditorProps> = ({
               <tr key={`${item.link.id}-${item.scene.id}`}>
                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm font-bold">{item.scene.title}</td>
                 <td className="p-3 border-b border-l border-[var(--theme-border)]/30 text-sm">{linkTypeLabels[item.link.type as ArcLinkType] || 'שלב בקשת'}</td>
-                <td className="p-3 border-b border-[var(--theme-border)]/30 text-sm">{item.arc.characterName || 'ללא שם'}</td>
+                <td className="p-3 border-b border-[var(--theme-border)]/30 text-sm">{getCharacterLinkedRowDisplayName(item.arc, characters)}</td>
               </tr>
             )) : (
               <tr><td colSpan={3} className="p-6 text-center text-sm text-[var(--theme-primary)]/35 italic">עדיין לא שויכו סצנות לקשת ההתפתחות.</td></tr>

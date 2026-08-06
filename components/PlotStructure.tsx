@@ -65,6 +65,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             characterArcs={characterArcs}
             onUpdateArcs={onUpdateArcs}
             scenes={scenes}
+            characters={characters}
             isLibrarySidebarCollapsed={isLibrarySidebarCollapsed}
           />
         ) : activeSubView === 'relationships' ? (
@@ -80,6 +81,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
             conflicts={conflicts}
             onUpdateConflicts={onUpdateConflicts}
             scenes={scenes}
+            characters={characters}
             isLibrarySidebarCollapsed={isLibrarySidebarCollapsed}
           />
         ) : (
