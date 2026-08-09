@@ -56,6 +56,7 @@ import {
   Cloud,
   AlertCircle,
   Menu,
+  LogOut,
   Zap
 } from 'lucide-react';
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot, BoardVersion } from './types';
@@ -1037,6 +1038,11 @@ const App: React.FC = () => {
     handleViewChange('questionnaires');
     handleQuestionnaireTabChange(tab);
     setIsMobileLibraryOpen(false);
+  };
+
+  const handleLogout = () => {
+    setIsMobileLibraryOpen(false);
+    return logout();
   };
 
   const handleBulkAdd = () => {
@@ -2326,8 +2332,15 @@ const App: React.FC = () => {
             </div>
 
             {user && (
-              <div className="p-4 border-t border-[var(--theme-border)] text-xs text-[var(--theme-muted)] truncate">
-                {user.email}
+              <div className="p-4 border-t border-[var(--theme-border)] space-y-3">
+                <p className="text-xs text-[var(--theme-muted)] truncate">{user.email}</p>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
+                >
+                  <LogOut size={16} />
+                  <span>התנתקות</span>
+                </button>
               </div>
             )}
           </aside>
@@ -2501,7 +2514,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => logout()}
+                      onClick={handleLogout}
                       className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] transition-all shadow-sm"
                     >
                       התנתק
@@ -2601,7 +2614,7 @@ const App: React.FC = () => {
                 </div>
               )}
               {activeView === 'editor' && (
-                <div className="absolute inset-0 bg-white overflow-auto shadow-2xl">
+                <div className="storylines-scrollbar absolute inset-0 bg-white overflow-auto shadow-2xl">
                    <Editor 
                     project={activeBook} 
                     bookId={activeBook.id}
@@ -2689,7 +2702,7 @@ const App: React.FC = () => {
                 </div>
               )}
               {activeView === 'questionnaires' && (
-                <div className="absolute inset-0 overflow-auto">
+                <div className="storylines-scrollbar absolute inset-0 overflow-auto">
                   <Questionnaires 
                     allBooks={books}
                     activeBookId={activeBookId}

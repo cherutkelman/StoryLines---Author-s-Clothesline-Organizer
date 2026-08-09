@@ -44,7 +44,7 @@ const PlotStructure: React.FC<PlotStructureProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-[var(--theme-bg)] p-8 overflow-y-auto">
+    <div className="storylines-scrollbar h-full flex flex-col bg-[var(--theme-bg)] p-8 overflow-y-auto">
       <div className={`${isLibrarySidebarCollapsed ? 'max-w-7xl' : 'max-w-5xl'} mx-auto w-full space-y-8 pb-20`}>
         <PlotPlanningNavigation activeSubView={activeSubView} onChange={handleSubViewChange} />
 
