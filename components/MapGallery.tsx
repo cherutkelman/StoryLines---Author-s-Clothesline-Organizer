@@ -34,7 +34,7 @@ const normalizeGallery = (gallery?: MapGalleryData): MapGalleryData => {
     { id: DEFAULT_CATEGORY_ID, name: 'כללי' },
     ...sourceCategories
       .filter(category => category.id !== DEFAULT_CATEGORY_ID)
-      .map(category => ({ ...category, name: category.name || 'ללא שם' })),
+      .map(category => ({ ...category, name: category.name ?? 'ללא שם' })),
   ];
   const activeCategoryId = categories.some(category => category.id === gallery?.activeCategoryId)
     ? gallery?.activeCategoryId
@@ -392,6 +392,9 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery, navig
             <input
               value={activeCategory.name}
               onChange={(event) => renameCategory(event.target.value)}
+              onBlur={(event) => {
+                if (!event.currentTarget.value.trim()) renameCategory('ללא שם');
+              }}
               disabled={activeCategory.id === DEFAULT_CATEGORY_ID}
               className="min-w-0 w-44 bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)] rounded-xl px-3 py-2 text-sm font-bold text-[var(--theme-primary)] outline-none focus:ring-2 focus:ring-[var(--theme-primary)]/15 disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder="שם קטגוריה"

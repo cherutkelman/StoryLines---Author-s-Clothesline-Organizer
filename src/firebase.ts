@@ -51,6 +51,9 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 const shouldUseRedirectAuth = () => {
   if (typeof window === 'undefined') return false;
@@ -133,7 +136,7 @@ export const signIn = async () => {
         `&code_challenge=${encodeURIComponent(codeChallenge)}` +
         `&code_challenge_method=S256` +
         `&access_type=offline` +
-        `&prompt=consent`;
+        `&prompt=select_account`;
 
       let code: string | null = null;
 
