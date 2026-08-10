@@ -1,5 +1,5 @@
 import React from 'react';
-import { CopyPlus, Download, History, LayoutGrid, Maximize, Rows, ZoomIn, ZoomOut } from 'lucide-react';
+import { Clock3, CopyPlus, Download, History, LayoutGrid, Maximize, Rows, ZoomIn, ZoomOut } from 'lucide-react';
 import { BoardViewMode } from '../../types';
 
 interface BoardToolbarProps {
@@ -26,6 +26,7 @@ const BoardToolbar: React.FC<BoardToolbarProps> = props => (
       <div className="flex bg-[var(--theme-secondary)]/50 p-1 rounded-xl border border-[var(--theme-border)]/50">
         <button onClick={() => props.onViewModeChange('plotlines')} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${props.viewMode === 'plotlines' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`} title="תצוגת קווי עלילה"><LayoutGrid size={16} /><span>קווים</span></button>
         <button onClick={() => props.onViewModeChange('chapters')} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${props.viewMode === 'chapters' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`} title="תצוגת פרקים"><Rows size={16} /><span>פרקים</span></button>
+        <button onClick={() => props.onViewModeChange('timeline')} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${props.viewMode === 'timeline' ? 'bg-[var(--theme-card)] text-[var(--theme-primary)] shadow-sm' : 'text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]'}`} title="תצוגת ציר זמן"><Clock3 size={16} /><span>ציר זמן</span></button>
       </div>
     </div>
     <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+9.25rem)] left-6 z-40 flex items-center gap-3 lg:bottom-auto lg:left-auto lg:right-6 lg:top-6">

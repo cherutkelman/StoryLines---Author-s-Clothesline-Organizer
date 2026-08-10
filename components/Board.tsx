@@ -13,6 +13,7 @@ import { getBoardSequenceColumns } from '../src/book-sequence';
 import { BoardProps } from './board/boardTypes';
 import ChaptersBoardView from './board/ChaptersBoardView';
 import PlotlinesBoardView from './board/PlotlinesBoardView';
+import TimelineBoardView from './board/TimelineBoardView';
 import BoardToolbar from './board/BoardToolbar';
 import BoardSummary from './board/BoardSummary';
 import { buildBoardChapters } from './board/boardHelpers';
@@ -40,6 +41,9 @@ const Board: React.FC<BoardProps> = ({
   onRenameChapter,
   onDeleteChapter,
   onMoveChapterDivider,
+  onTimelineChange,
+  timelineCollapsedGroupIds,
+  onTimelineCollapsedGroupIdsChange,
   onLoadBoardVersions,
   onPreviewVersionChange,
   onRestoreDeletedSceneFromVersion
@@ -54,6 +58,7 @@ const Board: React.FC<BoardProps> = ({
   const [restoredDeletedSceneIds, setRestoredDeletedSceneIds] = useState<Set<string>>(() => new Set());
   const boardRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
+  const [timelineSelectionControlsHost, setTimelineSelectionControlsHost] = useState<HTMLDivElement | null>(null);
   const pinchGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
   const isPreviewMode = Boolean(previewVersion);
   const boardProject = previewVersion ? createBoardPreviewProject(project, previewVersion) : project;
@@ -315,6 +320,66 @@ const Board: React.FC<BoardProps> = ({
 
   const chapters = buildBoardChapters(boardProject, effectiveVisiblePlotlines);
 
+  const renderBoardView = () => {
+    switch (viewMode) {
+      case 'plotlines':
+        return (
+          <PlotlinesBoardView
+            boardColumns={boardColumns}
+            activePlotlines={activePlotlines}
+            boardProject={boardProject}
+            columnCount={columnCount}
+            isPreviewMode={isPreviewMode}
+            currentSceneIds={currentSceneIds}
+            missingPreviewSceneIds={missingPreviewSceneIds}
+            restoredDeletedSceneIds={restoredDeletedSceneIds}
+            restoringDeletedSceneId={restoringDeletedSceneId}
+            onAddScene={onAddScene}
+            onAddSceneInSequence={onAddSceneInSequence}
+            updateScene={updateScene}
+            onDeleteScene={onDeleteScene}
+            onSceneDoubleClick={onSceneDoubleClick}
+            onAddChapterMarker={onAddChapterMarker}
+            onUpdateChapterMarker={onUpdateChapterMarker}
+            onDeleteChapterMarker={onDeleteChapterMarker}
+            onAddChapterDivider={onAddChapterDivider}
+            onRenameChapter={onRenameChapter}
+            onDeleteChapter={onDeleteChapter}
+            canRestoreDeletedScene={Boolean(onRestoreDeletedSceneFromVersion)}
+            onRestoreDeletedScene={(sceneId) => { void handleRestoreDeletedScene(sceneId); }}
+            onDragStart={handleDragStart}
+            onChapterDragStart={handleChapterDragStart}
+            onDragOver={handleDragOver}
+            onChapterDividerDrop={handleChapterDividerDrop}
+            onSceneSequenceDrop={handleSceneSequenceDrop}
+            onSceneRowDrop={handleSceneRowDrop}
+          />
+        );
+      case 'chapters':
+        return (
+          <ChaptersBoardView
+            chapters={chapters}
+            boardProject={boardProject}
+            isPreviewMode={isPreviewMode}
+            onSceneDoubleClick={onSceneDoubleClick}
+            onUpdateChapterMarker={onUpdateChapterMarker}
+            updateScene={updateScene}
+          />
+        );
+      case 'timeline':
+        return (
+          <TimelineBoardView
+            project={boardProject}
+            selectionControlsHost={timelineSelectionControlsHost}
+            onTimelineChange={isPreviewMode ? undefined : onTimelineChange}
+            updateScene={isPreviewMode ? undefined : updateScene}
+            collapsedGroupIds={timelineCollapsedGroupIds}
+            onCollapsedGroupIdsChange={onTimelineCollapsedGroupIdsChange}
+          />
+        );
+    }
+  };
+
   return (
     <div className="relative h-full w-full overflow-hidden flex flex-col">
       <BoardToolbar
@@ -362,6 +427,14 @@ const Board: React.FC<BoardProps> = ({
 
       {/* Board Scrollable Area */}
       <div ref={boardScrollRef} className="flex-1 overflow-auto bg-[var(--theme-bg)] cursor-grab active:cursor-grabbing scrollbar-hide">
+        {viewMode === 'timeline' && (
+          <div
+            ref={setTimelineSelectionControlsHost}
+            data-timeline-controls-layer
+            dir="rtl"
+            className="pointer-events-none sticky left-0 right-0 top-4 z-[60] flex w-full max-w-full justify-end px-4 lg:top-24"
+          />
+        )}
         <div 
           ref={boardRef}
           className="p-32 pb-64 transition-transform duration-200 origin-top-right"
@@ -372,49 +445,8 @@ const Board: React.FC<BoardProps> = ({
           }}
         >
           <div className="relative">
-            {viewMode === 'plotlines' ? (
-              <PlotlinesBoardView
-                boardColumns={boardColumns}
-                activePlotlines={activePlotlines}
-                boardProject={boardProject}
-                columnCount={columnCount}
-                isPreviewMode={isPreviewMode}
-                currentSceneIds={currentSceneIds}
-                missingPreviewSceneIds={missingPreviewSceneIds}
-                restoredDeletedSceneIds={restoredDeletedSceneIds}
-                restoringDeletedSceneId={restoringDeletedSceneId}
-                onAddScene={onAddScene}
-                onAddSceneInSequence={onAddSceneInSequence}
-                updateScene={updateScene}
-                onDeleteScene={onDeleteScene}
-                onSceneDoubleClick={onSceneDoubleClick}
-                onAddChapterMarker={onAddChapterMarker}
-                onUpdateChapterMarker={onUpdateChapterMarker}
-                onDeleteChapterMarker={onDeleteChapterMarker}
-                onAddChapterDivider={onAddChapterDivider}
-                onRenameChapter={onRenameChapter}
-                onDeleteChapter={onDeleteChapter}
-                canRestoreDeletedScene={Boolean(onRestoreDeletedSceneFromVersion)}
-                onRestoreDeletedScene={(sceneId) => { void handleRestoreDeletedScene(sceneId); }}
-                onDragStart={handleDragStart}
-                onChapterDragStart={handleChapterDragStart}
-                onDragOver={handleDragOver}
-                onChapterDividerDrop={handleChapterDividerDrop}
-                onSceneSequenceDrop={handleSceneSequenceDrop}
-                onSceneRowDrop={handleSceneRowDrop}
-              />
-            ) : (
-              <ChaptersBoardView
-                chapters={chapters}
-                boardProject={boardProject}
-                isPreviewMode={isPreviewMode}
-                onSceneDoubleClick={onSceneDoubleClick}
-                onUpdateChapterMarker={onUpdateChapterMarker}
-                updateScene={updateScene}
-              />
-
-            )}
-            {activePlotlines.length === 0 && (
+            {renderBoardView()}
+            {viewMode !== 'timeline' && activePlotlines.length === 0 && (
               <div className="h-96 flex flex-col items-center justify-center text-[var(--theme-primary)]/20">
                 <p className="text-xl font-bold">כל קווי העלילה מוסתרים</p>
                 <p className="text-sm">השתמש בתפריט הצדדי כדי להציג אותם</p>

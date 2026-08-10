@@ -11,6 +11,7 @@ import {
   Layout, 
   LayoutGrid,
   Rows,
+  Clock3,
   TrendingUp,
   Share2,
   Wand2,
@@ -128,6 +129,7 @@ const PLOT_STRUCTURE_NAV_ITEMS: { id: PlotStructureSubView; icon: React.ElementT
 const BOARD_NAV_ITEMS: { id: BoardViewMode; icon: React.ElementType; label: string }[] = [
   { id: 'plotlines', icon: LayoutGrid, label: 'קווים' },
   { id: 'chapters', icon: Rows, label: 'פרקים' },
+  { id: 'timeline', icon: Clock3, label: 'ציר זמן' },
 ];
 
 const normalizeLoadedBooks = async (loadedBooks: Book[]): Promise<Book[]> => {
@@ -2608,6 +2610,9 @@ const App: React.FC = () => {
                     onRenameChapter={renameChapter}
                     onDeleteChapter={deleteChapter}
                     onMoveChapterDivider={moveChapterDivider}
+                    onTimelineChange={(timeline) => updateActiveBook({ timeline })}
+                    timelineCollapsedGroupIds={activeUI.timelineCollapsedGroupIds}
+                    onTimelineCollapsedGroupIdsChange={(groupIds) => updateBookUiState({ timelineCollapsedGroupIds: groupIds })}
                     onLoadBoardVersions={() => boardVersionStorage.loadBoardVersions(activeBook.id)}
                     onRestoreDeletedSceneFromVersion={restoreDeletedBoardSceneFromVersion}
                   />

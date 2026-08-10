@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle2, Flag, Pin, Plus, Trash2, X } from 'lucide-react';
 import { ChapterMarker, Plotline, Project, Scene } from '../../types';
 import { BoardSequenceColumn } from '../../src/book-sequence';
+import { normalizeSceneTimeLabel } from '../../src/scene-time-label';
 import SceneArcMarkers from './SceneArcMarkers';
 
 const INSERTION_SLOT_WIDTH = 40;
@@ -263,7 +264,14 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                     <div
                       data-board-scene-id={sceneInThisSlot.id}
                       draggable={!isPreviewMode}
-                      onDragStart={() => handleDragStart(sceneInThisSlot.id)}
+                      onDragStart={(event) => {
+                        if ((event.target as HTMLElement).closest('[data-scene-time-label-editor]')) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          return;
+                        }
+                        handleDragStart(sceneInThisSlot.id);
+                      }}
                       onDoubleClick={() => {
                         if (isPreviewMode) return;
                         onSceneDoubleClick?.(sceneInThisSlot.id);
@@ -324,9 +332,45 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                           updateScene(sceneInThisSlot.id, { title: e.target.value });
                         }}
                       />
-                      <div className="h-px bg-[var(--theme-secondary)] my-3" />
+                      <div className="h-px bg-[var(--theme-secondary)] my-2" />
+                      <div data-scene-time-label-editor className="mb-1 flex items-center gap-1.5">
+                        <label
+                          className="shrink-0 text-[9px] font-black text-[var(--theme-primary)]/45"
+                          htmlFor={`plotline-scene-time-${sceneInThisSlot.id}`}
+                        >
+                          זמן
+                        </label>
+                        <input
+                          id={`plotline-scene-time-${sceneInThisSlot.id}`}
+                          type="text"
+                          draggable={false}
+                          value={sceneInThisSlot.timeLabel || ''}
+                          placeholder="למשל: למחרת בבוקר"
+                          readOnly={isPreviewMode}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                          onDragStart={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onChange={(event) => {
+                            if (isPreviewMode) return;
+                            updateScene(sceneInThisSlot.id, {
+                              timeLabel: event.target.value || undefined,
+                            });
+                          }}
+                          onBlur={(event) => {
+                            if (isPreviewMode) return;
+                            const timeLabel = normalizeSceneTimeLabel(event.currentTarget.value);
+                            if (timeLabel !== sceneInThisSlot.timeLabel) {
+                              updateScene(sceneInThisSlot.id, { timeLabel });
+                            }
+                          }}
+                          className="min-w-0 flex-1 bg-transparent p-0 text-right text-[9px] font-bold text-[var(--theme-accent)] placeholder:text-[var(--theme-primary)]/25 border-none focus:ring-0"
+                        />
+                      </div>
                       <textarea
-                        className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-16 overflow-hidden mb-2"
+                        className="text-[11px] text-[var(--theme-primary)]/60 leading-relaxed text-center w-full bg-transparent border-none focus:ring-0 p-0 resize-none h-10 overflow-hidden mb-1"
                         value={sceneInThisSlot.summary || ''}
                         placeholder="תמצית ההתרחשות..."
                         readOnly={isPreviewMode}
@@ -402,4 +446,3 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
 );
 
 export default PlotlinesBoardView;
-

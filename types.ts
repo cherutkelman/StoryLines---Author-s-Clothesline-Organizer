@@ -107,6 +107,7 @@ export interface Scene {
   title: string;
   content: string;
   summary?: string;
+  timeLabel?: string;
   position: number; // Order within the plotline
   isCompleted?: boolean; // Whether the scene is marked as finished
   chapterTitle?: string;
@@ -164,6 +165,31 @@ export type BookSequenceItem =
       type: 'chapter-divider';
       chapterId: string;
     };
+
+export interface TimelineData {
+  items: TimelineItem[];
+}
+
+export type TimelineItem = TimelineSceneItem | TimelinePointItem | TimelineGroupItem;
+
+export interface TimelineSceneItem {
+  id: string;
+  type: 'scene';
+  sceneId: string;
+}
+
+export interface TimelinePointItem {
+  id: string;
+  type: 'point';
+  sceneIds: string[];
+}
+
+export interface TimelineGroupItem {
+  id: string;
+  type: 'group';
+  title: string;
+  sceneIds: string[];
+}
 
 export interface Plotline {
   id: string;
@@ -385,6 +411,7 @@ export interface Project {
   mapGallery?: MapGallery;
   chapterMarkers?: ChapterMarker[];
   bookSequence?: BookSequenceItem[];
+  timeline?: TimelineData;
   plotStructure?: string;
   plotStructurePoints?: Record<string, { sceneId?: string; description?: string }>;
   customPlotPoints?: { id: string; label: string; x: number; y: number }[];
@@ -464,6 +491,7 @@ export interface BookUIState {
   questionnaireSelectedEntryId?: string | null;
   boardZoomLevel?: number;
   boardViewMode?: BoardViewMode;
+  timelineCollapsedGroupIds?: string[];
   mapsActiveTab?: 'characterDiagram' | 'worldMaps' | 'mindMaps' | 'gallery';
   mapsSelectedMapId?: string | null;
   mapsSelectedMindMapId?: string | null;
@@ -471,7 +499,7 @@ export interface BookUIState {
 }
 
 export type PlotStructureSubView = 'structure' | 'arc' | 'relationships' | 'conflicts' | 'twists';
-export type BoardViewMode = 'plotlines' | 'chapters';
+export type BoardViewMode = 'plotlines' | 'chapters' | 'timeline';
 
 export interface Book extends Project {
   id: string;

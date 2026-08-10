@@ -1,4 +1,4 @@
-import { BoardVersion, BoardViewMode, ChapterMarker, Project, Scene } from '../../types';
+import { BoardVersion, BoardViewMode, ChapterMarker, Project, Scene, TimelineData } from '../../types';
 
 export interface BoardProps {
   project: Project;
@@ -25,6 +25,9 @@ export interface BoardProps {
   onRenameChapter?: (chapterId: string, title: string) => void;
   onDeleteChapter?: (chapterId: string) => void;
   onMoveChapterDivider?: (chapterId: string, targetSequenceIndex: number) => void;
+  onTimelineChange?: (timeline: TimelineData) => void;
+  timelineCollapsedGroupIds?: string[];
+  onTimelineCollapsedGroupIdsChange?: (groupIds: string[]) => void;
   onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
   onPreviewVersionChange?: (version: BoardVersion | null) => void;
   onRestoreDeletedSceneFromVersion?: (version: BoardVersion, sceneId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };

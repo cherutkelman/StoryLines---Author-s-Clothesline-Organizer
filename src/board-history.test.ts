@@ -48,6 +48,15 @@ const createBook = (): Book => ({
 });
 
 describe('board history', () => {
+  it('preserves timeline point items in board snapshots', () => {
+    const book = {
+      ...createBook(),
+      timeline: { items: [{ id: 'point-1', type: 'point' as const, sceneIds: ['s1', 's2'] }] },
+    };
+
+    expect(createBoardSnapshot(book).timeline).toEqual(book.timeline);
+  });
+
   it('creates a board snapshot without scene content or legacy scene history', () => {
     const book = {
       ...createBook(),
@@ -95,6 +104,145 @@ describe('board history', () => {
     };
 
     expect(hasBoardSnapshotChanges(before, createBoardSnapshot(changedBook))).toBe(true);
+  });
+
+  it('includes a newly materialized timeline group in board change detection', () => {
+    const before = createBoardSnapshot(createBook());
+    const changedBook: Book = {
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'timeline-group-1', type: 'group', title: 'Childhood', sceneIds: ['s1', 's2'] }],
+      },
+    };
+    const after = createBoardSnapshot(changedBook);
+
+    expect(after.timeline).toEqual(changedBook.timeline);
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects a timeline-only reorder as a board change', () => {
+    const timelineItems = [
+      { id: 'timeline-s1', type: 'scene' as const, sceneId: 's1' },
+      { id: 'timeline-s2', type: 'scene' as const, sceneId: 's2' },
+    ];
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: { items: timelineItems },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: { items: [...timelineItems].reverse() },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects ungrouping as a board change', () => {
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'group', type: 'group', title: 'Past', sceneIds: ['s1', 's2'] }],
+      },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [
+          { id: 'timeline-scene-s1', type: 'scene', sceneId: 's1' },
+          { id: 'timeline-scene-s2', type: 'scene', sceneId: 's2' },
+        ],
+      },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects a real group title change as a board change', () => {
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'group', type: 'group', title: 'Past', sceneIds: ['s1', 's2'] }],
+      },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'group', type: 'group', title: 'Childhood', sceneIds: ['s1', 's2'] }],
+      },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects a scene timeLabel change as a board change', () => {
+    const before = createBoardSnapshot(createBook());
+    const after = createBoardSnapshot({
+      ...createBook(),
+      scenes: createBook().scenes.map(scene => scene.id === 's1'
+        ? { ...scene, timeLabel: 'Three years earlier' }
+        : scene),
+    });
+
+    expect(after.scenes[0]).toMatchObject({ timeLabel: 'Three years earlier' });
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects adding independent scenes to a timeline group as a board change', () => {
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [
+          { id: 'timeline-s1', type: 'scene', sceneId: 's1' },
+          { id: 'group', type: 'group', title: 'Period', sceneIds: ['s2'] },
+        ],
+      },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'group', type: 'group', title: 'Period', sceneIds: ['s1', 's2'] }],
+      },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects extracting scenes from a timeline group as a board change', () => {
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [{ id: 'group', type: 'group', title: 'Period', sceneIds: ['s1', 's2'] }],
+      },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [
+          { id: 'timeline-scene-s1', type: 'scene', sceneId: 's1' },
+          { id: 'group', type: 'group', title: 'Period', sceneIds: ['s2'] },
+        ],
+      },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
+  });
+
+  it('detects placing an unplaced scene as a board change', () => {
+    const before = createBoardSnapshot({
+      ...createBook(),
+      timeline: { items: [{ id: 'timeline-s1', type: 'scene', sceneId: 's1' }] },
+    });
+    const after = createBoardSnapshot({
+      ...createBook(),
+      timeline: {
+        items: [
+          { id: 'timeline-s1', type: 'scene', sceneId: 's1' },
+          { id: 'timeline-s2', type: 'scene', sceneId: 's2' },
+        ],
+      },
+    });
+
+    expect(hasBoardSnapshotChanges(before, after)).toBe(true);
   });
 
   it('does not detect scene content-only edits as board changes', () => {
