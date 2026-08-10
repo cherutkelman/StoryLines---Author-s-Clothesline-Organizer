@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Copy, Grid3X3, ImagePlus, Maximize2, Minimize2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { MapGallery as MapGalleryData } from '../types';
 import { compressDataUrlToLimit, compressImageFileToLimit } from '../src/image-utils';
 import { auth, storage } from '../src/firebase';
@@ -17,6 +17,8 @@ const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 8;
 const MAX_GALLERY_IMAGE_DATA_URL_LENGTH = 70000;
 const MAX_GALLERY_DATA_URL_LENGTH = 450000;
+const MAX_GALLERY_UPLOAD_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_GALLERY_UPLOAD_FILE_SIZE_LABEL = '15MB';
 
 const createDefaultGallery = (): MapGalleryData => ({
   categories: [{ id: DEFAULT_CATEGORY_ID, name: 'כללי' }],
@@ -73,6 +75,28 @@ const uploadGalleryFile = async (file: File, imageId: string): Promise<string> =
   return uploadGalleryBlob(blob, imageId, file.name);
 };
 
+const isFirebaseStorageUrl = (url: string) =>
+  url.startsWith('gs://') || url.startsWith('https://firebasestorage.googleapis.com/');
+
+const deleteUnreferencedGalleryFiles = async (
+  removedImages: MapGalleryData['images'],
+  remainingImages: MapGalleryData['images']
+): Promise<number> => {
+  if (!isWeb) return 0;
+
+  const remainingUrls = new Set(remainingImages.map(image => image.dataUrl));
+  const urlsToDelete = Array.from(new Set(removedImages.map(image => image.dataUrl)))
+    .filter(url => isFirebaseStorageUrl(url) && !remainingUrls.has(url));
+
+  const results = await Promise.allSettled(
+    urlsToDelete.map(url => deleteObject(ref(storage, url)))
+  );
+
+  return results.filter(result =>
+    result.status === 'rejected' && result.reason?.code !== 'storage/object-not-found'
+  ).length;
+};
+
 const migrateInlineGalleryImage = async (image: MapGalleryData['images'][number]): Promise<MapGalleryData['images'][number]> => {
   if (!isWeb || !image.dataUrl.startsWith('data:image/')) return image;
 
@@ -112,11 +136,18 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery, navig
   const handleCompressedUpload = async (files: FileList | null) => {
     if (!files?.length) return;
 
+    const selectedFiles = Array.from(files).slice(0, 1);
+    const oversizedFile = selectedFiles.find(file => file.size > MAX_GALLERY_UPLOAD_FILE_SIZE_BYTES);
+    if (oversizedFile) {
+      setUploadError(`התמונה "${oversizedFile.name}" לא הועלתה כי היא גדולה מדי. ניתן להעלות תמונות בגודל של עד ${MAX_GALLERY_UPLOAD_FILE_SIZE_LABEL}.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setIsUploading(true);
     setUploadError(null);
 
     try {
-      const selectedFiles = Array.from(files).slice(0, 1);
       const uploadedImages = await Promise.all(
         selectedFiles.map(async (file) => {
           try {
@@ -188,26 +219,38 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery, navig
     });
   };
 
-  const deleteCategory = () => {
+  const deleteCategory = async () => {
     if (activeCategory.id === DEFAULT_CATEGORY_ID || normalized.categories.length <= 1) return;
     if (!confirm('למחוק את הקטגוריה ואת התמונות שבתוכה?')) return;
 
     const categories = normalized.categories.filter(category => category.id !== activeCategory.id);
+    const removedImages = normalized.images.filter(image => image.categoryId === activeCategory.id);
+    const images = normalized.images.filter(image => image.categoryId !== activeCategory.id);
+    const failedDeletionCount = await deleteUnreferencedGalleryFiles(removedImages, images);
     updateGallery({
       categories,
-      images: normalized.images.filter(image => image.categoryId !== activeCategory.id),
+      images,
       activeCategoryId: categories[0].id,
       activeImageId: null,
     });
+    if (failedDeletionCount > 0) {
+      setUploadError('הקטגוריה נמחקה מהגלריה, אך חלק מהתמונות לא נמחקו מהאחסון. כדאי לנסות שוב מאוחר יותר.');
+    }
   };
 
-  const deleteImage = (imageId: string) => {
+  const deleteImage = async (imageId: string) => {
+    const removedImage = normalized.images.find(image => image.id === imageId);
+    if (!removedImage) return;
     const images = normalized.images.filter(image => image.id !== imageId);
+    const failedDeletionCount = await deleteUnreferencedGalleryFiles([removedImage], images);
     const nextCategoryImages = isGeneralCategory ? images : images.filter(image => image.categoryId === activeCategory.id);
     updateGallery({
       images,
       activeImageId: nextCategoryImages[0]?.id || null,
     });
+    if (failedDeletionCount > 0) {
+      setUploadError('התמונה הוסרה מהגלריה, אך מחיקתה מהאחסון נכשלה. כדאי לנסות שוב מאוחר יותר.');
+    }
   };
 
   const getImageTargetCategories = (imageCategoryId: string) =>
@@ -328,7 +371,6 @@ const MapGallery: React.FC<MapGalleryProps> = ({ gallery, onUpdateGallery, navig
                 >
                   <Maximize2 size={17} />
                 </button>
-                <span className="w-8 text-center text-xs font-black text-[var(--theme-primary)]/60">{normalized.gridColumns}</span>
                 <button
                   onClick={() => updateGallery({ gridColumns: Math.min(MAX_COLUMNS, normalized.gridColumns! + 1) })}
                   className="p-2 rounded-lg text-[var(--theme-primary)]/70 hover:bg-[var(--theme-card)] transition-all disabled:opacity-30"
