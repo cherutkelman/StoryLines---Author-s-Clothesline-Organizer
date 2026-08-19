@@ -13,6 +13,9 @@ interface EditorSceneListProps {
   renderExpandedScene: (scene: Scene, plotline: Plotline | undefined) => React.ReactNode;
 }
 
+export const getEditorSceneTargetId = (sceneId: string) => `scene-${sceneId}`;
+export const getEditorChapterTargetId = (chapterId: string) => `chapter-${chapterId}`;
+
 const isInteractiveElement = (target: EventTarget | null) => {
   return target instanceof HTMLElement && Boolean(target.closest('button, input, textarea, select, a'));
 };
@@ -22,7 +25,11 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
     {items.map((item, idx) => {
       if (item.type === 'chapter-divider') {
         return (
-          <div key={item.id} className="pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4">
+          <div
+            key={item.id}
+            id={getEditorChapterTargetId(item.chapterMarker.id)}
+            className="scroll-mt-32 pt-16 pb-6 border-b-4 border-[var(--theme-primary)]/10 mb-12 flex items-center gap-4"
+          >
             <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
               <Flag size={20} />
             </div>
@@ -40,7 +47,8 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
       return (
         <React.Fragment key={scene.id}>
           <article
-            className={`relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
+            id={getEditorSceneTargetId(scene.id)}
+            className={`scroll-mt-32 relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
             style={{ borderRightColor: plotline?.color }}
             onClick={(event) => {
               if (displayMode === 'full' || isInteractiveElement(event.target)) return;

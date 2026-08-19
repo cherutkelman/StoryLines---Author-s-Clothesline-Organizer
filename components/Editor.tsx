@@ -8,7 +8,7 @@ import { relationshipQuestionSections } from './relationshipQuestions';
 import { EditorProps } from './editor/editorTypes';
 import { formatVersionDate, formatVersionTime, getVersionReasonLabel, getVersionTypeLabel } from './editor/editorHistoryHelpers';
 import EditorToolbar from './editor/EditorToolbar';
-import EditorSceneList from './editor/EditorSceneList';
+import EditorSceneList, { getEditorChapterTargetId, getEditorSceneTargetId } from './editor/EditorSceneList';
 import EditorHistoryPanel from './editor/EditorHistoryPanel';
 import { 
   BookOpen, 
@@ -23,7 +23,10 @@ import {
   MapPin,
   Trash2,
   FileText,
-  Users
+  Users,
+  Flag,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react';
 
 const AutoExpandingTextarea: React.FC<{
@@ -168,7 +171,7 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
@@ -177,6 +180,8 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [showChaptersInNav, setShowChaptersInNav] = useState(true);
+  const [isQuickNavCollapsed, setIsQuickNavCollapsed] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [historyMode, setHistoryMode] = useState<'view' | 'compare'>('view');
@@ -203,6 +208,11 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
     setDisplayMode(mode);
     onDisplayModeChange?.(mode);
+    if (mode === 'focus') {
+      handleExpandedScenesChange([]);
+      setDisplayedSceneId(null);
+      void handleFocusScene(null);
+    }
   };
 
   const getSceneSnapshot = (id: string | null): Scene | undefined => {
@@ -404,6 +414,8 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   useEffect(() => {
     if (externalCommand?.action === 'tips') {
       setIsInfoModalOpen(true);
+    } else if (externalCommand?.action === 'closeAll') {
+      handleDisplayModeChange('focus');
     }
   }, [externalCommand]);
 
@@ -454,6 +466,33 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       .map(item => item.scene),
     [activeSequenceItems]
   );
+
+  const scrollToEditorTarget = (targetId: string, waitForRender = false) => {
+    const scroll = () => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    if (!waitForRender) {
+      window.requestAnimationFrame(scroll);
+      return;
+    }
+
+    window.requestAnimationFrame(() => window.requestAnimationFrame(scroll));
+  };
+
+  const handleQuickNavSceneClick = (sceneId: string) => {
+    const needsExpansion = displayMode === 'focus' && !expandedSceneIds.includes(sceneId);
+
+    if (needsExpansion) {
+      toggleSceneExpanded(sceneId);
+    } else {
+      lastInteractedSceneIdRef.current = sceneId;
+      setDisplayedSceneId(sceneId);
+      void handleFocusScene(sceneId);
+    }
+
+    scrollToEditorTarget(getEditorSceneTargetId(sceneId), needsExpansion);
+  };
 
   const historySceneId = resolveSceneHistorySceneId(
     {
@@ -681,7 +720,82 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   ] as const;
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-8 relative">
+    <div className="mx-auto flex max-w-[90rem] items-start gap-6 px-8 py-12 relative" dir="rtl">
+      <aside
+        aria-label="ניווט מהיר בפרקים ובסצנות"
+        className={`sticky top-4 hidden max-h-[calc(100vh-2rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-lg transition-[width] duration-200 xl:flex ${
+          isQuickNavCollapsed ? 'w-14' : isLibrarySidebarCollapsed ? 'w-64' : 'w-52'
+        }`}
+      >
+        <div className={`flex items-center border-b border-[var(--theme-border)] bg-[var(--theme-secondary)]/20 p-3 ${isQuickNavCollapsed ? 'justify-center' : 'justify-between gap-2'}`}>
+          {!isQuickNavCollapsed && (
+            <>
+              <h2 className="truncate text-xs font-black uppercase tracking-widest text-[var(--theme-primary)]">ניווט מהיר</h2>
+              <button
+                type="button"
+                onClick={() => setShowChaptersInNav(current => !current)}
+                className={`rounded-lg p-2 transition-colors ${showChaptersInNav ? 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]' : 'text-[var(--theme-primary)]/35 hover:bg-[var(--theme-secondary)]'}`}
+                aria-pressed={showChaptersInNav}
+                aria-label={showChaptersInNav ? 'הסתר פרקים מהניווט' : 'הצג פרקים בניווט'}
+                title={showChaptersInNav ? 'הסתר פרקים' : 'הצג פרקים'}
+              >
+                <Flag size={15} />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsQuickNavCollapsed(current => !current)}
+            className="rounded-lg p-2 text-[var(--theme-primary)]/55 transition-colors hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]"
+            aria-label={isQuickNavCollapsed ? 'הרחב ניווט מהיר' : 'כווץ ניווט מהיר'}
+            title={isQuickNavCollapsed ? 'הרחב ניווט מהיר' : 'כווץ ניווט מהיר'}
+          >
+            {isQuickNavCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
+          </button>
+        </div>
+        {!isQuickNavCollapsed && (
+          <nav className="storylines-scrollbar flex-1 space-y-1 overflow-y-auto p-3" aria-label="פרקים וסצנות">
+            {activeSequenceItems.map(item => {
+              if (item.type === 'chapter-divider') {
+                if (!showChaptersInNav) return null;
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => scrollToEditorTarget(getEditorChapterTargetId(item.chapterMarker.id))}
+                    className="mt-3 flex w-full items-center gap-2 border-r-2 border-[var(--theme-primary)] px-3 py-2 text-right text-xs font-black text-[var(--theme-primary)] transition-colors hover:bg-[var(--theme-secondary)]"
+                    title={item.chapterMarker.title || 'פרק ללא כותרת'}
+                  >
+                    <Flag size={13} className="shrink-0" />
+                    <span className="truncate">{item.chapterMarker.title || 'פרק ללא כותרת'}</span>
+                  </button>
+                );
+              }
+
+              const scene = item.scene;
+              const isFocused = focusedSceneId === scene.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => handleQuickNavSceneClick(scene.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-xs transition-colors ${
+                    isFocused
+                      ? 'bg-[var(--theme-secondary)] font-bold text-[var(--theme-primary)]'
+                      : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
+                  }`}
+                  aria-current={isFocused ? 'location' : undefined}
+                  title={scene.title || 'סצנה ללא כותרת'}
+                >
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isFocused ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-primary)]/20'}`} />
+                  <span className="truncate">{scene.title || 'סצנה ללא כותרת'}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </aside>
+      <main className="min-w-0 w-full max-w-4xl flex-1">
       <EditorToolbar
         totalWords={totalWords}
         displayMode={displayMode}
@@ -1045,6 +1159,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 };

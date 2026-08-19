@@ -373,8 +373,9 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>('board');
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
   const [editorMobileSearchQuery, setEditorMobileSearchQuery] = useState('');
-  const [editorExternalCommand, setEditorExternalCommand] = useState<{ action: 'tips'; nonce: number } | null>(null);
+  const [editorExternalCommand, setEditorExternalCommand] = useState<{ action: 'tips' | 'closeAll'; nonce: number } | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const previousActiveViewRef = useRef<AppView>(activeView);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   const [lastCloudSaved, setLastCloudSaved] = useState<Date | null>(null);
@@ -421,6 +422,13 @@ const App: React.FC = () => {
   useEffect(() => {
     focusedEditorSceneIdRef.current = activeUI.editorFocusedSceneId ?? null;
   }, [activeUI.editorFocusedSceneId]);
+
+  useEffect(() => {
+    if (previousActiveViewRef.current !== 'editor' && activeView === 'editor') {
+      setIsSidebarCollapsed(true);
+    }
+    previousActiveViewRef.current = activeView;
+  }, [activeView]);
 
   useEffect(() => {
     return () => {
@@ -2163,7 +2171,7 @@ const App: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                               <button
                                 onClick={() => {
-                                  updateBookUiState({ editorDisplayMode: 'focus' });
+                                  setEditorExternalCommand({ action: 'closeAll', nonce: Date.now() });
                                   setIsMobileLibraryOpen(false);
                                 }}
                                 className={`min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
@@ -2173,7 +2181,7 @@ const App: React.FC = () => {
                                 }`}
                               >
                                 <Focus size={16} />
-                                <span className="flex-1">מיקוד</span>
+                                <span className="flex-1">סגור הכל</span>
                               </button>
                               <button
                                 onClick={() => {

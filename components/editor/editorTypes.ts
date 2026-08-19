@@ -26,7 +26,7 @@ export interface EditorProps {
   isLibrarySidebarCollapsed?: boolean;
   externalSearchQuery?: string;
   onExternalSearchQueryChange?: (value: string) => void;
-  externalCommand?: { action: 'tips'; nonce: number } | null;
+  externalCommand?: { action: 'tips' | 'closeAll'; nonce: number } | null;
   appActiveSceneId?: string | null;
 }
 
