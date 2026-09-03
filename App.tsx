@@ -97,6 +97,7 @@ import {
   normalizeBookSequence,
   renameChapterInBookSequence,
 } from './src/book-sequence';
+import { normalizeLoadedBookCollections } from './src/book-loading';
 import { normalizeBookCharacterIdentities } from './src/characters/characterIdentity';
 import { deleteCharacterFromBook } from './src/characters/characterDeletion';
 import { hideCharacterInBookFromQuestionnaire, restoreCharacterInListToQuestionnaire } from './src/characters/characterQuestionnaireVisibility';
@@ -143,7 +144,8 @@ const normalizeLoadedBooks = async (loadedBooks: Book[]): Promise<Book[]> => {
     ? await sceneVersionStorage.migrateLegacySceneVersionsFromBooks(loadedBooks)
     : loadedBooks;
   const now = Date.now();
-  return deduplicateBooks(migratedBooks.map(book => {
+  return deduplicateBooks(migratedBooks.map(rawBook => {
+    const book = normalizeLoadedBookCollections(rawBook);
     const sceneNormalizedBook = legacyBookIds.has(book.id)
       ? { ...book, updatedAt: now, pendingSync: true }
       : book;

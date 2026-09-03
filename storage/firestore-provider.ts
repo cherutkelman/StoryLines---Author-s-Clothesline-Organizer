@@ -7,9 +7,11 @@ import {
   query, 
   where, 
   getDocs, 
+  getDoc,
   writeBatch, 
   doc
 } from "firebase/firestore";
+import { mergeSeparatedBookStructure, type SeparatedBookStructure } from '../src/book-loading';
 
 enum OperationType {
   CREATE = 'create',
@@ -76,6 +78,37 @@ export class FirestoreStorageProvider implements IStorageProvider {
     return this.userId;
   }
 
+  private async hydrateSeparatedBookStructure(book: Book): Promise<Book> {
+    const needsScenes = !Array.isArray(book.scenes);
+    // chapterMarkers and bookSequence are legitimately absent on legacy books;
+    // a missing required plotlines array is the split-schema signal.
+    const needsStructure = !Array.isArray(book.plotlines);
+    if (!needsScenes && !needsStructure) return book;
+
+    const toleratePartialAccess = <T,>(error: unknown): T | undefined => {
+      const code = (error as { code?: unknown } | null)?.code;
+      if (code === 'permission-denied' || code === 'firestore/permission-denied') return undefined;
+      throw error;
+    };
+
+    const [separatedScenes, separatedStructure] = await Promise.all([
+      needsScenes
+        ? getDocs(collection(db, 'books', book.id, 'scenes')).then(snapshot =>
+            snapshot.docs
+              .map(sceneDocument => sceneDocument.data() as Book['scenes'][number])
+              .sort((left, right) => left.position - right.position)
+          ).catch(toleratePartialAccess<Book['scenes']>)
+        : Promise.resolve(undefined),
+      needsStructure
+        ? getDoc(doc(db, 'books', book.id, 'content', 'sceneStructure')).then(snapshot =>
+            snapshot.exists() ? snapshot.data() as SeparatedBookStructure : undefined
+          ).catch(toleratePartialAccess<SeparatedBookStructure>)
+        : Promise.resolve(undefined),
+    ]);
+
+    return mergeSeparatedBookStructure(book, separatedScenes, separatedStructure) as Book;
+  }
+
   async loadBooks(includeDeleted = false): Promise<Book[]> {
     if (!this.userId) {
       console.warn("[FirestoreStorageProvider] loadBooks called but userId is null. Returning empty list.");
@@ -128,7 +161,9 @@ export class FirestoreStorageProvider implements IStorageProvider {
         `[FirestoreStorageProvider] loadBooks: Success. Found ${map.size} accessible docs.`
       );
 
-      const books = Array.from(map.values());
+      const books = await Promise.all(
+        Array.from(map.values()).map(book => this.hydrateSeparatedBookStructure(book))
+      );
 
       this.quotaExceededUntil = 0; // Reset on success
       if (includeDeleted) return books;

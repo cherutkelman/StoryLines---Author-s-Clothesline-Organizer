@@ -44,6 +44,17 @@ const project = (
 });
 
 describe('book sequence', () => {
+  it('normalizes a permitted legacy or partial book with no scenes', () => {
+    const partialBook = { plotlines: [] } as Partial<Project> as Project;
+
+    expect(normalizeBookSequence(partialBook)).toEqual([]);
+    expect(getBookSequenceDisplayItems(partialBook)).toEqual([]);
+  });
+
+  it('returns no display items for an empty book without chapter markers or bookSequence', () => {
+    expect(getBookSequenceDisplayItems(project([]))).toEqual([]);
+  });
+
   it('creates a sequence for a legacy book with scenes only', () => {
     expect(createBookSequenceFromLegacyBook(project([
       scene('s2', 1),

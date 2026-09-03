@@ -2,7 +2,7 @@ import type { Book, BookSequenceItem, ChapterMarker, Project, Scene } from '../t
 
 type BookSequenceScene = Pick<Scene, 'id' | 'position'> & Partial<Scene>;
 type BookSequenceSource = {
-  scenes: BookSequenceScene[];
+  scenes?: BookSequenceScene[];
   chapterMarkers?: ChapterMarker[];
   bookSequence?: BookSequenceItem[];
 };
@@ -91,6 +91,9 @@ const toChapterItem = (chapterId: string): BookSequenceItem => ({
   chapterId,
 });
 
+const getBookSequenceScenes = (book: BookSequenceSource): BookSequenceScene[] =>
+  book.scenes || [];
+
 const sortByPositionThenIndex = <T extends { index: number }>(
   getPosition: (item: T) => number
 ) => (a: T, b: T): number => {
@@ -101,7 +104,8 @@ const sortByPositionThenIndex = <T extends { index: number }>(
 export const createBookSequenceFromLegacyBook = (
   book: BookSequenceSource
 ): BookSequenceItem[] => {
-  const indexedScenes = book.scenes.map((scene, index) => ({ scene, index }));
+  const scenes = getBookSequenceScenes(book);
+  const indexedScenes = scenes.map((scene, index) => ({ scene, index }));
   const indexedMarkers = (book.chapterMarkers || []).map((marker, index) => ({ marker, index }));
 
   const validScenes = indexedScenes
@@ -148,7 +152,8 @@ export const normalizeBookSequence = (book: BookSequenceSource): BookSequenceIte
     return createBookSequenceFromLegacyBook(book);
   }
 
-  const sceneIds = new Set(book.scenes.map(scene => scene.id));
+  const scenes = getBookSequenceScenes(book);
+  const sceneIds = new Set(scenes.map(scene => scene.id));
   const chapterIds = new Set((book.chapterMarkers || []).map(marker => marker.id));
   const includedSceneIds = new Set<string>();
   const includedChapterIds = new Set<string>();
@@ -169,7 +174,7 @@ export const normalizeBookSequence = (book: BookSequenceSource): BookSequenceIte
     }
   });
 
-  book.scenes.forEach((scene) => {
+  scenes.forEach((scene) => {
     if (includedSceneIds.has(scene.id)) return;
     includedSceneIds.add(scene.id);
     normalized.push(toSceneItem(scene.id));
@@ -190,7 +195,7 @@ export const getOrderedSceneIds = (book: BookSequenceSource): string[] =>
     .map(item => item.sceneId);
 
 export const getOrderedScenes = <T extends BookSequenceSource>(book: T): Scene[] => {
-  const scenesById = new Map(book.scenes.map(scene => [scene.id, scene]));
+  const scenesById = new Map(getBookSequenceScenes(book).map(scene => [scene.id, scene]));
   return getOrderedSceneIds(book)
     .map(sceneId => scenesById.get(sceneId))
     .filter(Boolean) as Scene[];
@@ -211,7 +216,7 @@ export const getChapterDividerLocation = (
 };
 
 export const getBookSequenceDisplayItems = (book: BookSequenceSource): BookSequenceDisplayItem[] => {
-  const scenesById = new Map(book.scenes.map(scene => [scene.id, scene]));
+  const scenesById = new Map(getBookSequenceScenes(book).map(scene => [scene.id, scene]));
   const chaptersById = new Map((book.chapterMarkers || []).map(marker => [marker.id, marker]));
 
   return normalizeBookSequence(book)
