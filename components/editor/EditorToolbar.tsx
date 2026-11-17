@@ -1,8 +1,11 @@
 import React from 'react';
 import { AlignJustify, BookOpen, Download, Focus, Hash, History, Info, Plus, Search, X } from 'lucide-react';
 import type { EditorDisplayMode } from './editorTypes';
+import EditorTextScaleControls from './EditorTextScaleControls';
 
 interface EditorToolbarProps {
+  textScale: number;
+  onTextScaleChange: (scale: number) => void;
   totalWords: number;
   displayMode: EditorDisplayMode;
   isSearchOpen: boolean;
@@ -12,14 +15,22 @@ interface EditorToolbarProps {
   onSearchOpenChange: (isOpen: boolean) => void;
   onSearchQueryChange: (query: string) => void;
   onOpenBulkAdd: () => void;
+  onNewChapter?: () => void;
   onOpenQuestionnaireBridge: () => void;
   onExport?: () => void;
   onOpenHistory: () => void;
   onOpenTips: () => void;
 }
 
-const EditorToolbar: React.FC<EditorToolbarProps> = ({ totalWords, displayMode, isSearchOpen, searchQuery, hasActiveScene, onDisplayModeChange, onSearchOpenChange, onSearchQueryChange, onOpenBulkAdd, onOpenQuestionnaireBridge, onExport, onOpenHistory, onOpenTips }) => (
-  <div className="sticky top-4 z-40 mb-12 flex flex-col items-center gap-4">
+const EditorToolbar: React.FC<EditorToolbarProps> = ({ textScale, onTextScaleChange, totalWords, displayMode, isSearchOpen, searchQuery, hasActiveScene, onDisplayModeChange, onSearchOpenChange, onSearchQueryChange, onOpenBulkAdd, onNewChapter, onOpenQuestionnaireBridge, onExport, onOpenHistory, onOpenTips }) => (
+  <div data-editor-toolbar className="sticky top-4 z-40 mb-12 flex flex-col items-center gap-4">
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
+      <EditorTextScaleControls textScale={textScale} onTextScaleChange={onTextScaleChange} />
+      {onNewChapter && <button type="button" onClick={onNewChapter} aria-label="פרק חדש" title="פרק חדש"
+        className="flex min-h-11 items-center gap-2 rounded-xl bg-[var(--theme-primary)]/90 px-4 py-2 text-sm font-bold text-[var(--theme-bg)] shadow-lg hover:opacity-80">
+        <Plus size={14} aria-hidden="true" /><span>פרק חדש</span>
+      </button>}
+    </div>
     <div className="bg-[var(--theme-primary)]/90 backdrop-blur-md text-[var(--theme-bg)] px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-6 border border-[var(--theme-primary)]/50">
       <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--theme-bg)] text-[var(--theme-primary)] rounded-lg shadow-sm"><Hash size={16} className="opacity-70" /><span className="text-sm font-black tabular-nums">{totalWords.toLocaleString()} מילים</span></div>
       <div className="hidden sm:flex items-center gap-1 bg-black/10 p-1 rounded-lg">

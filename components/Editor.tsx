@@ -8,6 +8,10 @@ import { relationshipQuestionSections } from './relationshipQuestions';
 import { EditorProps } from './editor/editorTypes';
 import { formatVersionDate, formatVersionTime, getVersionReasonLabel, getVersionTypeLabel } from './editor/editorHistoryHelpers';
 import EditorToolbar from './editor/EditorToolbar';
+import { useEditorTextScale } from './editor/editorTextScale';
+import { resizeSceneTextarea } from './editor/sceneTextareaSize';
+import { addChapterFromEditor } from './editor/editorChapterActions';
+import { captureSceneCollapseAnchor, getSceneExpansionChange } from './editor/sceneCollapseScroll';
 import EditorSceneList, { getEditorChapterTargetId, getEditorSceneTargetId } from './editor/EditorSceneList';
 import EditorHistoryPanel from './editor/EditorHistoryPanel';
 import { 
@@ -35,11 +39,12 @@ const AutoExpandingTextarea: React.FC<{
   placeholder?: string;
   className?: string;
   minRows?: number;
-  focusOnRender?: boolean;
+  textScale?: number;
   onFocus?: () => void;
   onDraftChange?: (value: string) => void;
-}> = ({ value, onChange, placeholder, className, minRows = 5, focusOnRender = false, onFocus, onDraftChange }) => {
+}> = ({ value, onChange, placeholder, className, minRows = 5, textScale = 100, onFocus, onDraftChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previousTextScaleRef = useRef(textScale);
   const [localValue, setLocalValue] = useState(value);
 
   const getScrollContainer = () => {
@@ -59,6 +64,7 @@ const AutoExpandingTextarea: React.FC<{
     const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
     const selectionStart = textarea?.selectionStart;
     const selectionEnd = textarea?.selectionEnd;
+    const selectionDirection = textarea?.selectionDirection;
 
     callback();
 
@@ -69,7 +75,7 @@ const AutoExpandingTextarea: React.FC<{
         window.scrollTo({ top: previousScrollTop });
       }
       if (textarea && document.activeElement === textarea && selectionStart !== undefined && selectionEnd !== undefined) {
-        textarea.setSelectionRange(selectionStart, selectionEnd);
+        textarea.setSelectionRange(selectionStart, selectionEnd, selectionDirection ?? 'none');
       }
     });
   };
@@ -94,33 +100,19 @@ const AutoExpandingTextarea: React.FC<{
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
-      const newHeight = Math.max(textarea.scrollHeight, minRows * 28);
-      textarea.style.height = `${newHeight}px`;
+      resizeSceneTextarea(textarea, minRows);
     }
   };
 
   useLayoutEffect(() => {
-    if (document.activeElement === textareaRef.current) {
+    const scaleChanged = previousTextScaleRef.current !== textScale;
+    previousTextScaleRef.current = textScale;
+    if (scaleChanged || document.activeElement === textareaRef.current) {
       preserveScroll(adjustHeight);
       return;
     }
     adjustHeight();
-  }, [localValue]);
-
-  useEffect(() => {
-    if (!focusOnRender) return;
-
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const focusTimer = window.setTimeout(() => {
-      textarea.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      textarea.focus();
-    }, 0);
-
-    return () => window.clearTimeout(focusTimer);
-  }, [focusOnRender]);
+  }, [localValue, textScale]);
 
   return (
     <textarea
@@ -134,7 +126,7 @@ const AutoExpandingTextarea: React.FC<{
       }}
       onFocus={onFocus}
       rows={minRows}
-      style={{ overflow: 'hidden' }}
+      style={{ overflow: 'hidden', fontSize: `${1.125 * textScale / 100}rem` }}
     />
   );
 };
@@ -171,10 +163,17 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, onAddChapterDivider, onRenameChapter, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
+  const { textScale, setTextScale } = useEditorTextScale();
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
+  const pendingCollapseAnchorRef = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    const restore = pendingCollapseAnchorRef.current;
+    pendingCollapseAnchorRef.current = null;
+    restore?.();
+  }, [expandedSceneIds]);
   const [bridgeType, setBridgeType] = useState<'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -256,14 +255,15 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
 
   const toggleSceneExpanded = (id: string) => {
     lastInteractedSceneIdRef.current = id;
-    const nextExpandedSceneIds = expandedSceneIds.includes(id)
-      ? expandedSceneIds.filter(sceneId => sceneId !== id)
-      : [...expandedSceneIds, id];
-    const nextFocusedSceneId = nextExpandedSceneIds.includes(id) ? id : (nextExpandedSceneIds[nextExpandedSceneIds.length - 1] || null);
-
-    handleExpandedScenesChange(nextExpandedSceneIds);
-    setDisplayedSceneId(nextFocusedSceneId);
-    void handleFocusScene(nextFocusedSceneId);
+    const change = getSceneExpansionChange(expandedSceneIds, focusedSceneId, id);
+    pendingCollapseAnchorRef.current = change.closing
+      ? captureSceneCollapseAnchor(document.getElementById(getEditorSceneTargetId(id)))
+      : null;
+    handleExpandedScenesChange(change.expandedSceneIds);
+    setDisplayedSceneId(id);
+    if (!change.closing || change.focusedSceneId !== focusedSceneId) {
+      void handleFocusScene(change.focusedSceneId);
+    }
   };
 
   const openHistoryForScene = async (sceneId?: string | null) => {
@@ -653,22 +653,6 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     });
   }, [project.relationships, project.characters]);
 
-  if (activeScenes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-[var(--theme-primary)]/20 p-10">
-        <BookOpen size={64} className="mb-4 opacity-10" />
-        <p className="text-lg font-medium mb-4">אין סצנות להצגה</p>
-        <button 
-          onClick={onOpenBulkAdd}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all"
-        >
-          <CopyPlus size={18} />
-          <span>הוספה מהירה של סצנות</span>
-        </button>
-      </div>
-    );
-  }
-
   const bridgeItems: any[] = bridgeType === 'relationships'
     ? relationshipBridgeItems
     : bridgeType
@@ -797,6 +781,8 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       </aside>
       <main className="min-w-0 w-full max-w-4xl flex-1">
       <EditorToolbar
+        textScale={textScale}
+        onTextScaleChange={setTextScale}
         totalWords={totalWords}
         displayMode={displayMode}
         isSearchOpen={isSearchOpen}
@@ -806,19 +792,36 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
         onSearchOpenChange={setIsSearchOpen}
         onSearchQueryChange={updateSearchQuery}
         onOpenBulkAdd={onOpenBulkAdd}
+        onNewChapter={onAddChapterDivider ? () => addChapterFromEditor(
+          project, [focusedSceneId, displayedSceneId, lastInteractedSceneIdRef.current], onAddChapterDivider,
+        ) : undefined}
         onOpenQuestionnaireBridge={() => setBridgeType('characters')}
         onExport={onExport}
         onOpenHistory={handleHistoryButtonClick}
         onOpenTips={() => setIsInfoModalOpen(true)}
       />
+      {activeScenes.length === 0 && (
+      <div className="flex flex-col items-center justify-center text-[var(--theme-primary)]/20 p-10">
+        <BookOpen size={64} className="mb-4 opacity-10" />
+        <p className="text-lg font-medium mb-4">אין סצנות להצגה</p>
+        <button
+          onClick={onOpenBulkAdd}
+          className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all"
+        >
+          <CopyPlus size={18} />
+          <span>הוספה מהירה של סצנות</span>
+        </button>
+      </div>
+      )}
       <EditorSceneList
         items={activeSequenceItems}
         plotlines={project.plotlines}
         displayMode={displayMode}
         expandedSceneIds={expandedSceneIds}
         onSelectScene={toggleSceneExpanded}
-        renderExpandedScene={(scene, plotline) => (
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+        onRenameChapter={onRenameChapter}
+        renderExpandedScene={(scene, plotline, collapseControl) => (
+                  <div className="animate-in fade-in duration-300">
                     <header className="flex items-center justify-between mb-4">
                     <div className="flex-1 flex items-center gap-4">
                       <div className="flex flex-col flex-1">
@@ -859,9 +862,11 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                       >
                         <Trash2 size={18} />
                       </button>
+                      {collapseControl}
                     </div>
                   </header>
                     <AutoExpandingTextarea 
+                      textScale={textScale}
                       className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
                       value={scene.content}
                       placeholder="התחל לכתוב כאן..."
@@ -881,7 +886,6 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                         });
                       }}
                       minRows={5}
-                      focusOnRender={focusedSceneId === scene.id}
                       onFocus={() => { void handleFocusScene(scene.id); }}
                     />
 

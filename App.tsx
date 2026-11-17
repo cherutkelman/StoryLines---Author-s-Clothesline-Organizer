@@ -63,6 +63,7 @@ import {
 import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnection, WorldMap, THEMES, ChapterMarker, BookUIState, PlotStructureSubView, BoardViewMode, MapGallery, SceneVersion, BoardSnapshot, BoardVersion } from './types';
 import Board from './components/Board';
 import Editor from './components/Editor';
+import { useMobileEditorViewport } from './src/editor/mobileEditorViewport';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
@@ -1818,6 +1819,7 @@ const App: React.FC = () => {
   };
 
   const shouldShowLoginScreen = isWeb && isAuthReady && !user;
+  useMobileEditorViewport(isFirebaseConfigured && !isLoading && !shouldShowLoginScreen && activeView === 'editor' && Boolean(activeBook));
 
   if (shouldShowLoginScreen && !loginScreenLoggedRef.current) {
     loginScreenLoggedRef.current = true;
@@ -1901,7 +1903,7 @@ const App: React.FC = () => {
   }
 
   return renderWithAuthDebug(
-    <div className="h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
+    <div className="storylines-app-shell h-screen flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-y-auto scrollbar-hide transition-colors duration-500">
       {cloudError && (
         <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between text-sm font-bold z-[100] sticky top-0 shadow-lg animate-in slide-in-from-top duration-500">
           <div className="flex items-center gap-2">
@@ -2359,7 +2361,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="storylines-app-content flex-1 flex overflow-hidden">
         <aside 
           className={`border-l border-[var(--theme-border)] bg-[var(--theme-card)] overflow-hidden hidden lg:flex flex-col shadow-xl z-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-80'}`}
         >
@@ -2553,7 +2555,7 @@ const App: React.FC = () => {
           )}
         </aside>
 
-        <main className="flex-1 relative overflow-hidden bg-[var(--theme-bg)]">
+        <main className="storylines-app-main flex-1 relative overflow-hidden bg-[var(--theme-bg)]">
           {activeBook ? (
             <>
               {activeView === 'planning' && (
@@ -2629,7 +2631,7 @@ const App: React.FC = () => {
                 </div>
               )}
               {activeView === 'editor' && (
-                <div className="storylines-scrollbar absolute inset-0 bg-white overflow-auto shadow-2xl">
+                <div className="storylines-editor-scroll storylines-scrollbar absolute inset-0 bg-white overflow-auto shadow-2xl">
                    <Editor 
                     project={activeBook} 
                     bookId={activeBook.id}
@@ -2679,6 +2681,8 @@ const App: React.FC = () => {
                     onDeleteSceneVersion={handleDeleteSceneVersion}
                     onRenameSceneVersion={handleRenameSceneVersion}
                     onUpdateChapterMarker={updateChapterMarker}
+                    onAddChapterDivider={addChapterDivider}
+                    onRenameChapter={renameChapter}
                     isLibrarySidebarCollapsed={isSidebarCollapsed}
                     externalSearchQuery={editorMobileSearchQuery}
                     onExternalSearchQueryChange={setEditorMobileSearchQuery}

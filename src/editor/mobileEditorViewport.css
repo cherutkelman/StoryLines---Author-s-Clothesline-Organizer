@@ -1,0 +1,24 @@
+html.storylines-mobile-editor-active,
+html.storylines-mobile-editor-active body {
+  overflow: hidden;
+}
+
+.storylines-mobile-editor-active .storylines-app-shell {
+  position: fixed;
+  top: var(--sl-editor-viewport-top, 0px);
+  right: 0;
+  left: 0;
+  height: var(--sl-editor-viewport-height, 100%);
+  overflow: hidden;
+}
+
+.storylines-mobile-editor-active .storylines-app-content,
+.storylines-mobile-editor-active .storylines-app-main {
+  min-height: 0;
+}
+
+.storylines-mobile-editor-active .storylines-editor-scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}

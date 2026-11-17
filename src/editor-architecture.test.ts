@@ -40,7 +40,7 @@ describe('text editor architecture', () => {
     expect(editor.match(/<EditorSceneList\b/g)).toHaveLength(1);
     expect(editor).toContain('onSelectScene={toggleSceneExpanded}');
     expect(editor).toContain('const toggleSceneExpanded');
-    expect(editor).toContain('void handleFocusScene(nextFocusedSceneId)');
+    expect(editor).toContain('void handleFocusScene(change.focusedSceneId)');
     expect(editor.match(/activeSequenceItems\.map/g)).toHaveLength(1);
     expect(sceneList).toContain('items.map');
     expect(sceneList).not.toContain('updateActiveBook');

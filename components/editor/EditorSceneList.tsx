@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, ChevronDown, Flag } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Flag } from 'lucide-react';
 import type { Plotline, Scene } from '../../types';
 import type { BookSequenceDisplayItem } from '../../src/book-sequence';
 import type { EditorDisplayMode } from './editorTypes';
@@ -10,7 +10,8 @@ interface EditorSceneListProps {
   displayMode: EditorDisplayMode;
   expandedSceneIds: string[];
   onSelectScene: (sceneId: string) => void | Promise<void>;
-  renderExpandedScene: (scene: Scene, plotline: Plotline | undefined) => React.ReactNode;
+  onRenameChapter?: (chapterId: string, title: string) => void;
+  renderExpandedScene: (scene: Scene, plotline: Plotline | undefined, collapseControl: React.ReactNode) => React.ReactNode;
 }
 
 export const getEditorSceneTargetId = (sceneId: string) => `scene-${sceneId}`;
@@ -20,7 +21,13 @@ const isInteractiveElement = (target: EventTarget | null) => {
   return target instanceof HTMLElement && Boolean(target.closest('button, input, textarea, select, a'));
 };
 
-const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, displayMode, expandedSceneIds, onSelectScene, renderExpandedScene }) => (
+export const shouldOpenSceneFromArticle = (
+  displayMode: EditorDisplayMode,
+  isExpanded: boolean,
+  isInteractiveTarget: boolean,
+) => displayMode === 'focus' && !isExpanded && !isInteractiveTarget;
+
+const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, displayMode, expandedSceneIds, onSelectScene, onRenameChapter, renderExpandedScene }) => (
   <div className="space-y-4">
     {items.map((item, idx) => {
       if (item.type === 'chapter-divider') {
@@ -33,9 +40,10 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
             <div className="bg-[var(--theme-primary)] p-2 rounded-xl text-[var(--theme-card)]">
               <Flag size={20} />
             </div>
-            <div className="text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest">
-              {item.chapterMarker.title}
-            </div>
+            <input type="text" aria-label="כותרת הפרק" dir="rtl"
+              value={item.chapterMarker.title} readOnly={!onRenameChapter}
+              onChange={event => onRenameChapter?.(item.chapterMarker.id, event.target.value)}
+              className="min-w-0 w-full bg-transparent border-none p-0 text-4xl font-black text-[var(--theme-primary)] handwritten uppercase tracking-widest" />
           </div>
         );
       }
@@ -48,10 +56,10 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
         <React.Fragment key={scene.id}>
           <article
             id={getEditorSceneTargetId(scene.id)}
-            className={`scroll-mt-32 relative pr-8 border-r-4 transition-all duration-500 ease-in-out ${isExpanded ? `mb-20 opacity-100 ${displayMode === 'focus' ? 'cursor-pointer' : ''}` : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
+            className={`scroll-mt-32 relative pr-8 border-r-4 transition-colors duration-500 ease-in-out ${isExpanded ? 'mb-20 opacity-100' : 'mb-2 opacity-70 hover:opacity-100 cursor-pointer'} ${scene.isCompleted ? 'grayscale-[0.3]' : ''}`}
             style={{ borderRightColor: plotline?.color }}
             onClick={(event) => {
-              if (displayMode === 'full' || isInteractiveElement(event.target)) return;
+              if (!shouldOpenSceneFromArticle(displayMode, isExpanded, isInteractiveElement(event.target))) return;
               void onSelectScene(scene.id);
             }}
           >
@@ -72,7 +80,14 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
                 </div>
                 <ChevronDown size={16} className="text-[var(--theme-primary)]/20 group-hover:text-[var(--theme-primary)]/40" />
               </div>
-            ) : renderExpandedScene(scene, plotline)}
+            ) : renderExpandedScene(scene, plotline, displayMode === 'focus' ? (
+              <button type="button" aria-label={`סגירת הסצנה ${scene.title || 'ללא כותרת'}`}
+                title="סגירת הסצנה"
+                className="min-h-11 min-w-11 shrink-0 rounded-xl border border-[var(--theme-border)] p-2 text-[var(--theme-primary)]/60"
+                onClick={event => { event.stopPropagation(); void onSelectScene(scene.id); }}>
+                <ChevronUp size={16} aria-hidden="true" />
+              </button>
+            ) : null)}
           </article>
         </React.Fragment>
       );
