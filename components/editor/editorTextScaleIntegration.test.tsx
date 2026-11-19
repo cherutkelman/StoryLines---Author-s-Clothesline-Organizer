@@ -31,7 +31,7 @@ describe('production editor text-scale integration', () => {
     expect(html).toContain('כותרת פרק');
     expect(html).toContain('גוף בעברית');
     expect(html).toContain('dir="rtl"');
-    expect(html).toContain('170%');
+    expect(html).not.toContain('aria-label="גודל הטקסט הנוכחי"');
     expect(getItem).toHaveBeenCalledWith(EDITOR_TEXT_SCALE_KEY);
     expect(onUpdateScene).not.toHaveBeenCalled();
   });

@@ -28,7 +28,9 @@ export interface EditorProps {
   isLibrarySidebarCollapsed?: boolean;
   externalSearchQuery?: string;
   onExternalSearchQueryChange?: (value: string) => void;
-  externalCommand?: { action: 'tips' | 'closeAll'; nonce: number } | null;
+  mobileMenuHost?: HTMLElement | null;
+  mobileWordCountHost?: HTMLElement | null;
+  onCloseMobileMenu?: () => void;
   appActiveSceneId?: string | null;
 }
 

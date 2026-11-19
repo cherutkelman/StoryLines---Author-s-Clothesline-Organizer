@@ -2,18 +2,19 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import EditorTextScaleControls from './EditorTextScaleControls';
-import EditorToolbar from './EditorToolbar';
+import { EditorToolbarContent } from './EditorToolbar';
 
-const toolbarProps = (): React.ComponentProps<typeof EditorToolbar> => ({
+const toolbarProps = (): React.ComponentProps<typeof EditorToolbarContent> => ({
   textScale: 150, onTextScaleChange: vi.fn(), totalWords: 100, displayMode: 'full',
   isSearchOpen: false, searchQuery: '', hasActiveScene: true,
   onDisplayModeChange: vi.fn(), onSearchOpenChange: vi.fn(), onSearchQueryChange: vi.fn(),
   onOpenBulkAdd: vi.fn(), onOpenQuestionnaireBridge: vi.fn(), onOpenHistory: vi.fn(), onOpenTips: vi.fn(),
+  menuId: 'test-toolbar', openMenu: 'view', onMenuToggle: vi.fn(), onMenuAction: vi.fn(),
 });
 
 describe('text display controls', () => {
   it.each(['full', 'focus'] as const)('exposes accessible controls on mobile and desktop in %s mode', displayMode => {
-    const html = renderToStaticMarkup(<EditorToolbar {...toolbarProps()} displayMode={displayMode} />);
+    const html = renderToStaticMarkup(<EditorToolbarContent {...toolbarProps()} displayMode={displayMode} />);
     expect(html).toContain('aria-label="גודל תצוגת גוף הטקסט"');
     expect(html).toContain('aria-label="גודל הטקסט הנוכחי"');
     expect(html).toContain('150%');

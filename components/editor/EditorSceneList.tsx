@@ -9,6 +9,7 @@ interface EditorSceneListProps {
   plotlines: Plotline[];
   displayMode: EditorDisplayMode;
   expandedSceneIds: string[];
+  searchExpandedSceneId?: string;
   onSelectScene: (sceneId: string) => void | Promise<void>;
   onRenameChapter?: (chapterId: string, title: string) => void;
   renderExpandedScene: (scene: Scene, plotline: Plotline | undefined, collapseControl: React.ReactNode) => React.ReactNode;
@@ -27,7 +28,7 @@ export const shouldOpenSceneFromArticle = (
   isInteractiveTarget: boolean,
 ) => displayMode === 'focus' && !isExpanded && !isInteractiveTarget;
 
-const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, displayMode, expandedSceneIds, onSelectScene, onRenameChapter, renderExpandedScene }) => (
+const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, displayMode, expandedSceneIds, searchExpandedSceneId, onSelectScene, onRenameChapter, renderExpandedScene }) => (
   <div className="space-y-4">
     {items.map((item, idx) => {
       if (item.type === 'chapter-divider') {
@@ -50,7 +51,7 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
 
       const scene = item.scene;
       const plotline = plotlines.find(candidate => candidate.id === scene.plotlineId);
-      const isExpanded = displayMode === 'full' || expandedSceneIds.includes(scene.id);
+      const isExpanded = displayMode === 'full' || expandedSceneIds.includes(scene.id) || searchExpandedSceneId === scene.id;
 
       return (
         <React.Fragment key={scene.id}>

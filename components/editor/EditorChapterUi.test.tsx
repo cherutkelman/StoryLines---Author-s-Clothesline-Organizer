@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { Project } from '../../types';
 import Editor from '../Editor';
-import EditorToolbar from './EditorToolbar';
+import EditorToolbar, { EditorToolbarContent } from './EditorToolbar';
 import { addChapterFromEditor } from './editorChapterActions';
 import { addChapterDividerToBookSequence, getBoardSequenceColumns, getBookSequenceDisplayItems } from '../../src/book-sequence';
 
@@ -14,6 +14,12 @@ const toolbarProps = (): React.ComponentProps<typeof EditorToolbar> => ({
   onDisplayModeChange: vi.fn(), onSearchOpenChange: vi.fn(), onSearchQueryChange: vi.fn(),
   onOpenBulkAdd: vi.fn(), onOpenQuestionnaireBridge: vi.fn(), onOpenHistory: vi.fn(), onOpenTips: vi.fn(),
 });
+const writingMenuProps = {
+  menuId: 'test-toolbar',
+  openMenu: 'write' as const,
+  onMenuToggle: vi.fn(),
+  onMenuAction: (action: () => void) => action(),
+};
 const renderEditor = (book: Project, mode: 'full' | 'focus') => renderToStaticMarkup(
   <Editor project={book} bookId="book" user={null} visiblePlotlines={[]} initialDisplayMode={mode}
     onUpdateScene={vi.fn()} onDeleteScene={vi.fn()} onOpenBulkAdd={vi.fn()}
@@ -23,7 +29,7 @@ const renderEditor = (book: Project, mode: 'full' | 'focus') => renderToStaticMa
 describe('new chapter in the production editor UI', () => {
   it.each(['full', 'focus'] as const)('keeps the chapter action available in an empty %s editor and displays chapters without scenes', mode => {
     const empty = emptyBook();
-    expect(renderEditor(empty, mode)).toContain('aria-label="פרק חדש"');
+    expect(renderEditor(empty, mode)).toContain('כתיבה');
     const book = { ...empty, ...addChapterDividerToBookSequence(empty, 0, 'new') };
     const html = renderEditor(book, mode);
     expect(html).toContain('value="פרק 1"');
@@ -33,10 +39,10 @@ describe('new chapter in the production editor UI', () => {
     expect(book.scenes).toBe(empty.scenes);
   });
 
-  it('routes a native toolbar button click to the existing creation action once', async () => {
+  it('routes a native toolbar button click to the existing creation action once', () => {
     let book = emptyBook();
     const add = vi.fn((index: number) => { book = { ...book, ...addChapterDividerToBookSequence(book, index, 'new') }; });
-    const tree = await EditorToolbar({ ...toolbarProps(), onNewChapter: () => addChapterFromEditor(book, [], add) });
+    const tree = EditorToolbarContent({ ...toolbarProps(), ...writingMenuProps, onNewChapter: () => addChapterFromEditor(book, [], add) });
     type Props = { children?: React.ReactNode; 'aria-label'?: string; onClick?: () => void };
     const findButton = (node: React.ReactNode): React.ReactElement<Props> | undefined => {
       for (const child of React.Children.toArray(node)) {
@@ -53,17 +59,17 @@ describe('new chapter in the production editor UI', () => {
   });
 
   it('does not expose the chapter action without the existing App callback', () => {
-    const html = renderToStaticMarkup(<EditorToolbar {...toolbarProps()} />);
+    const html = renderToStaticMarkup(<EditorToolbarContent {...toolbarProps()} {...writingMenuProps} />);
     expect(html).not.toContain('aria-label="פרק חדש"');
   });
 
   it('keeps the action visible on mobile and keyboard-accessible', () => {
-    const html = renderToStaticMarkup(<EditorToolbar {...toolbarProps()} onNewChapter={vi.fn()} />);
+    const html = renderToStaticMarkup(<EditorToolbarContent {...toolbarProps()} {...writingMenuProps} onNewChapter={vi.fn()} />);
     const button = html.match(/<button[^>]*aria-label="פרק חדש"[^>]*>/)?.[0];
     expect(button).toBeDefined();
     expect(button).toContain('type="button"');
     expect(button).not.toContain('hidden');
-    expect(button).not.toContain('disabled');
+    expect(button).not.toContain(' disabled=""');
     expect(button).toContain('min-h-11');
   });
 

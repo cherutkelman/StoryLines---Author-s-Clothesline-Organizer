@@ -1,0 +1,30 @@
+.storylines-editor-search-body {
+  position: relative;
+}
+
+.storylines-editor-search-body textarea {
+  position: relative;
+}
+
+.storylines-editor-search-body .storylines-editor-search-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  user-select: none;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.storylines-editor-search-mirror mark {
+  color: inherit;
+  background-color: var(--theme-secondary);
+  background-color: color-mix(in srgb, var(--theme-bg) 75%, var(--theme-primary));
+}
+
+.storylines-editor-search-mirror mark[data-editor-active-match] {
+  background-color: color-mix(in srgb, var(--theme-bg) 64%, var(--theme-primary));
+  box-shadow: inset 0 -2px var(--theme-primary);
+}

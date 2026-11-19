@@ -73,7 +73,6 @@ describe('text editor architecture', () => {
     expect(app).toContain('const previousActiveViewRef = useRef<AppView>(activeView)');
     expect(app).toContain("previousActiveViewRef.current !== 'editor' && activeView === 'editor'");
     expect(app).toContain('setIsSidebarCollapsed(true)');
-    expect(app).toContain("setEditorExternalCommand({ action: 'closeAll', nonce: Date.now() })");
   });
 
   it('renders history through a storage-free presentation component', () => {

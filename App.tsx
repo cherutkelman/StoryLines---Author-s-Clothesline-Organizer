@@ -16,10 +16,6 @@ import {
   Share2,
   Wand2,
   Download,
-  AlignJustify,
-  Focus,
-  Search,
-  Info,
   Upload,
   Settings2,
   MonitorSmartphone,
@@ -376,7 +372,8 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>('board');
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
   const [editorMobileSearchQuery, setEditorMobileSearchQuery] = useState('');
-  const [editorExternalCommand, setEditorExternalCommand] = useState<{ action: 'tips' | 'closeAll'; nonce: number } | null>(null);
+  const [editorMobileMenuHost, setEditorMobileMenuHost] = useState<HTMLDivElement | null>(null);
+  const [editorMobileWordCountHost, setEditorMobileWordCountHost] = useState<HTMLDivElement | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const previousActiveViewRef = useRef<AppView>(activeView);
   const [visiblePlotlines, setVisiblePlotlines] = useState<string[]>([]);
@@ -2170,77 +2167,8 @@ const App: React.FC = () => {
                           </div>
                         )}
 
-                        {isEditorItem && isActive && (
-                          <div className="space-y-2 pr-8">
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditorExternalCommand({ action: 'closeAll', nonce: Date.now() });
-                                  setIsMobileLibraryOpen(false);
-                                }}
-                                className={`min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
-                                  (activeUI.editorDisplayMode || 'focus') === 'focus'
-                                    ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
-                                    : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
-                                }`}
-                              >
-                                <Focus size={16} />
-                                <span className="flex-1">סגור הכל</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  updateBookUiState({ editorDisplayMode: 'full' });
-                                  setIsMobileLibraryOpen(false);
-                                }}
-                                className={`min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all ${
-                                  activeUI.editorDisplayMode === 'full'
-                                    ? 'bg-[var(--theme-secondary)] text-[var(--theme-primary)] shadow-sm border border-[var(--theme-border)]'
-                                    : 'text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]'
-                                }`}
-                              >
-                                <AlignJustify size={16} />
-                                <span className="flex-1">מלא</span>
-                              </button>
-                              <div className="col-span-2 flex items-center gap-3 rounded-xl bg-[var(--theme-bg)] px-4 py-2.5 text-[var(--theme-primary)] border border-[var(--theme-border)]">
-                                <Search size={16} className="shrink-0 opacity-70" />
-                                <input
-                                  value={editorMobileSearchQuery}
-                                  onChange={(e) => setEditorMobileSearchQuery(e.target.value)}
-                                  placeholder="חיפוש"
-                                  className="min-w-0 flex-1 bg-transparent border-none p-0 text-sm font-bold text-[var(--theme-primary)] placeholder:text-[var(--theme-primary)]/40 focus:ring-0 outline-none"
-                                />
-                                {editorMobileSearchQuery && (
-                                  <button
-                                    onClick={() => setEditorMobileSearchQuery('')}
-                                    className="p-1 text-[var(--theme-primary)]/50 hover:text-[var(--theme-primary)]"
-                                    aria-label="נקה חיפוש"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => {
-                                  exportManuscript();
-                                  setIsMobileLibraryOpen(false);
-                                }}
-                                className="min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]"
-                              >
-                                <Download size={16} />
-                                <span className="flex-1">ייצוא</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditorExternalCommand({ action: 'tips', nonce: Date.now() });
-                                  setIsMobileLibraryOpen(false);
-                                }}
-                                className="min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]"
-                              >
-                                <Info size={16} />
-                                <span className="flex-1">טיפים</span>
-                              </button>
-                            </div>
-                          </div>
+                        {isEditorItem && isActive && activeBook && (
+                          <div ref={setEditorMobileMenuHost} data-editor-mobile-menu-host className="pr-8" />
                         )}
 
                         {isMapsItem && isActive && (
@@ -2631,7 +2559,10 @@ const App: React.FC = () => {
                 </div>
               )}
               {activeView === 'editor' && (
-                <div className="storylines-editor-scroll storylines-scrollbar absolute inset-0 bg-white overflow-auto shadow-2xl">
+                <div className="absolute inset-0 flex flex-col bg-white shadow-2xl">
+                  <div ref={setEditorMobileWordCountHost} data-editor-mobile-word-count-host
+                    className="flex shrink-0 justify-center border-b border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 lg:hidden" />
+                  <div className="storylines-editor-scroll storylines-scrollbar min-h-0 flex-1 overflow-auto">
                    <Editor 
                     project={activeBook} 
                     bookId={activeBook.id}
@@ -2686,9 +2617,12 @@ const App: React.FC = () => {
                     isLibrarySidebarCollapsed={isSidebarCollapsed}
                     externalSearchQuery={editorMobileSearchQuery}
                     onExternalSearchQueryChange={setEditorMobileSearchQuery}
-                    externalCommand={editorExternalCommand}
+                    mobileMenuHost={editorMobileMenuHost}
+                    mobileWordCountHost={editorMobileWordCountHost}
+                    onCloseMobileMenu={() => setIsMobileLibraryOpen(false)}
                     appActiveSceneId={activeUI.editorFocusedSceneId ?? null}
                   />
+                  </div>
                 </div>
               )}
               {activeView === 'maps' && (

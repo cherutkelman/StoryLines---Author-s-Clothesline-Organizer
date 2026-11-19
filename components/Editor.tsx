@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Scene, QuestionnaireEntry } from '../types';
 import { canDeleteSceneVersion, diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
@@ -14,6 +14,8 @@ import { addChapterFromEditor } from './editor/editorChapterActions';
 import { captureSceneCollapseAnchor, getSceneExpansionChange } from './editor/sceneCollapseScroll';
 import EditorSceneList, { getEditorChapterTargetId, getEditorSceneTargetId } from './editor/EditorSceneList';
 import EditorHistoryPanel from './editor/EditorHistoryPanel';
+import EditorSearchHighlights from './editor/EditorSearchHighlights';
+import { findSceneSearchMatches, nextSearchMatchIndex, type SearchRange } from './editor/editorSearch';
 import { 
   BookOpen, 
   CheckCircle2, 
@@ -42,10 +44,25 @@ const AutoExpandingTextarea: React.FC<{
   textScale?: number;
   onFocus?: () => void;
   onDraftChange?: (value: string) => void;
-}> = ({ value, onChange, placeholder, className, minRows = 5, textScale = 100, onFocus, onDraftChange }) => {
+  sceneId: string;
+  searchRanges?: readonly SearchRange[];
+  activeSearchStart?: number;
+  onSearchDraftChange?: (sceneId: string, draft?: string) => void;
+}> = ({ value, onChange, placeholder, className, minRows = 5, textScale = 100, onFocus, onDraftChange,
+  sceneId, searchRanges, activeSearchStart, onSearchDraftChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const previousTextScaleRef = useRef(textScale);
   const [localValue, setLocalValue] = useState(value);
+  const fontSize = `${1.125 * textScale / 100}rem`;
+
+  useLayoutEffect(() => {
+    onSearchDraftChange?.(sceneId, localValue === value ? undefined : localValue);
+  }, [onSearchDraftChange, sceneId, localValue, value]);
+
+  useLayoutEffect(() => () => {
+    onSearchDraftChange?.(sceneId);
+  }, [onSearchDraftChange, sceneId]);
 
   const getScrollContainer = () => {
     const textarea = textareaRef.current;
@@ -115,19 +132,31 @@ const AutoExpandingTextarea: React.FC<{
   }, [localValue, textScale]);
 
   return (
-    <textarea
-      ref={textareaRef}
-      className={className}
-      value={localValue}
-      placeholder={placeholder}
-      onChange={(e) => {
-        onDraftChange?.(e.target.value);
-        preserveScroll(() => setLocalValue(e.target.value));
-      }}
-      onFocus={onFocus}
-      rows={minRows}
-      style={{ overflow: 'hidden', fontSize: `${1.125 * textScale / 100}rem` }}
-    />
+    <div className="storylines-editor-search-body">
+      {searchRanges && searchRanges.length > 0 && (
+        <EditorSearchHighlights ref={mirrorRef} content={localValue} ranges={searchRanges}
+          activeStart={activeSearchStart} className={className} fontSize={fontSize} />
+      )}
+      <textarea
+        ref={textareaRef}
+        className={className}
+        value={localValue}
+        placeholder={placeholder}
+        onChange={(e) => {
+          onDraftChange?.(e.target.value);
+          preserveScroll(() => setLocalValue(e.target.value));
+        }}
+        onFocus={onFocus}
+        onScroll={event => {
+          const mirror = mirrorRef.current;
+          if (!mirror) return;
+          mirror.scrollTop = event.currentTarget.scrollTop;
+          mirror.scrollLeft = event.currentTarget.scrollLeft;
+        }}
+        rows={minRows}
+        style={{ overflow: 'hidden', fontSize }}
+      />
+    </div>
   );
 };
 
@@ -163,7 +192,7 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, onAddChapterDivider, onRenameChapter, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, externalCommand, appActiveSceneId }) => {
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, onAddChapterDivider, onRenameChapter, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, mobileMenuHost, mobileWordCountHost, onCloseMobileMenu, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const { textScale, setTextScale } = useEditorTextScale();
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
@@ -178,6 +207,8 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchNavigation, setSearchNavigation] = useState<{ bookId: string; query: string; index: number; sceneId: string }>();
+  const [searchDrafts, setSearchDrafts] = useState<{ bookId: string; values: Map<string, string> }>();
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [showChaptersInNav, setShowChaptersInNav] = useState(true);
   const [isQuickNavCollapsed, setIsQuickNavCollapsed] = useState(false);
@@ -202,12 +233,26 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const deleteInFlightVersionIdRef = useRef<string | null>(null);
   const renameInFlightVersionIdRef = useRef<string | null>(null);
   const activeSearchQuery = externalSearchQuery ?? searchQuery;
-  const updateSearchQuery = onExternalSearchQueryChange ?? setSearchQuery;
+  const updateSearchQuery = (query: string) => {
+    setSearchNavigation(undefined);
+    (onExternalSearchQueryChange ?? setSearchQuery)(query);
+  };
+  const updateSearchDraft = useCallback((sceneId: string, draft?: string) => {
+    setSearchDrafts(previous => {
+      const existing = previous?.bookId === bookId ? previous.values : undefined;
+      if (existing?.get(sceneId) === draft) return previous;
+      const values = new Map(existing);
+      if (draft === undefined) values.delete(sceneId);
+      else values.set(sceneId, draft);
+      return { bookId, values };
+    });
+  }, [bookId]);
 
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
     setDisplayMode(mode);
     onDisplayModeChange?.(mode);
     if (mode === 'focus') {
+      setSearchNavigation(undefined);
       handleExpandedScenesChange([]);
       setDisplayedSceneId(null);
       void handleFocusScene(null);
@@ -254,6 +299,10 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const toggleSceneExpanded = (id: string) => {
+    if (id === searchExpandedSceneId && !expandedSceneIds.includes(id)) {
+      setSearchNavigation(undefined);
+      return;
+    }
     lastInteractedSceneIdRef.current = id;
     const change = getSceneExpansionChange(expandedSceneIds, focusedSceneId, id);
     pendingCollapseAnchorRef.current = change.closing
@@ -412,14 +461,6 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   }, [initialDisplayMode, displayMode]);
 
   useEffect(() => {
-    if (externalCommand?.action === 'tips') {
-      setIsInfoModalOpen(true);
-    } else if (externalCommand?.action === 'closeAll') {
-      handleDisplayModeChange('focus');
-    }
-  }, [externalCommand]);
-
-  useEffect(() => {
     if (!deleteCandidateVersionId) return;
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -446,19 +487,9 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   }, [renameCandidateVersionId, renamingVersionId]);
 
   const activeSequenceItems = useMemo(() => {
-    const query = activeSearchQuery.trim().toLowerCase();
-
-    return getBookSequenceDisplayItems(project).filter((item) => {
-      if (item.type === 'chapter-divider') return !query;
-
-      const scene = item.scene;
-      if (!visiblePlotlines.includes(scene.plotlineId)) return false;
-      if (!query) return true;
-
-      return scene.title.toLowerCase().includes(query) ||
-        scene.content.toLowerCase().includes(query);
-    });
-  }, [project, visiblePlotlines, activeSearchQuery]);
+    return getBookSequenceDisplayItems(project).filter(item =>
+      item.type === 'chapter-divider' || visiblePlotlines.includes(item.scene.plotlineId));
+  }, [project, visiblePlotlines]);
 
   const activeScenes = useMemo(
     () => activeSequenceItems
@@ -466,6 +497,49 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       .map(item => item.scene),
     [activeSequenceItems]
   );
+  const query = activeSearchQuery.trim();
+  const { matches: searchMatches, byScene: searchMatchesByScene } = useMemo(() => {
+    const drafts = searchDrafts?.bookId === bookId ? searchDrafts.values : undefined;
+    return findSceneSearchMatches(drafts && query
+      ? activeScenes.map(scene => ({ id: scene.id, content: drafts.get(scene.id) ?? scene.content }))
+      : activeScenes, query);
+  }, [activeScenes, bookId, query, searchDrafts]);
+  const navigation = searchNavigation?.bookId === bookId && searchNavigation.query === query
+    ? searchNavigation : undefined;
+  const activeSearchIndex = Math.min(navigation?.index ?? 0, searchMatches.length - 1);
+  const activeSearchMatch = searchMatches[activeSearchIndex];
+  // Reveal only the result visited by navigation, without changing the user's expansion preferences.
+  const searchExpandedSceneId = activeSearchMatch?.sceneId === navigation?.sceneId
+    ? navigation?.sceneId : undefined;
+
+  const navigateSearch = (step: -1 | 1) => {
+    const index = nextSearchMatchIndex(navigation?.index, searchMatches.length, step);
+    if (index === undefined) return;
+    setSearchNavigation({ bookId, query, index, sceneId: searchMatches[index].sceneId });
+  };
+
+  useEffect(() => {
+    if (!navigation) return;
+    const frame = window.requestAnimationFrame(() => {
+      const scene = document.getElementById(getEditorSceneTargetId(navigation.sceneId));
+      const target = scene?.querySelector('[data-editor-active-match]') ?? scene;
+      const scroller = scene?.closest('.storylines-editor-scroll');
+      if (target && scroller) {
+        const result = target.getBoundingClientRect();
+        const viewport = scroller.getBoundingClientRect();
+        scroller.scrollBy({ top: result.top - viewport.top + (result.height - viewport.height) / 2 });
+      } else {
+        target?.scrollIntoView({ block: 'center', inline: 'nearest' });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [navigation]);
+
+  const keepSearchSceneOpenForEditing = (sceneId: string) => {
+    if (searchExpandedSceneId === sceneId && displayMode === 'focus' && !expandedSceneIds.includes(sceneId)) {
+      handleExpandedScenesChange([...expandedSceneIds, sceneId]);
+    }
+  };
 
   const scrollToEditorTarget = (targetId: string, waitForRender = false) => {
     const scroll = () => {
@@ -781,12 +855,18 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       </aside>
       <main className="min-w-0 w-full max-w-4xl flex-1">
       <EditorToolbar
+        mobileMenuHost={mobileMenuHost}
+        mobileWordCountHost={mobileWordCountHost}
+        onCloseMobileMenu={onCloseMobileMenu}
         textScale={textScale}
         onTextScaleChange={setTextScale}
         totalWords={totalWords}
         displayMode={displayMode}
         isSearchOpen={isSearchOpen}
         searchQuery={activeSearchQuery}
+        searchResultCount={searchMatches.length}
+        activeSearchResult={activeSearchIndex + 1}
+        onNavigateSearch={navigateSearch}
         hasActiveScene={Boolean(resolvedHistorySceneId)}
         onDisplayModeChange={handleDisplayModeChange}
         onSearchOpenChange={setIsSearchOpen}
@@ -818,6 +898,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
         plotlines={project.plotlines}
         displayMode={displayMode}
         expandedSceneIds={expandedSceneIds}
+        searchExpandedSceneId={searchExpandedSceneId}
         onSelectScene={toggleSceneExpanded}
         onRenameChapter={onRenameChapter}
         renderExpandedScene={(scene, plotline, collapseControl) => (
@@ -836,6 +917,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                             placeholder="כותרת הסצנה..." 
                             onChange={(val) => onUpdateScene(scene.id, { title: val })}
                             onDraftChange={(val) => {
+                              keepSearchSceneOpenForEditing(scene.id);
                               lastInteractedSceneIdRef.current = scene.id;
                               setDisplayedSceneId(scene.id);
                               sceneTitleDraftsRef.current[scene.id] = val;
@@ -866,6 +948,10 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                     </div>
                   </header>
                     <AutoExpandingTextarea 
+                      sceneId={scene.id}
+                      searchRanges={searchMatchesByScene.get(scene.id)}
+                      activeSearchStart={activeSearchMatch?.sceneId === scene.id ? activeSearchMatch.start : undefined}
+                      onSearchDraftChange={query ? updateSearchDraft : undefined}
                       textScale={textScale}
                       className="w-full bg-transparent border-none focus:ring-0 p-0 text-[var(--theme-primary)] leading-relaxed resize-none text-lg"
                       value={scene.content}
@@ -886,7 +972,10 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                         });
                       }}
                       minRows={5}
-                      onFocus={() => { void handleFocusScene(scene.id); }}
+                      onFocus={() => {
+                        keepSearchSceneOpenForEditing(scene.id);
+                        void handleFocusScene(scene.id);
+                      }}
                     />
 
                 </div>
