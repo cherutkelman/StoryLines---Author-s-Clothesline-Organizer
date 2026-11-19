@@ -1,5 +1,6 @@
 import React from 'react';
 import { ClipboardCopy, FileText, GitCompare, Pencil, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import CopySceneVersionTextButton from '../CopySceneVersionTextButton';
 import type { Scene, SceneVersion } from '../../types';
 import { formatVersionDate, formatVersionTime, getVersionReasonLabel, getVersionTypeLabel } from './editorHistoryHelpers';
 
@@ -261,9 +262,15 @@ const EditorHistoryPanel: React.FC<EditorHistoryPanelProps> = (props) => {
                       )}
 
                       {historyMode === 'view' ? (
-                        <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
-                          {selectedVersion.content || 'אין תוכן בגרסה הזו.'}
-                        </article>
+                        <>
+                          <CopySceneVersionTextButton
+                            key={JSON.stringify([selectedVersion.bookId, selectedVersion.sceneId, selectedVersion.id])}
+                            content={selectedVersion.content}
+                          />
+                          <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
+                            {selectedVersion.content || 'אין תוכן בגרסה הזו.'}
+                          </article>
+                        </>
                       ) : (
                         <article className="whitespace-pre-wrap rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-lg leading-relaxed text-[var(--theme-primary)]">
                           {comparisonParts.map((part, index) => {

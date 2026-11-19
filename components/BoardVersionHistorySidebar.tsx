@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import type { BoardVersion } from '../types';
+import DeletedSceneHistory from './DeletedSceneHistory';
 import {
   BOARD_HISTORY_EMPTY_MESSAGE,
   prepareBoardVersionList,
@@ -12,7 +13,8 @@ interface BoardVersionHistorySidebarProps {
   boardTitle: string;
   activePreviewVersionId?: string | null;
   onClose: () => void;
-  onLoadVersions: () => Promise<BoardVersion[]> | BoardVersion[];
+  onLoadVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
+  deletedSceneHistory?: React.ComponentProps<typeof DeletedSceneHistory>;
   onPreviewVersion: (version: BoardVersion) => void;
 }
 
@@ -23,13 +25,14 @@ const BoardVersionHistorySidebar: React.FC<BoardVersionHistorySidebarProps> = ({
   onClose,
   onLoadVersions,
   onPreviewVersion,
+  deletedSceneHistory,
 }) => {
   const [versions, setVersions] = useState<BoardVersion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !onLoadVersions) return;
 
     let isCurrent = true;
     setIsLoading(true);
@@ -83,6 +86,9 @@ const BoardVersionHistorySidebar: React.FC<BoardVersionHistorySidebarProps> = ({
       </header>
 
       <section className="min-h-0 flex-1 overflow-y-auto bg-[var(--theme-secondary)]/10 p-4">
+        {deletedSceneHistory && (
+          <DeletedSceneHistory key={deletedSceneHistory.bookId} {...deletedSceneHistory} />
+        )}
         {isLoading && (
           <div className="flex items-center justify-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 text-sm font-bold text-[var(--theme-primary)]/50">
             <Loader2 size={18} className="animate-spin" />

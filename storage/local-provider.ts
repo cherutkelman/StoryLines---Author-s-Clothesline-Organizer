@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { Book } from "../types";
 import { IStorageProvider } from "./types";
+import { readSceneInventory } from "../src/deleted-scene-history";
 
 const STORAGE_KEY = 'storylines_library_v2';
 const USER_ID_KEY = "storylines_user_id";
@@ -8,6 +9,14 @@ const USER_ID_KEY = "storylines_user_id";
 export class LocalStorageProvider implements IStorageProvider {
   name = 'LocalStorage';
   private externalUserId: string | null = null;
+
+  readBookSceneInventory(bookId: string) {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const books = saved ? JSON.parse(saved) as Book[] : [];
+    const book = books.find(item => item.id === bookId && !item.deletedAt
+      && (!this.externalUserId || item.ownerId === this.externalUserId));
+    return readSceneInventory(book);
+  }
 
   setUserId(userId: string | null) {
     this.externalUserId = userId;

@@ -29,8 +29,8 @@ export interface BoardProps {
   timelineCollapsedGroupIds?: string[];
   onTimelineCollapsedGroupIdsChange?: (groupIds: string[]) => void;
   onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
+  sceneHistoryBookId?: string;
   onPreviewVersionChange?: (version: BoardVersion | null) => void;
-  onRestoreDeletedSceneFromVersion?: (version: BoardVersion, sceneId: string) => Promise<{ success: boolean; message?: string }> | { success: boolean; message?: string };
 }
 
 export interface BoardChapter {

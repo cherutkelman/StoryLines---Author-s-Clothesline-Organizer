@@ -45,17 +45,14 @@ const Board: React.FC<BoardProps> = ({
   timelineCollapsedGroupIds,
   onTimelineCollapsedGroupIdsChange,
   onLoadBoardVersions,
+  sceneHistoryBookId,
   onPreviewVersionChange,
-  onRestoreDeletedSceneFromVersion
 }) => {
   const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
-  const [restoringDeletedSceneId, setRestoringDeletedSceneId] = useState<string | null>(null);
-  const [deletedSceneRestoreError, setDeletedSceneRestoreError] = useState<string | null>(null);
-  const [restoredDeletedSceneIds, setRestoredDeletedSceneIds] = useState<Set<string>>(() => new Set());
   const boardRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const [timelineSelectionControlsHost, setTimelineSelectionControlsHost] = useState<HTMLDivElement | null>(null);
@@ -78,51 +75,16 @@ const Board: React.FC<BoardProps> = ({
 
   const closeBoardPreview = () => {
     setPreviewVersion(null);
-    setDeletedSceneRestoreError(null);
-    setRestoredDeletedSceneIds(new Set());
   };
 
   const showBoardPreview = (version: BoardVersion) => {
     setPreviewVersion(version);
-    setDeletedSceneRestoreError(null);
-    setRestoredDeletedSceneIds(new Set());
   };
 
-  const currentSceneIds = useMemo(() => new Set(project.scenes.map(scene => scene.id)), [project.scenes]);
   const missingPreviewSceneIds = useMemo(() => {
     if (!previewVersion) return new Set<string>();
     return new Set(findBoardSnapshotScenesMissingFromCurrent(previewVersion.snapshot, project).map(scene => scene.id));
   }, [previewVersion, project]);
-
-  useEffect(() => {
-    setRestoredDeletedSceneIds(prev => {
-      const next = new Set([...prev].filter(sceneId => currentSceneIds.has(sceneId)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [currentSceneIds]);
-
-  const handleRestoreDeletedScene = async (sceneId: string) => {
-    if (!previewVersion || !onRestoreDeletedSceneFromVersion || restoringDeletedSceneId) return;
-
-    setRestoringDeletedSceneId(sceneId);
-    setDeletedSceneRestoreError(null);
-
-    try {
-      const result = await onRestoreDeletedSceneFromVersion(previewVersion, sceneId);
-      if (result.success) {
-        setRestoredDeletedSceneIds(prev => new Set(prev).add(sceneId));
-        return;
-      }
-      if (result.message) {
-        setDeletedSceneRestoreError(result.message);
-      }
-    } catch (error) {
-      console.warn('[BoardVersionHistory] Failed to restore deleted scene.', error);
-      setDeletedSceneRestoreError('לא ניתן היה להחזיר את הסצנה ללוח הנוכחי.');
-    } finally {
-      setRestoringDeletedSceneId(null);
-    }
-  };
 
   const handleZoomChange = (newZoom: number) => {
     setZoomLevel(newZoom);
@@ -330,10 +292,7 @@ const Board: React.FC<BoardProps> = ({
             boardProject={boardProject}
             columnCount={columnCount}
             isPreviewMode={isPreviewMode}
-            currentSceneIds={currentSceneIds}
             missingPreviewSceneIds={missingPreviewSceneIds}
-            restoredDeletedSceneIds={restoredDeletedSceneIds}
-            restoringDeletedSceneId={restoringDeletedSceneId}
             onAddScene={onAddScene}
             onAddSceneInSequence={onAddSceneInSequence}
             updateScene={updateScene}
@@ -345,8 +304,6 @@ const Board: React.FC<BoardProps> = ({
             onAddChapterDivider={onAddChapterDivider}
             onRenameChapter={onRenameChapter}
             onDeleteChapter={onDeleteChapter}
-            canRestoreDeletedScene={Boolean(onRestoreDeletedSceneFromVersion)}
-            onRestoreDeletedScene={(sceneId) => { void handleRestoreDeletedScene(sceneId); }}
             onDragStart={handleDragStart}
             onChapterDragStart={handleChapterDragStart}
             onDragOver={handleDragOver}
@@ -386,7 +343,7 @@ const Board: React.FC<BoardProps> = ({
         zoomLevel={zoomLevel}
         viewMode={viewMode}
         isPreviewMode={isPreviewMode}
-        canOpenHistory={Boolean(onLoadBoardVersions)}
+        canOpenHistory={Boolean(onLoadBoardVersions || sceneHistoryBookId)}
         onZoomChange={handleZoomChange}
         onViewModeChange={handleViewModeChange}
         onBulkAdd={() => { if (!isPreviewMode) onBulkAdd(boardProject.plotlines[0]?.id || ''); }}
@@ -394,12 +351,13 @@ const Board: React.FC<BoardProps> = ({
         onOpenHistory={() => setIsVersionHistoryOpen(true)}
       />
 
-      {onLoadBoardVersions && (
+      {(onLoadBoardVersions || sceneHistoryBookId) && (
         <BoardVersionHistorySidebar
           isOpen={isVersionHistoryOpen}
           boardTitle={title}
           onClose={() => setIsVersionHistoryOpen(false)}
           onLoadVersions={onLoadBoardVersions}
+          deletedSceneHistory={sceneHistoryBookId ? { bookId: sceneHistoryBookId, project } : undefined}
           activePreviewVersionId={previewVersion?.id ?? null}
           onPreviewVersion={showBoardPreview}
         />
@@ -417,11 +375,6 @@ const Board: React.FC<BoardProps> = ({
           >
             חזור ללוח הנוכחי
           </button>
-          {deletedSceneRestoreError && (
-            <span className="w-full text-xs font-black text-red-700">
-              {deletedSceneRestoreError}
-            </span>
-          )}
         </div>
       )}
 

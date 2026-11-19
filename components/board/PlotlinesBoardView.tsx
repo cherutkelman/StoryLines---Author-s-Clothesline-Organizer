@@ -13,10 +13,7 @@ interface PlotlinesBoardViewProps {
   boardProject: Project;
   columnCount: number;
   isPreviewMode: boolean;
-  currentSceneIds: Set<string>;
   missingPreviewSceneIds: Set<string>;
-  restoredDeletedSceneIds: Set<string>;
-  restoringDeletedSceneId: string | null;
   onAddScene: (plotlineId: string, position: number) => void;
   onAddSceneInSequence?: (plotlineId: string, targetSequenceIndex: number) => void;
   updateScene: (id: string, updates: Partial<Scene>) => void;
@@ -28,8 +25,6 @@ interface PlotlinesBoardViewProps {
   onAddChapterDivider?: (sequenceIndex: number) => void;
   onRenameChapter?: (chapterId: string, title: string) => void;
   onDeleteChapter?: (chapterId: string) => void;
-  canRestoreDeletedScene: boolean;
-  onRestoreDeletedScene: (sceneId: string) => void;
   onDragStart: (sceneId: string) => void;
   onChapterDragStart: (chapterId: string) => void;
   onDragOver: (event: React.DragEvent) => void;
@@ -40,10 +35,10 @@ interface PlotlinesBoardViewProps {
 
 const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
   boardColumns, activePlotlines, boardProject, columnCount, isPreviewMode,
-  currentSceneIds, missingPreviewSceneIds, restoredDeletedSceneIds, restoringDeletedSceneId,
+  missingPreviewSceneIds,
   onAddScene, onAddSceneInSequence, updateScene, onDeleteScene, onSceneDoubleClick,
   onAddChapterMarker, onUpdateChapterMarker, onDeleteChapterMarker, onAddChapterDivider,
-  onRenameChapter, onDeleteChapter, canRestoreDeletedScene, onRestoreDeletedScene,
+  onRenameChapter, onDeleteChapter,
   onDragStart: handleDragStart, onChapterDragStart: handleChapterDragStart, onDragOver: handleDragOver,
   onChapterDividerDrop: handleChapterDividerDrop, onSceneSequenceDrop: handleSceneSequenceDrop,
   onSceneRowDrop: handleSceneRowDrop,
@@ -257,8 +252,6 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
               ) : sceneInThisSlot ? (
                 (() => {
                   const isDeletedFromCurrent = isPreviewMode && missingPreviewSceneIds.has(sceneInThisSlot.id);
-                  const isRestoredToCurrent = isPreviewMode && restoredDeletedSceneIds.has(sceneInThisSlot.id) && currentSceneIds.has(sceneInThisSlot.id);
-                  const isRestoringThisScene = restoringDeletedSceneId === sceneInThisSlot.id;
 
                   return (
                     <div
@@ -276,7 +269,7 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                         if (isPreviewMode) return;
                         onSceneDoubleClick?.(sceneInThisSlot.id);
                       }}
-                      className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''} ${isDeletedFromCurrent ? 'ring-2 ring-red-200' : ''} ${isRestoredToCurrent ? 'ring-2 ring-green-200' : ''}`}
+                      className={`w-40 h-40 bg-[var(--theme-card)] shadow-xl border-t-8 p-4 rounded-sm transition-all hover:-translate-y-2 hover:shadow-2xl relative z-10 flex flex-col ${isPreviewMode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${sceneInThisSlot.isCompleted ? 'opacity-90 grayscale-[0.3]' : ''} ${isDeletedFromCurrent ? 'ring-2 ring-red-200' : ''}`}
                       style={{ borderTopColor: plotline.color }}
                     >
                       <div className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-10 bg-[var(--theme-secondary)] border border-[var(--theme-border)]/50 rounded-full shadow-md z-20 flex flex-col items-center py-1 gap-1">
@@ -314,12 +307,6 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                       {isDeletedFromCurrent && (
                         <span className="absolute -top-3 -right-3 z-30 rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-red-600 shadow-sm">
                           נמחקה
-                        </span>
-                      )}
-
-                      {isRestoredToCurrent && (
-                        <span className="absolute -top-3 -right-3 z-30 rounded-full bg-green-50 px-2 py-1 text-[10px] font-black text-green-700 shadow-sm">
-                          הוחזרה ללוח הנוכחי
                         </span>
                       )}
 
@@ -381,23 +368,9 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                       />
                       <SceneArcMarkers project={boardProject} sceneId={sceneInThisSlot.id} />
                       <div className="mt-auto pt-1 border-t border-amber-50/50 flex flex-col items-center gap-1">
-                        {isDeletedFromCurrent && canRestoreDeletedScene ? (
-                          <button
-                            type="button"
-                            disabled={isRestoringThisScene}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRestoreDeletedScene(sceneInThisSlot.id);
-                            }}
-                            className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-black text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-60"
-                          >
-                            {isRestoringThisScene ? 'מחזירה...' : 'החזר סצנה ללוח הנוכחי'}
-                          </button>
-                        ) : (
-                          <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
-                            {plotline.name}
-                          </span>
-                        )}
+                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
+                          {plotline.name}
+                        </span>
                       </div>
                     </div>
                   );

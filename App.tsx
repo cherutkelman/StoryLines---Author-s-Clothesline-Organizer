@@ -2626,7 +2626,7 @@ const App: React.FC = () => {
                     timelineCollapsedGroupIds={activeUI.timelineCollapsedGroupIds}
                     onTimelineCollapsedGroupIdsChange={(groupIds) => updateBookUiState({ timelineCollapsedGroupIds: groupIds })}
                     onLoadBoardVersions={() => boardVersionStorage.loadBoardVersions(activeBook.id)}
-                    onRestoreDeletedSceneFromVersion={restoreDeletedBoardSceneFromVersion}
+                    sceneHistoryBookId={activeBook.id}
                   />
                 </div>
               )}

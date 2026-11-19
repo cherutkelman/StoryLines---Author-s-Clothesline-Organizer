@@ -8,10 +8,13 @@ import {
   where, 
   getDocs, 
   getDoc,
+  getDocFromServer,
+  getDocsFromServer,
   writeBatch, 
   doc
 } from "firebase/firestore";
 import { mergeSeparatedBookStructure, type SeparatedBookStructure } from '../src/book-loading';
+import { readSceneInventory } from '../src/deleted-scene-history';
 
 enum OperationType {
   CREATE = 'create',
@@ -76,6 +79,41 @@ export class FirestoreStorageProvider implements IStorageProvider {
   getUserId(): string {
     if (!this.userId) throw new Error("FirestoreStorageProvider: userId not set");
     return this.userId;
+  }
+
+  async readBookSceneInventory(bookId: string) {
+    const bookRef = doc(db, 'books', bookId);
+    const snapshot = await getDocFromServer(bookRef);
+    const book = snapshot.data() as Book | undefined;
+    if (!book || book.id !== bookId || book.deletedAt || snapshot.metadata.hasPendingWrites) {
+      return readSceneInventory();
+    }
+
+    const [scenes, structure] = await Promise.allSettled([
+      book.scenes == null
+        ? getDocsFromServer(collection(bookRef, 'scenes')).then(result =>
+            result.metadata.hasPendingWrites
+              ? undefined
+              : result.docs.map(scene => {
+                  const data = scene.data() as Book['scenes'][number];
+                  return data.id === scene.id ? data : undefined;
+                })
+          )
+        : Promise.resolve(undefined),
+      book.plotlines == null
+        ? getDocFromServer(doc(bookRef, 'content', 'sceneStructure')).then(result =>
+            result.metadata.hasPendingWrites ? undefined : result.data() as SeparatedBookStructure | undefined
+          )
+        : Promise.resolve(undefined),
+    ]);
+
+    const splitScenes = scenes.status === 'fulfilled' ? scenes.value : undefined;
+    const splitStructure = structure.status === 'fulfilled' ? structure.value : undefined;
+    const inventory = readSceneInventory(
+      mergeSeparatedBookStructure(book, splitScenes?.filter(scene => scene !== undefined), splitStructure),
+    );
+    if (splitScenes?.some(scene => scene === undefined)) inventory.complete = false;
+    return inventory;
   }
 
   private async hydrateSeparatedBookStructure(book: Book): Promise<Book> {

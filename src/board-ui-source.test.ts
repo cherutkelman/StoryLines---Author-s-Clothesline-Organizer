@@ -54,16 +54,41 @@ describe('board UI source', () => {
     expect(sidebarSource).not.toContain('השווה לגרסה הנוכחית');
   });
 
-  it('allows only deleted-scene restore actions inside historical board preview cards', () => {
+  it('marks deleted scenes in historical cards without offering a restore action', () => {
     const boardSource = readFileSync('components/Board.tsx', 'utf8');
     const plotlinesViewSource = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
 
     expect(boardSource).toContain('findBoardSnapshotScenesMissingFromCurrent');
-    expect(plotlinesViewSource).toContain('החזר סצנה ללוח הנוכחי');
-    expect(plotlinesViewSource).toContain('הוחזרה ללוח הנוכחי');
+    expect(plotlinesViewSource).toContain('נמחקה');
+    expect(plotlinesViewSource).not.toContain('החזר סצנה ללוח הנוכחי');
+    expect(plotlinesViewSource).not.toContain('הוחזרה ללוח הנוכחי');
+    expect(plotlinesViewSource).not.toMatch(/canRestoreDeletedScene|onRestoreDeletedScene/);
     expect(plotlinesViewSource).not.toContain('שחזר שם');
     expect(plotlinesViewSource).not.toContain('שחזר מיקום');
     expect(plotlinesViewSource).not.toContain('שחזר החלפה');
+  });
+
+  it('keeps the legacy restore implementation disconnected from the board UI', () => {
+    const appSource = readFileSync('App.tsx', 'utf8');
+    const boardSource = readFileSync('components/Board.tsx', 'utf8');
+    const boardTypes = readFileSync('components/board/boardTypes.ts', 'utf8');
+
+    expect(appSource.match(/\brestoreDeletedBoardSceneFromVersion\b/g)).toEqual(['restoreDeletedBoardSceneFromVersion']);
+    expect(boardSource).not.toMatch(/onRestoreDeletedScene|handleRestoreDeletedScene/);
+    expect(boardTypes).not.toContain('onRestoreDeletedSceneFromVersion');
+  });
+
+  it('keeps deleted-scene history and clipboard controls connected to the selected versions', () => {
+    const boardSource = readFileSync('components/Board.tsx', 'utf8');
+    const sidebarSource = readFileSync('components/BoardVersionHistorySidebar.tsx', 'utf8');
+    const deletedHistorySource = readFileSync('components/DeletedSceneHistory.tsx', 'utf8');
+    const editorHistorySource = readFileSync('components/editor/EditorHistoryPanel.tsx', 'utf8');
+
+    expect(boardSource).toContain('deletedSceneHistory={sceneHistoryBookId');
+    expect(sidebarSource).toContain('<DeletedSceneHistory key={deletedSceneHistory.bookId}');
+    expect(deletedHistorySource).toContain('<CopySceneVersionTextButton key={selected.id} content={selected.content}');
+    expect(editorHistorySource).toContain('<CopySceneVersionTextButton');
+    expect(editorHistorySource).toContain('content={selectedVersion.content}');
   });
 
   it('backs up the current board before restoring a deleted scene', () => {

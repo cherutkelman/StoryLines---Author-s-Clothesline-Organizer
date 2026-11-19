@@ -3,10 +3,15 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  getDocsFromServer,
+  limit,
+  orderBy,
   query,
   setDoc,
+  startAfter,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -18,6 +23,13 @@ import { logSceneHistoryDebug } from './scene-history-debug';
 import { canDeleteSceneVersion, normalizeSceneVersionName } from './scene-history';
 
 const LOCAL_SCENE_VERSIONS_KEY = 'storylines_scene_versions_v1';
+const SCENE_VERSION_PAGE_SIZE = 25;
+
+export interface SceneVersionPage {
+  versions: SceneVersion[];
+  scannedCount: number;
+  nextCursor?: string;
+}
 export const getSceneVersionDocumentPath = (bookId: string, versionId: string) =>
   ['books', bookId, 'sceneVersions', versionId] as const;
 
@@ -41,14 +53,16 @@ export const stripLegacySceneVersionsFromBook = <T extends Book>(book: T): T => 
 };
 
 export class LocalSceneVersionStorageProvider implements SceneVersionStorageProvider {
-  private loadAll(): SceneVersion[] {
+  private loadAll(strict = false): SceneVersion[] {
     const saved = localStorage.getItem(LOCAL_SCENE_VERSIONS_KEY);
     if (!saved) return [];
 
     try {
       const parsed = JSON.parse(saved);
+      if (strict && !Array.isArray(parsed)) throw new TypeError('Invalid scene version collection.');
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
+      if (strict) throw error;
       console.error('[LocalSceneVersionStorageProvider] Failed to parse scene versions', error);
       return [];
     }
@@ -94,7 +108,7 @@ export class LocalSceneVersionStorageProvider implements SceneVersionStorageProv
   }
 
   async loadAllSceneVersionsForBook(bookId: string): Promise<SceneVersion[]> {
-    return sortNewestFirst(this.loadAll().filter(version => version.bookId === bookId));
+    return sortNewestFirst(this.loadAll(true).filter(version => version.bookId === bookId));
   }
 
   async renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void> {
@@ -181,6 +195,20 @@ export class FirestoreSceneVersionStorageProvider implements SceneVersionStorage
     return sortNewestFirst(snap.docs.map(docSnap => docSnap.data() as SceneVersion));
   }
 
+  async loadSceneVersionPage(bookId: string, cursor?: string): Promise<SceneVersionPage> {
+    const page = await getDocsFromServer(query(
+      this.getVersionsCollection(bookId),
+      orderBy(documentId()),
+      ...(cursor ? [startAfter(cursor)] : []),
+      limit(SCENE_VERSION_PAGE_SIZE),
+    ));
+    return {
+      versions: page.docs.map(snapshot => snapshot.data() as SceneVersion),
+      scannedCount: page.size,
+      nextCursor: page.size === SCENE_VERSION_PAGE_SIZE ? page.docs.at(-1)?.id : undefined,
+    };
+  }
+
   async renameSceneVersion(bookId: string, versionId: string, name?: string): Promise<void> {
     const normalizedName = normalizeSceneVersionName(name);
     const versionRef = doc(db, ...getSceneVersionDocumentPath(bookId, versionId));
@@ -248,6 +276,22 @@ export class SceneVersionStorageService {
 
   getLocalProvider(): LocalSceneVersionStorageProvider {
     return this.localProvider;
+  }
+
+  async loadSceneVersionPage(bookId: string, cursor?: string): Promise<SceneVersionPage> {
+    if (isWeb) return this.remoteProvider.loadSceneVersionPage(bookId, cursor);
+
+    const localVersions = cursor ? [] : await this.localProvider.loadAllSceneVersionsForBook(bookId);
+    if (storageManager.getMode() !== 'cloud') {
+      return { versions: localVersions, scannedCount: localVersions.length };
+    }
+
+    const page = await this.remoteProvider.loadSceneVersionPage(bookId, cursor);
+    return {
+      ...page,
+      versions: this.mergeVersions(localVersions, page.versions),
+      scannedCount: localVersions.length + page.scannedCount,
+    };
   }
 
   async saveSceneVersion(version: SceneVersion): Promise<void> {
