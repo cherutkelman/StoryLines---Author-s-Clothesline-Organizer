@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { loadBooks, saveBooks, getOrCreateUserId, createNewBook, updateBookAndSharedFields, softDeleteBookInList, updateBookInList, syncService, SyncState, SyncStatus, loadUIStates, saveUIStates, loadGlobalUIState, saveGlobalUIState, syncLogger, setUserId, migrateLegacyBooks, setStorageMode, deduplicateBooks, storageManager } from "./storage";
 import { auth, completeRedirectSignIn, isFirebaseConfigured, logOut as logout, missingFirebaseEnvVars, signIn as signInWithGoogle } from './src/firebase';
 import { isElectron, isWeb, restartDesktopApp, subscribeToDesktopUpdates } from './src/platform';
@@ -16,6 +16,7 @@ import {
   Share2,
   Wand2,
   Download,
+  History,
   Upload,
   Settings2,
   MonitorSmartphone,
@@ -60,6 +61,7 @@ import { Scene, Plotline, Project, Book, QuestionnaireEntry, CharacterMapConnect
 import Board from './components/Board';
 import Editor from './components/Editor';
 import { useMobileEditorViewport } from './src/editor/mobileEditorViewport';
+import { getEditorSceneInsertionAfter } from './components/editor/editorSceneActions';
 import Questionnaires from './components/Questionnaires';
 import MapsManager from './components/MapsManager';
 import PlotStructure from './components/PlotStructure';
@@ -79,6 +81,7 @@ import {
 import { sceneVersionStorage } from './src/scene-version-storage';
 import { createAutomaticBoardVersionOnExit, createBoardSnapshot, createBoardVersion } from './src/board-history';
 import { boardVersionStorage } from './src/board-version-storage';
+import { canAccessBoardHistory } from './src/board-version-history-ui';
 import {
   chooseSceneVersionForDeletedSceneRestore,
   getHistoricalChapterForScene,
@@ -371,6 +374,8 @@ const App: React.FC = () => {
   const [storageMode, setStorageModeState] = useState<'local' | 'cloud'>(storageManager.getMode());
   const [activeView, setActiveView] = useState<AppView>('board');
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
+  const [boardHistoryBookId, setBoardHistoryBookId] = useState<string | null>(null);
+  const [boardPreviewVersion, setBoardPreviewVersion] = useState<BoardVersion | null>(null);
   const [editorMobileSearchQuery, setEditorMobileSearchQuery] = useState('');
   const [editorMobileMenuHost, setEditorMobileMenuHost] = useState<HTMLDivElement | null>(null);
   const [editorMobileWordCountHost, setEditorMobileWordCountHost] = useState<HTMLDivElement | null>(null);
@@ -413,6 +418,18 @@ const App: React.FC = () => {
     books.find(b => b.id === activeBookId) || books[0], 
     [books, activeBookId]
   );
+  const historyBookId = activeBook?.id;
+  const isBoardPreviewActive = Boolean(historyBookId && boardPreviewVersion?.bookId === historyBookId);
+  const canOpenBoardHistory = canAccessBoardHistory(activeBook, isWeb || storageMode === 'cloud', user?.uid);
+  const loadActiveBoardVersions = useCallback(
+    () => historyBookId ? boardVersionStorage.loadBoardVersions(historyBookId) : [],
+    [historyBookId],
+  );
+
+  useEffect(() => {
+    setBoardHistoryBookId(openBookId =>
+      activeView === 'board' && canOpenBoardHistory && openBookId === historyBookId ? openBookId : null);
+  }, [activeView, canOpenBoardHistory, historyBookId]);
 
   const activeUI = useMemo(() => 
     uiStates[activeBookId] || (activeBook ? uiStates[activeBook.id] : {}) || {},
@@ -1040,6 +1057,28 @@ const App: React.FC = () => {
     setIsMobileLibraryOpen(false);
   };
 
+  const handleBoardHistoryOpenChange = (open: boolean) => {
+    if (!open) {
+      setBoardHistoryBookId(null);
+      return;
+    }
+    if (activeView !== 'board' || !historyBookId || !canOpenBoardHistory) return;
+
+    if (isMobileLibraryOpen) {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.matches('input, textarea, [contenteditable="true"]')) focused.blur();
+      setIsMobileLibraryOpen(false);
+    }
+    setBoardHistoryBookId(historyBookId);
+  };
+
+  const openBoardBulkAdd = (plotlineId: string) => {
+    if (!activeBook || isBoardPreviewActive) return;
+    setBulkPlotlineId(plotlineId);
+    setIsMobileLibraryOpen(false);
+    setIsBulkAddOpen(true);
+  };
+
   const handleQuestionnaireTabChange = (tab: QuestionnaireTabId) => {
     updateBookUiState({ questionnaireActiveTab: tab });
   };
@@ -1125,7 +1164,7 @@ const App: React.FC = () => {
 
   const deletePlotline = (id: string) => {
     if (!activeBook || activeBook.plotlines.length <= 1) return;
-    if (confirm('מחיקת קו עלילה תשאיר את הסצנות שלו יתומות. להמשיך?')) {
+    if (confirm('מחיקת קו העלילה תמחק גם את כל הסצנות המשויכות אליו. להמשיך?')) {
       const deletedPositions = activeBook.scenes
         .filter(s => s.plotlineId === id)
         .map(s => s.position)
@@ -1173,6 +1212,14 @@ const App: React.FC = () => {
     const updates = addSceneToBookSequence(activeBook, newScene, targetSequenceIndex);
     if (!updates) return;
     updateActiveBook(updates);
+    return newScene.id;
+  };
+
+  const addSceneAfterEditorScene = (sceneId: string) => {
+    if (!activeBook || activeBook.id !== activeBookId) return;
+    const placement = getEditorSceneInsertionAfter(activeBook, sceneId);
+    if (!placement) return;
+    return addSceneInSequence(placement.plotlineId, placement.sequenceIndex);
   };
 
   const restoreDeletedBoardSceneFromVersion = async (version: BoardVersion, sceneId: string): Promise<{ success: boolean; message?: string }> => {
@@ -2153,6 +2200,17 @@ const App: React.FC = () => {
                                 </button>
                               );
                             })}
+                            {activeBook && (
+                              <button
+                                type="button"
+                                disabled={isBoardPreviewActive}
+                                onClick={() => openBoardBulkAdd(activeBook.plotlines[0]?.id || '')}
+                                className="w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right text-[var(--theme-primary)]/60 enabled:hover:bg-[var(--theme-secondary)] enabled:hover:text-[var(--theme-primary)] disabled:opacity-40"
+                              >
+                                <CopyPlus size={16} aria-hidden="true" />
+                                <span className="flex-1">הוספה מהירה</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => {
                                 handleViewChange('board');
@@ -2164,6 +2222,41 @@ const App: React.FC = () => {
                               <Download size={16} />
                               <span className="flex-1">ייצוא לוח</span>
                             </button>
+                            {canOpenBoardHistory && (
+                              <button
+                                type="button"
+                                onClick={() => handleBoardHistoryOpenChange(true)}
+                                className="w-full min-h-11 flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-right transition-all text-[var(--theme-primary)]/60 hover:bg-[var(--theme-secondary)] hover:text-[var(--theme-primary)]"
+                              >
+                                <History size={16} aria-hidden="true" />
+                                <span className="flex-1">היסטוריית גרסאות</span>
+                              </button>
+                            )}
+                            {activeBook && (
+                              <details key={activeBook.id} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-primary)]">
+                                <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-bold">קווי עלילה</summary>
+                                <fieldset disabled={isBoardPreviewActive} className="min-w-0 space-y-2 px-2 pb-2 disabled:opacity-60">
+                                  <legend className="sr-only">ניהול קווי עלילה</legend>
+                                  <button type="button" onClick={addPlotline}
+                                    className="flex min-h-11 w-full items-center gap-2 rounded-lg bg-[var(--theme-secondary)] px-2 text-sm font-bold">
+                                    <Plus size={16} aria-hidden="true" /> הוסף קו עלילה
+                                  </button>
+                                  {activeBook.plotlines.map((plotline, index) => (
+                                    <div key={plotline.id} className="flex min-w-0 items-center gap-1">
+                                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: plotline.color }} aria-hidden="true" />
+                                      <input type="text" aria-label={`שם קו עלילה ${index + 1}`} value={plotline.name}
+                                        onChange={event => renamePlotline(plotline.id, event.target.value)}
+                                        className="min-h-11 min-w-0 flex-1 rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 text-base" />
+                                      <button type="button" aria-label={`מחק קו עלילה: ${plotline.name || index + 1}`}
+                                        disabled={activeBook.plotlines.length <= 1} onClick={() => deletePlotline(plotline.id)}
+                                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md hover:bg-[var(--theme-secondary)] disabled:opacity-40">
+                                        <Trash2 size={16} aria-hidden="true" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </fieldset>
+                              </details>
+                            )}
                           </div>
                         )}
 
@@ -2533,7 +2626,7 @@ const App: React.FC = () => {
                     updateScene={updateScene} 
                     onDeleteScene={deleteScene}
                     onUpdateSummary={(summary) => updateActiveBook({ summary })}
-                    onBulkAdd={(pId) => { setBulkPlotlineId(pId); setIsBulkAddOpen(true); }} 
+                    onBulkAdd={openBoardBulkAdd}
                     initialZoom={activeUI.boardZoomLevel}
                     onZoomChange={(z) => updateBookUiState({ boardZoomLevel: z })}
                     initialViewMode={activeUI.boardViewMode}
@@ -2553,8 +2646,11 @@ const App: React.FC = () => {
                     onTimelineChange={(timeline) => updateActiveBook({ timeline })}
                     timelineCollapsedGroupIds={activeUI.timelineCollapsedGroupIds}
                     onTimelineCollapsedGroupIdsChange={(groupIds) => updateBookUiState({ timelineCollapsedGroupIds: groupIds })}
-                    onLoadBoardVersions={() => boardVersionStorage.loadBoardVersions(activeBook.id)}
-                    sceneHistoryBookId={activeBook.id}
+                    onLoadBoardVersions={canOpenBoardHistory ? loadActiveBoardVersions : undefined}
+                    sceneHistoryBookId={canOpenBoardHistory ? activeBook.id : undefined}
+                    isVersionHistoryOpen={canOpenBoardHistory && boardHistoryBookId === activeBook.id}
+                    onVersionHistoryOpenChange={handleBoardHistoryOpenChange}
+                    onPreviewVersionChange={setBoardPreviewVersion}
                   />
                 </div>
               )}
@@ -2571,6 +2667,7 @@ const App: React.FC = () => {
                     onUpdateScene={updateScene} 
                     onDeleteScene={deleteScene}
                     onOpenBulkAdd={() => setIsBulkAddOpen(true)} 
+                    onAddSceneAfter={addSceneAfterEditorScene}
                     initialFocusedSceneId={activeUI.editorFocusedSceneId}
                     onFocusScene={async (id, previousSceneSnapshot) => {
                       const previousSceneId = focusedEditorSceneIdRef.current;

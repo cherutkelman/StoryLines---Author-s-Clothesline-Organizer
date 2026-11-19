@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BoardVersion } from '../types';
 import {
   BOARD_HISTORY_EMPTY_MESSAGE,
+  canAccessBoardHistory,
   createBoardPreviewProject,
   getBoardVersionDisplayName,
   isBoardVersionPreviewReadOnly,
@@ -29,6 +30,17 @@ const createVersion = (
 });
 
 describe('board version history UI helpers', () => {
+  it('matches owner and member access for cloud history and supports local books', () => {
+    const book = { ownerId: 'owner', memberIds: ['member'] };
+    expect(canAccessBoardHistory(undefined, false)).toBe(false);
+    expect(canAccessBoardHistory({ ...book, deletedAt: 10 }, true, 'owner')).toBe(false);
+    expect(canAccessBoardHistory(book, true)).toBe(false);
+    expect(canAccessBoardHistory(book, true, 'other')).toBe(false);
+    expect(canAccessBoardHistory(book, true, 'owner')).toBe(true);
+    expect(canAccessBoardHistory(book, true, 'member')).toBe(true);
+    expect(canAccessBoardHistory(book, false)).toBe(true);
+  });
+
   it('exposes the empty state text for an empty sidebar list', () => {
     expect(prepareBoardVersionList([])).toEqual([]);
     expect(BOARD_HISTORY_EMPTY_MESSAGE).toBe('עדיין לא נשמרו גרסאות ללוח העלילה.');

@@ -65,27 +65,27 @@ const BoardVersionHistorySidebar: React.FC<BoardVersionHistorySidebarProps> = ({
 
   return (
     <aside
-      className="fixed bottom-0 right-0 top-0 z-[100] flex h-full w-full max-w-md flex-col border-r border-[var(--theme-border)] bg-[var(--theme-card)] shadow-2xl"
+      className="fixed bottom-0 right-0 top-0 z-[100] flex h-full max-h-[100dvh] w-full max-w-md flex-col border-r border-[var(--theme-border)] bg-[var(--theme-card)] shadow-2xl"
       dir="rtl"
     >
-      <header className="flex items-center justify-between gap-4 border-b border-[var(--theme-border)] bg-[var(--theme-secondary)]/20 px-6 py-5">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-secondary)]/20 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-4 sm:px-6 sm:py-5">
         <div className="min-w-0">
           <h2 className="text-xl font-black text-[var(--theme-primary)]">היסטוריית גרסאות</h2>
-          <p className="truncate text-sm font-bold text-[var(--theme-primary)]/50">
+          <p className="break-words text-sm font-bold text-[var(--theme-primary)]/50 sm:truncate">
             {boardTitle || 'לוח העלילה'}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-2 text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[var(--theme-primary)] hover:bg-[var(--theme-secondary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--theme-primary)]"
           aria-label="סגור"
         >
           <X size={24} />
         </button>
       </header>
 
-      <section className="min-h-0 flex-1 overflow-y-auto bg-[var(--theme-secondary)]/10 p-4">
+      <section className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--theme-secondary)]/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {deletedSceneHistory && (
           <DeletedSceneHistory key={deletedSceneHistory.bookId} {...deletedSceneHistory} />
         )}
@@ -126,7 +126,7 @@ const BoardVersionHistorySidebar: React.FC<BoardVersionHistorySidebarProps> = ({
                   }`}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-black">{item.displayName}</span>
+                    <span className="min-w-0 break-words text-sm font-black sm:truncate">{item.displayName}</span>
                     <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-black ${isActive ? 'bg-white/20' : 'bg-[var(--theme-secondary)]'}`}>
                       {item.typeLabel}
                     </span>
@@ -134,9 +134,9 @@ const BoardVersionHistorySidebar: React.FC<BoardVersionHistorySidebarProps> = ({
                   <div className={`text-xs font-bold ${isActive ? 'text-[var(--theme-card)]/70' : 'text-[var(--theme-primary)]/50'}`}>
                     {item.dateLabel} · {item.timeLabel}
                   </div>
-                  <div className={`mt-1 flex items-center justify-between gap-2 text-[10px] font-black ${isActive ? 'text-[var(--theme-card)]/80' : 'text-[var(--theme-primary)]/35'}`}>
+                  <div className={`mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black ${isActive ? 'text-[var(--theme-card)]/80' : 'text-[var(--theme-primary)]/35'}`}>
                     <span>{item.reasonLabel}</span>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {isActive && (
                         <span className="rounded bg-white/20 px-2 py-0.5">
                           מוצגת עכשיו

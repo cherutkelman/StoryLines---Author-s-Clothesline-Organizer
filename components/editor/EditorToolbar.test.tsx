@@ -121,6 +121,23 @@ describe('editor toolbar menus', () => {
     expect(counter).not.toMatch(/sticky|absolute|fixed/);
   });
 
+  it.each(['toolbar', 'drawer'] as const)('routes single and bulk insertion to separate callbacks in the %s', placement => {
+    const state = { ...props(), placement, openMenu: 'write' as const, onAddSceneAfter: vi.fn() };
+    const tree = EditorToolbarContent(state);
+    const click = (label: string) => {
+      const button = findButton(tree, props => React.Children.toArray(props.children).some(child =>
+        React.isValidElement<{ children: string }>(child) && child.props.children === label));
+      expect(button?.onClick).toBeDefined();
+      button?.onClick?.({} as React.MouseEvent<HTMLButtonElement>);
+    };
+    click('הוסף סצנה אחרי הסצנה הנוכחית');
+    expect(state.onAddSceneAfter).toHaveBeenCalledOnce();
+    expect(state.onOpenBulkAdd).not.toHaveBeenCalled();
+    click('סצנה חדשה');
+    expect(state.onOpenBulkAdd).toHaveBeenCalledOnce();
+    expect(state.onAddSceneAfter).toHaveBeenCalledOnce();
+  });
+
   it('mounts mobile actions only in the active editor navigation and keeps the count outside the scroll area', () => {
     const app = readFileSync('App.tsx', 'utf8');
     const toolbar = readFileSync('components/editor/EditorToolbar.tsx', 'utf8');

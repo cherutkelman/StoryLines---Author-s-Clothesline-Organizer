@@ -1,5 +1,6 @@
 
 import React, { useCallback, useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Scene, QuestionnaireEntry } from '../types';
 import { canDeleteSceneVersion, diffText, hasTextDiffChanges, resolveSceneHistorySceneId } from '../src/scene-history';
 import { logSceneHistoryDebug } from '../src/scene-history-debug';
@@ -11,6 +12,7 @@ import EditorToolbar from './editor/EditorToolbar';
 import { useEditorTextScale } from './editor/editorTextScale';
 import { resizeSceneTextarea } from './editor/sceneTextareaSize';
 import { addChapterFromEditor } from './editor/editorChapterActions';
+import { focusEditorSceneBody } from './editor/editorSceneActions';
 import { captureSceneCollapseAnchor, getSceneExpansionChange } from './editor/sceneCollapseScroll';
 import EditorSceneList, { getEditorChapterTargetId, getEditorSceneTargetId } from './editor/EditorSceneList';
 import EditorHistoryPanel from './editor/EditorHistoryPanel';
@@ -139,6 +141,7 @@ const AutoExpandingTextarea: React.FC<{
       )}
       <textarea
         ref={textareaRef}
+        data-editor-scene-body
         className={className}
         value={localValue}
         placeholder={placeholder}
@@ -192,7 +195,7 @@ const DebouncedInput: React.FC<{
   );
 };
 
-const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, onAddChapterDivider, onRenameChapter, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, mobileMenuHost, mobileWordCountHost, onCloseMobileMenu, appActiveSceneId }) => {
+const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines, onUpdateScene, onDeleteScene, onOpenBulkAdd, onAddSceneAfter, onAddChapterDivider, onRenameChapter, initialFocusedSceneId, onFocusScene, initialExpandedSceneIds, onExpandedScenesChange, initialDisplayMode, onDisplayModeChange, onExport, sceneVersions = [], onLoadSceneVersions, onCreateManualSceneVersion, onRestoreSceneVersion, onCopySceneVersion, onDeleteSceneVersion, onRenameSceneVersion, onUpdateChapterMarker, isLibrarySidebarCollapsed = false, externalSearchQuery, onExternalSearchQueryChange, mobileMenuHost, mobileWordCountHost, onCloseMobileMenu, appActiveSceneId }) => {
   const [displayMode, setDisplayMode] = useState<'full' | 'focus'>(initialDisplayMode || 'focus');
   const { textScale, setTextScale } = useEditorTextScale();
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
@@ -230,6 +233,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const sceneContentDraftsRef = useRef<Record<string, string>>({});
   const sceneTitleDraftsRef = useRef<Record<string, string>>({});
   const lastInteractedSceneIdRef = useRef<string | null>(initialFocusedSceneId || null);
+  const lastWritingSceneRef = useRef<{ bookId: string; sceneId: string } | null>(null);
   const deleteInFlightVersionIdRef = useRef<string | null>(null);
   const renameInFlightVersionIdRef = useRef<string | null>(null);
   const activeSearchQuery = externalSearchQuery ?? searchQuery;
@@ -276,6 +280,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const handleFocusScene = async (id: string | null) => {
+    if (lastWritingSceneRef.current?.sceneId !== id) lastWritingSceneRef.current = null;
     if (isValidSceneId(id)) {
       lastInteractedSceneIdRef.current = id;
       setDisplayedSceneId(id);
@@ -305,6 +310,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     }
     lastInteractedSceneIdRef.current = id;
     const change = getSceneExpansionChange(expandedSceneIds, focusedSceneId, id);
+    if (change.closing && lastWritingSceneRef.current?.sceneId === id) lastWritingSceneRef.current = null;
     pendingCollapseAnchorRef.current = change.closing
       ? captureSceneCollapseAnchor(document.getElementById(getEditorSceneTargetId(id)))
       : null;
@@ -539,6 +545,28 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
     if (searchExpandedSceneId === sceneId && displayMode === 'focus' && !expandedSceneIds.includes(sceneId)) {
       handleExpandedScenesChange([...expandedSceneIds, sceneId]);
     }
+  };
+
+  const handleAddSceneAfter = () => {
+    const writing = lastWritingSceneRef.current;
+    if (!writing || writing.bookId !== bookId || !activeScenes.some(scene => scene.id === writing.sceneId)
+      || (displayMode === 'focus' && !expandedSceneIds.includes(writing.sceneId))) {
+      window.alert('יש למקם את סמן הכתיבה בגוף הסצנה שאחריה תרצי להוסיף סצנה.');
+      return;
+    }
+
+    let createdSceneId: string | undefined;
+    // Mount the new textarea in the same user gesture so mobile can grant typing focus.
+    flushSync(() => {
+      createdSceneId = onAddSceneAfter?.(writing.sceneId);
+      if (!createdSceneId) return;
+      if (displayMode === 'focus') handleExpandedScenesChange([...expandedSceneIds, createdSceneId]);
+    });
+    if (!createdSceneId) {
+      window.alert('הסצנה או קו העלילה שלה אינם זמינים. יש לבחור סצנה מחדש.');
+      return;
+    }
+    focusEditorSceneBody(createdSceneId, document);
   };
 
   const scrollToEditorTarget = (targetId: string, waitForRender = false) => {
@@ -853,7 +881,13 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
           </nav>
         )}
       </aside>
-      <main className="min-w-0 w-full max-w-4xl flex-1">
+      <main className="min-w-0 w-full max-w-4xl flex-1" onFocusCapture={event => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.matches('input, textarea')
+          && !target.closest('[data-editor-scene-body], [data-editor-toolbar], [data-editor-drawer-menus]')) {
+          lastWritingSceneRef.current = null;
+        }
+      }}>
       <EditorToolbar
         mobileMenuHost={mobileMenuHost}
         mobileWordCountHost={mobileWordCountHost}
@@ -872,6 +906,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
         onSearchOpenChange={setIsSearchOpen}
         onSearchQueryChange={updateSearchQuery}
         onOpenBulkAdd={onOpenBulkAdd}
+        onAddSceneAfter={onAddSceneAfter ? handleAddSceneAfter : undefined}
         onNewChapter={onAddChapterDivider ? () => addChapterFromEditor(
           project, [focusedSceneId, displayedSceneId, lastInteractedSceneIdRef.current], onAddChapterDivider,
         ) : undefined}
@@ -973,6 +1008,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
                       }}
                       minRows={5}
                       onFocus={() => {
+                        lastWritingSceneRef.current = { bookId, sceneId: scene.id };
                         keepSearchSceneOpenForEditing(scene.id);
                         void handleFocusScene(scene.id);
                       }}

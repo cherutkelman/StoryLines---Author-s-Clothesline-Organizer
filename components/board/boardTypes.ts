@@ -30,6 +30,8 @@ export interface BoardProps {
   onTimelineCollapsedGroupIdsChange?: (groupIds: string[]) => void;
   onLoadBoardVersions?: () => Promise<BoardVersion[]> | BoardVersion[];
   sceneHistoryBookId?: string;
+  isVersionHistoryOpen: boolean;
+  onVersionHistoryOpenChange: (open: boolean) => void;
   onPreviewVersionChange?: (version: BoardVersion | null) => void;
 }
 

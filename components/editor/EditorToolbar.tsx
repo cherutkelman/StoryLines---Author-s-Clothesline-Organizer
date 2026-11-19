@@ -19,6 +19,7 @@ interface EditorToolbarProps {
   onSearchOpenChange: (isOpen: boolean) => void;
   onSearchQueryChange: (query: string) => void;
   onOpenBulkAdd: () => void;
+  onAddSceneAfter?: () => void;
   onNewChapter?: () => void;
   onOpenQuestionnaireBridge: () => void;
   onExport?: () => void;
@@ -58,7 +59,7 @@ export function EditorWordCount({ totalWords }: { totalWords: number }) {
 export function EditorToolbarContent({
   textScale, onTextScaleChange, totalWords, displayMode, isSearchOpen, searchQuery, hasActiveScene,
   searchResultCount = 0, activeSearchResult = 0, onNavigateSearch,
-  onDisplayModeChange, onSearchOpenChange, onSearchQueryChange, onOpenBulkAdd, onNewChapter,
+  onDisplayModeChange, onSearchOpenChange, onSearchQueryChange, onOpenBulkAdd, onAddSceneAfter, onNewChapter,
   onOpenQuestionnaireBridge, onExport, onOpenHistory, onOpenTips, menuId, menuRegionRef,
   openMenu, onMenuToggle, onMenuAction, placement = 'toolbar',
 }: EditorToolbarContentProps) {
@@ -117,6 +118,11 @@ export function EditorToolbarContent({
                   <button type="button" className={actionClass} onClick={() => onMenuAction(onOpenBulkAdd)}>
                     <Plus size={14} aria-hidden="true" /><span>סצנה חדשה</span>
                   </button>
+                  {onAddSceneAfter && (
+                    <button type="button" className={actionClass} onClick={() => onMenuAction(onAddSceneAfter)}>
+                      <Plus size={14} aria-hidden="true" className="shrink-0" /><span>הוסף סצנה אחרי הסצנה הנוכחית</span>
+                    </button>
+                  )}
                   {onNewChapter && (
                     <button type="button" className={actionClass} aria-label="פרק חדש" onClick={() => onMenuAction(onNewChapter)}>
                       <Plus size={14} aria-hidden="true" /><span>פרק חדש</span>

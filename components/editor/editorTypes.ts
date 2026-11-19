@@ -8,6 +8,7 @@ export interface EditorProps {
   onUpdateScene: (id: string, updates: Partial<Scene>) => void;
   onDeleteScene: (id: string) => void;
   onOpenBulkAdd: () => void;
+  onAddSceneAfter?: (sceneId: string) => string | undefined;
   onAddChapterDivider?: (sequenceIndex: number) => void;
   onRenameChapter?: (chapterId: string, title: string) => void;
   initialFocusedSceneId?: string | null;

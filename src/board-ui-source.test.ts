@@ -40,6 +40,62 @@ describe('board UI source', () => {
     expect(sidebarSource).not.toContain('bg-black/35');
     expect(sidebarSource).not.toContain('backdrop-blur');
     expect(sidebarSource).not.toContain('className="absolute inset-0 cursor-default"');
+    expect(sidebarSource).toContain('max-h-[100dvh]');
+    expect(sidebarSource).toContain('overflow-y-auto overscroll-contain');
+    expect(sidebarSource).toContain('dir="rtl"');
+  });
+
+  it('offers history under the active mobile board only with access and closes the drawer without writing', () => {
+    const app = readFileSync('App.tsx', 'utf8');
+    const mobileBoard = app.slice(app.indexOf('{isBoardItem && isActive && ('), app.indexOf('{isEditorItem && isActive && activeBook && ('));
+    expect(mobileBoard).toContain('{canOpenBoardHistory && (');
+    expect(mobileBoard).toContain('היסטוריית גרסאות');
+    expect(mobileBoard).toContain('onClick={() => handleBoardHistoryOpenChange(true)}');
+    const handler = app.slice(app.indexOf('const handleBoardHistoryOpenChange'), app.indexOf('const handleQuestionnaireTabChange'));
+    expect(handler).toContain('setIsMobileLibraryOpen(false)');
+    expect(handler).toContain('setBoardHistoryBookId(historyBookId)');
+    expect(handler).toContain('setBoardHistoryBookId(null)');
+    expect(handler).not.toMatch(/updateActiveBook|save|flush|handleViewChange/);
+  });
+
+  it('connects both entry points to a single sidebar and scopes its open state and preview to the current book', () => {
+    const app = readFileSync('App.tsx', 'utf8');
+    const board = readFileSync('components/Board.tsx', 'utf8');
+    expect(board.match(/<BoardVersionHistorySidebar\b/g)).toHaveLength(1);
+    expect(board).toContain('onOpenHistory={() => onVersionHistoryOpenChange(true)}');
+    expect(board).toContain('onClose={() => onVersionHistoryOpenChange(false)}');
+    expect(board).toMatch(/<BoardVersionHistorySidebar\s+key=\{sceneHistoryBookId\}/);
+    expect(board).toContain('selectedPreviewVersion?.bookId === sceneHistoryBookId');
+    expect(app).toContain('isVersionHistoryOpen={canOpenBoardHistory && boardHistoryBookId === activeBook.id}');
+    expect(app).toContain("activeView === 'board' && canOpenBoardHistory && openBookId === historyBookId");
+  });
+
+  it('moves mobile quick add into the board drawer and keeps historical previews read-only', () => {
+    const app = readFileSync('App.tsx', 'utf8');
+    const toolbar = readFileSync('components/board/BoardToolbar.tsx', 'utf8');
+    const mobileBoard = app.slice(app.indexOf('{isBoardItem && isActive && ('), app.indexOf('{isEditorItem && isActive && activeBook && ('));
+    const open = app.slice(app.indexOf('const openBoardBulkAdd'), app.indexOf('const handleQuestionnaireTabChange'));
+    expect(toolbar).toMatch(/hidden items-center gap-3 lg:flex">\s*<button onClick=\{props.onBulkAdd\}/);
+    expect(mobileBoard).toContain('הוספה מהירה');
+    expect(mobileBoard).toContain('disabled={isBoardPreviewActive}');
+    expect(mobileBoard).toContain('openBoardBulkAdd(activeBook.plotlines[0]?.id');
+    expect(open).toContain('if (!activeBook || isBoardPreviewActive) return');
+    expect(open).toContain('setIsMobileLibraryOpen(false)');
+    expect(open).toContain('setIsBulkAddOpen(true)');
+    expect(app).toContain('onBulkAdd={openBoardBulkAdd}');
+    expect(app).toContain('onPreviewVersionChange={setBoardPreviewVersion}');
+  });
+
+  it('exposes plotline management in the mobile board drawer with the existing handlers', () => {
+    const app = readFileSync('App.tsx', 'utf8');
+    const mobileBoard = app.slice(app.indexOf('{isBoardItem && isActive && ('), app.indexOf('{isEditorItem && isActive && activeBook && ('));
+    expect(mobileBoard).toContain('קווי עלילה</summary>');
+    expect(mobileBoard).toContain('onClick={addPlotline}');
+    expect(mobileBoard).toContain('renamePlotline(plotline.id, event.target.value)');
+    expect(mobileBoard).toContain('onClick={() => deletePlotline(plotline.id)}');
+    expect(mobileBoard).toContain('disabled={activeBook.plotlines.length <= 1}');
+    expect(mobileBoard).toContain('<fieldset disabled={isBoardPreviewActive}');
+    expect(app).toContain('תמחק גם את כל הסצנות המשויכות אליו');
   });
 
   it('keeps board version compare and restore UI out of the final board preview flow', () => {

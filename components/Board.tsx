@@ -46,13 +46,15 @@ const Board: React.FC<BoardProps> = ({
   onTimelineCollapsedGroupIdsChange,
   onLoadBoardVersions,
   sceneHistoryBookId,
+  isVersionHistoryOpen,
+  onVersionHistoryOpenChange,
   onPreviewVersionChange,
 }) => {
   const dragItem = useRef<{ type: 'scene'; sceneId: string } | { type: 'chapter-divider'; chapterId: string } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(initialZoom || 1);
   const [viewMode, setViewMode] = useState<BoardViewMode>(initialViewMode || 'plotlines');
-  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
-  const [previewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
+  const [selectedPreviewVersion, setPreviewVersion] = useState<BoardVersion | null>(null);
+  const previewVersion = selectedPreviewVersion?.bookId === sceneHistoryBookId ? selectedPreviewVersion : null;
   const boardRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const [timelineSelectionControlsHost, setTimelineSelectionControlsHost] = useState<HTMLDivElement | null>(null);
@@ -62,6 +64,10 @@ const Board: React.FC<BoardProps> = ({
   const effectiveVisiblePlotlines = isPreviewMode
     ? boardProject.plotlines.map(plotline => plotline.id)
     : visiblePlotlines;
+
+  useEffect(() => {
+    setPreviewVersion(null);
+  }, [sceneHistoryBookId]);
 
   useEffect(() => {
     onPreviewVersionChange?.(previewVersion);
@@ -348,14 +354,15 @@ const Board: React.FC<BoardProps> = ({
         onViewModeChange={handleViewModeChange}
         onBulkAdd={() => { if (!isPreviewMode) onBulkAdd(boardProject.plotlines[0]?.id || ''); }}
         onExport={exportBoard}
-        onOpenHistory={() => setIsVersionHistoryOpen(true)}
+        onOpenHistory={() => onVersionHistoryOpenChange(true)}
       />
 
       {(onLoadBoardVersions || sceneHistoryBookId) && (
         <BoardVersionHistorySidebar
+          key={sceneHistoryBookId}
           isOpen={isVersionHistoryOpen}
           boardTitle={title}
-          onClose={() => setIsVersionHistoryOpen(false)}
+          onClose={() => onVersionHistoryOpenChange(false)}
           onLoadVersions={onLoadBoardVersions}
           deletedSceneHistory={sceneHistoryBookId ? { bookId: sceneHistoryBookId, project } : undefined}
           activePreviewVersionId={previewVersion?.id ?? null}

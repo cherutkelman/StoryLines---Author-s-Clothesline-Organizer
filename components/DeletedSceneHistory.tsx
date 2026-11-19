@@ -94,7 +94,7 @@ export default function DeletedSceneHistory({ bookId, project }: DeletedSceneHis
           type="button"
           disabled={Boolean(request)}
           onClick={() => dispatch({ type: 'load' })}
-          className="rounded border border-[var(--theme-border)] px-3 py-2 font-bold disabled:opacity-50"
+          className="min-h-11 max-w-full rounded border border-[var(--theme-border)] px-3 py-2 font-bold disabled:opacity-50"
         >
           {error ? 'נסה שוב' : 'טען עוד גרסאות תוכן'}
         </button>
@@ -121,7 +121,7 @@ function SceneVersionPreview({ group, partial }: {
         <select
           value={selection}
           onChange={event => setSelection(event.target.value)}
-          className="mt-1 block w-full rounded border border-[var(--theme-border)] bg-[var(--theme-card)] p-2"
+          className="mt-1 block min-h-11 w-full min-w-0 rounded border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 text-base sm:text-sm"
         >
           <option value="">בחירת גרסה</option>
           {group.versions.map(version => (
@@ -134,7 +134,7 @@ function SceneVersionPreview({ group, partial }: {
       {selected && (
         <>
           <CopySceneVersionTextButton key={selected.id} content={selected.content} />
-          <pre dir="auto" className="whitespace-pre-wrap break-words rounded bg-[var(--theme-secondary)]/20 p-3 font-sans">
+          <pre dir="auto" className="whitespace-pre-wrap rounded bg-[var(--theme-secondary)]/20 p-3 font-sans [overflow-wrap:anywhere]">
             {describeSceneVersionContent(selected.content)}
           </pre>
         </>

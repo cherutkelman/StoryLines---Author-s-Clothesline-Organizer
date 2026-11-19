@@ -1,4 +1,15 @@
-import type { BoardVersion, BoardVersionReason, BoardVersionType, Project } from '../types';
+import type { BoardVersion, BoardVersionReason, BoardVersionType, Book, Project } from '../types';
+
+export function canAccessBoardHistory(
+  book: Pick<Book, 'ownerId' | 'memberIds' | 'deletedAt'> | undefined,
+  requiresCloudAccess: boolean,
+  userId?: string,
+): boolean {
+  if (!book || book.deletedAt) return false;
+  if (!requiresCloudAccess) return true;
+  return Boolean(userId && (book.ownerId === userId
+    || (Array.isArray(book.memberIds) && book.memberIds.includes(userId))));
+}
 
 export const BOARD_HISTORY_EMPTY_MESSAGE = 'עדיין לא נשמרו גרסאות ללוח העלילה.';
 

@@ -5,6 +5,7 @@ import type { Project, SceneVersion } from '../types';
 import BoardVersionHistorySidebar from '../components/BoardVersionHistorySidebar';
 import { FirestoreStorageProvider } from '../storage/firestore-provider';
 import { FirestoreSceneVersionStorageProvider } from './scene-version-storage';
+import { FirestoreBoardVersionStorageProvider } from './board-version-storage';
 import { groupMissingSceneVersions, readSceneInventory } from './deleted-scene-history';
 import {
   describeSceneVersionContent,
@@ -18,6 +19,11 @@ const firestore = vi.hoisted(() => ({
   collection: vi.fn((...path: unknown[]) => path),
   getDocFromServer: vi.fn(),
   getDocsFromServer: vi.fn(),
+  getDocs: vi.fn(),
+  setDoc: vi.fn(),
+  updateDoc: vi.fn(),
+  deleteDoc: vi.fn(),
+  writeBatch: vi.fn(),
   query: vi.fn((...parts: unknown[]) => parts),
   documentId: vi.fn(() => '__name__'),
   orderBy: vi.fn(),
@@ -42,6 +48,25 @@ const bookSnapshot = (data: object | undefined, hasPendingWrites = false) => ({
 
 describe('deleted scene history', () => {
   beforeEach(() => vi.resetAllMocks());
+
+  it('reads board snapshots, scene inventory, and content versions without writing', async () => {
+    firestore.getDocs.mockResolvedValue({ docs: [] });
+    firestore.getDocFromServer.mockResolvedValue(bookSnapshot({ id: 'book', ...emptyProject }));
+    firestore.getDocsFromServer.mockResolvedValue({
+      size: 1, docs: [{ data: () => version('deleted') }],
+    });
+
+    expect(await new FirestoreBoardVersionStorageProvider().loadBoardVersions('book')).toEqual([]);
+    expect((await new FirestoreStorageProvider().readBookSceneInventory('book')).complete).toBe(true);
+    const page = await new FirestoreSceneVersionStorageProvider().loadSceneVersionPage('book');
+    expect(page.versions[0]?.content).toBe('Full scene text');
+    expect(firestore.getDocs).toHaveBeenCalledOnce();
+    expect(firestore.getDocFromServer).toHaveBeenCalledOnce();
+    expect(firestore.getDocsFromServer).toHaveBeenCalledOnce();
+    for (const write of [firestore.setDoc, firestore.updateDoc, firestore.deleteDoc, firestore.writeBatch]) {
+      expect(write).not.toHaveBeenCalled();
+    }
+  });
 
   it('excludes hidden and orphaned scenes, groups missing versions newest first and scopes the book', () => {
     const active = { ...emptyProject, scenes: [hiddenScene] };
