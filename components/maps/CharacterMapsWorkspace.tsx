@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { CopyPlus, Plus, Trash2, Users } from 'lucide-react';
 import { CharacterDiagram, QuestionnaireEntry } from '../../types';
 import CharacterMap from '../CharacterMap';
+import CharacterGuide from './CharacterGuide';
+import CharacterMapViewer from './CharacterMapViewer';
+import { createCharacterEntry } from '../../src/characters/characterFactory';
+import { findCharacterMapPosition, getCharacterMapPosition } from '../../src/characters/characterMapPlacement';
 import {
   addExistingCharactersToMap,
   getCharacterMapMemberIds,
@@ -9,6 +13,10 @@ import {
 } from '../../src/characters/characterMapMembership';
 
 interface CharacterMapsWorkspaceProps {
+  bookId: string | null;
+  showGuide: boolean;
+  viewingMap: boolean;
+  onChangeViewingMap: (viewing: boolean) => void;
   maps: CharacterDiagram[];
   currentMapId: string | null;
   characters: QuestionnaireEntry[];
@@ -18,7 +26,22 @@ interface CharacterMapsWorkspaceProps {
   onOpenImport: () => void;
 }
 
+const guideQuery = '(max-width: 1023px)';
+const subscribeToGuideLayout = (change: () => void) => {
+  const media = window.matchMedia(guideQuery);
+  media.addEventListener('change', change);
+  return () => media.removeEventListener('change', change);
+};
+const isGuideLayout = () => window.matchMedia(guideQuery).matches;
+export function useMobileCharacterMapLayout() {
+  return useSyncExternalStore(subscribeToGuideLayout, isGuideLayout, () => false);
+}
+
 const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
+  bookId,
+  showGuide,
+  viewingMap,
+  onChangeViewingMap,
   maps,
   currentMapId,
   characters,
@@ -63,9 +86,9 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
       })()
     : characters;
 
-  const addExistingCharacters = (characterIds: string[]) => {
+  const addExistingCharacters = (characterIds: string[], rootFontSize?: number) => {
     if (!currentMap) return;
-    const updatedMap = addExistingCharactersToMap(currentMap, characterIds);
+    const updatedMap = addExistingCharactersToMap(currentMap, characterIds, rootFontSize);
     if (updatedMap === currentMap) return;
     onUpdateMaps(maps.map(map => map.id === currentMap.id ? updatedMap : map));
   };
@@ -97,14 +120,28 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
     ]);
   };
 
+  const addNewCharacter = (rootFontSize?: number) => {
+    const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });
+    const position = findCharacterMapPosition(
+      getCharacterMapPosition(newNode), mapCharacters.map(getCharacterMapPosition), rootFontSize,
+    );
+    updateCharacters([...mapCharacters, { ...newNode, ...position }]);
+    return newNode.id;
+  };
+
+  const editGuideCharacter = (id: string, updates: Partial<QuestionnaireEntry>) => {
+    if (!mapCharacters.some(character => character.id === id)) return;
+    onUpdateCharacters(characters.map(character => character.id === id ? { ...character, ...updates } : character));
+  };
+
   return (
     <div className="h-full flex flex-col">
       {!currentMapId ? (
-        <div className="flex-1 p-12 lg:pt-24 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-12 lg:pt-24 overflow-y-auto">
           <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="font-bold text-[var(--theme-accent)] handwritten text-4xl">מפות הדמויות שלי</h2>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+              <h2 className="font-bold text-[var(--theme-accent)] handwritten text-3xl lg:text-4xl">מפות הדמויות שלי</h2>
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={onOpenImport}
                   className="flex items-center gap-2 px-6 py-3 bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)] rounded-2xl font-bold hover:bg-[var(--theme-secondary)] transition-all shadow-md"
@@ -123,7 +160,7 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
             </div>
 
             {maps.length === 0 ? (
-              <div className="bg-[var(--theme-card)]/50 border-2 border-dashed border-[var(--theme-border)] rounded-[3rem] p-20 text-center">
+              <div className="bg-[var(--theme-card)]/50 border-2 border-dashed border-[var(--theme-border)] rounded-[3rem] p-8 lg:p-20 text-center">
                 <div className="w-20 h-20 bg-[var(--theme-secondary)] text-[var(--theme-primary)] rounded-full flex items-center justify-center mx-auto mb-6">
                   <Users size={40} />
                 </div>
@@ -157,12 +194,33 @@ const CharacterMapsWorkspace: React.FC<CharacterMapsWorkspaceProps> = ({
             )}
           </div>
         </div>
+      ) : currentMap && showGuide && viewingMap ? (
+        <CharacterMapViewer
+          key={JSON.stringify([bookId, currentMap.id])}
+          characters={mapCharacters}
+          connections={currentMap.connections}
+          onBack={() => onChangeViewingMap(false)}
+        />
+      ) : currentMap && showGuide ? (
+        <CharacterGuide
+          key={JSON.stringify([bookId, currentMap.id])}
+          characters={mapCharacters}
+          bookCharacters={characters}
+          onShowMap={() => onChangeViewingMap(true)}
+          connections={currentMap.connections}
+          onEditCharacter={editGuideCharacter}
+          onAddNewCharacter={addNewCharacter}
+          onAddExistingCharacters={addExistingCharacters}
+          onRemoveCharacter={removeCharacter}
+          onUpdateConnections={connections => updateCurrentMap({ connections })}
+        />
       ) : currentMap ? (
         <CharacterMap
           characters={mapCharacters}
           bookCharacters={characters}
           connections={currentMap.connections}
           onUpdateCharacters={updateCharacters}
+          onAddNewCharacter={addNewCharacter}
           onUpdateConnections={connections => updateCurrentMap({ connections })}
           onAddExistingCharacters={addExistingCharacters}
           onRemoveCharacterFromMap={removeCharacter}

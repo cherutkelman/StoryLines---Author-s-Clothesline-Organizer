@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import type Konva from 'konva';
 import { 
-  Stage, Layer, Circle, Rect, Line, Text, Group, Transformer 
+  Stage, Layer, Group
 } from 'react-konva';
 import { 
   Plus, Minus, Maximize, Download, Trash2, X, Edit2, RefreshCw, Share2
 } from 'lucide-react';
-import { MindMap, MindMapNode, MindMapEdge } from '../types';
+import { MindMap, MindMapNode } from '../types';
+import { MindMapLine, MindMapNodeArtwork } from './maps/MindMapArtwork';
+import { useMindMapExport } from './maps/useMindMapExport';
+import { addMindMapBranch, createMindMapRoot } from '../src/mind-map-ideas';
 
 interface MindMapEditorProps {
   map: MindMap;
@@ -20,6 +24,8 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   const [isPanMode, setIsPanMode] = useState(false);
   
   const stageRef = useRef<any>(null);
+  const artworkRef = useRef<Konva.Layer>(null);
+  const { exportAsImage, exportError } = useMindMapExport(artworkRef, map.name);
   const containerRef = useRef<HTMLDivElement>(null);
   const centeredMapIdRef = useRef<string | null>(null);
 
@@ -96,14 +102,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   // Initialize root node if map is empty
   useEffect(() => {
     if (map.nodes.length === 0 && stageSize.width > 0 && stageSize.height > 0) {
-      const rootNode: MindMapNode = {
-        id: 'root',
-        x: stageSize.width / 2,
-        y: stageSize.height / 2,
-        text: 'נושא מרכזי',
-        type: 'circle',
-        isRoot: true
-      };
+      const rootNode = createMindMapRoot(stageSize.width / 2, stageSize.height / 2);
       onUpdateMap({ nodes: [rootNode], edges: [] });
     }
   }, [map.nodes.length, stageSize, onUpdateMap]);
@@ -132,31 +131,9 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
   };
 
   const addNode = (parentId: string) => {
-    const parent = map.nodes.find(n => n.id === parentId);
-    if (!parent) return;
-
-    const id = `node-${Date.now()}`;
-    const existingChildrenCount = map.edges.filter(edge => edge.fromId === parentId).length;
-    const angle = existingChildrenCount * 0.9 - 0.9;
-    const distance = 150;
-    const newNode: MindMapNode = {
-      id,
-      x: parent.x + Math.cos(angle) * distance,
-      y: parent.y + Math.sin(angle) * distance,
-      text: 'רעיון חדש',
-      type: 'square'
-    };
-
-    const newEdge: MindMapEdge = {
-      id: `edge-${Date.now()}`,
-      fromId: parentId,
-      toId: id
-    };
-
-    onUpdateMap({
-      nodes: [...map.nodes, newNode],
-      edges: [...map.edges, newEdge]
-    });
+    const updates = addMindMapBranch(map, parentId);
+    if (!updates) return;
+    onUpdateMap(updates);
     setSelectedId(parentId);
   };
 
@@ -190,18 +167,6 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
       edges: map.edges.filter(e => e.fromId !== id && e.toId !== id)
     });
     setSelectedId(null);
-  };
-
-  const exportAsImage = () => {
-    if (stageRef.current) {
-      const uri = stageRef.current.toDataURL();
-      const link = document.createElement('a');
-      link.download = `${map.name || 'mind-map'}.png`;
-      link.href = uri;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
   };
 
   const zoomIn = () => setScale(prev => Math.min(prev + 0.1, 3));
@@ -254,19 +219,14 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
             setSelectedId(null);
           }}
         >
-          <Layer>
+          <Layer ref={artworkRef}>
             {/* Edges */}
             {map.edges.map(edge => {
               const from = map.nodes.find(n => n.id === edge.fromId);
               const to = map.nodes.find(n => n.id === edge.toId);
               if (!from || !to) return null;
               return (
-                <Line
-                  key={edge.id}
-                  points={[from.x, from.y, to.x, to.y]}
-                  stroke={getComputedStyle(document.documentElement).getPropertyValue('--theme-border').trim() || '#cbd5e1'}
-                  strokeWidth={2}
-                />
+                <MindMapLine key={edge.id} from={from} to={to} />
               );
             })}
 
@@ -295,41 +255,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
                   setSelectedId(node.id);
                 }}
               >
-                {node.type === 'circle' ? (
-                  <Circle
-                    radius={50}
-                    fill={node.isRoot ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() || '#1e293b') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() + 'cc' || '#334155')}
-                    stroke={selectedId === node.id ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim() || '#3b82f6') : 'transparent'}
-                    strokeWidth={3}
-                    shadowBlur={5}
-                    shadowOpacity={0.2}
-                  />
-                ) : (
-                  <Rect
-                    x={-50}
-                    y={-30}
-                    width={100}
-                    height={60}
-                    fill={getComputedStyle(document.documentElement).getPropertyValue('--theme-secondary').trim() || '#f1f5f9'}
-                    stroke={selectedId === node.id ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim() || '#3b82f6') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-border').trim() || '#cbd5e1')}
-                    strokeWidth={2}
-                    cornerRadius={8}
-                    shadowBlur={5}
-                    shadowOpacity={0.1}
-                  />
-                )}
-                <Text
-                  text={node.text}
-                  fontSize={14}
-                  fill={node.type === 'circle' ? (getComputedStyle(document.documentElement).getPropertyValue('--theme-card').trim() || 'white') : (getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() || '#1e293b')}
-                  align="center"
-                  verticalAlign="middle"
-                  width={90}
-                  height={node.type === 'circle' ? 100 : 60}
-                  offsetX={45}
-                  offsetY={node.type === 'circle' ? 50 : 30}
-                  wrap="char"
-                />
+                <MindMapNodeArtwork node={node} selected={selectedId === node.id} />
               </Group>
             ))}
           </Layer>
@@ -344,6 +270,7 @@ const MindMapEditor: React.FC<MindMapEditorProps> = ({ map, onUpdateMap }) => {
           >
             <Download size={20} />
           </button>
+          {exportError && <p role="alert" className="max-w-60 rounded-xl bg-[var(--theme-card)] p-2 text-[var(--theme-text)]">לא ניתן לייצא את המפה כתמונה.</p>}
         </div>
 
         <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-[var(--theme-card)]/80 backdrop-blur-md p-2 rounded-2xl border border-[var(--theme-border)] shadow-xl">

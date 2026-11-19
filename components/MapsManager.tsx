@@ -7,7 +7,7 @@ import MindMapsWorkspace from './maps/MindMapsWorkspace';
 import MapsImportDialog from './maps/MapsImportDialog';
 import { MapsManagerProps } from './maps/mapsTypes';
 import SelectedMapHeader from './maps/SelectedMapHeader';
-import CharacterMapsWorkspace from './maps/CharacterMapsWorkspace';
+import CharacterMapsWorkspace, { useMobileCharacterMapLayout } from './maps/CharacterMapsWorkspace';
 import { ImportMapCategory } from './maps/mapsDefinitions';
 
 const MapsManager: React.FC<MapsManagerProps> = ({
@@ -39,6 +39,17 @@ const MapsManager: React.FC<MapsManagerProps> = ({
   const [currentMapId, setCurrentMapId] = useState<string | null>(selectedMapId || null);
   const [currentMindMapId, setCurrentMindMapId] = useState<string | null>(selectedMindMapId || null);
   const [currentCharacterMapId, setCurrentCharacterMapId] = useState<string | null>(selectedCharacterMapId || null);
+  const [viewerKey, setViewerKey] = useState<string>();
+  const [mindViewerKey, setMindViewerKey] = useState<string>();
+  const showCharacterGuide = useMobileCharacterMapLayout();
+  const characterMapKey = JSON.stringify([activeBookId, currentCharacterMapId]);
+  const viewingCharacterMap = showCharacterGuide && activeTab === 'characterDiagram' &&
+    Boolean(currentCharacterMapId) && viewerKey === characterMapKey;
+  useEffect(() => { setViewerKey(undefined); }, [characterMapKey, showCharacterGuide, activeTab]);
+  const mindMapKey = JSON.stringify([activeBookId, currentMindMapId]);
+  const viewingMindMap = showCharacterGuide && activeTab === 'mindMaps' &&
+    Boolean(currentMindMapId) && mindViewerKey === mindMapKey;
+  useEffect(() => { setMindViewerKey(undefined); }, [mindMapKey, showCharacterGuide, activeTab]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importCategory, setImportCategory] = useState<ImportMapCategory>('worldMaps');
 
@@ -126,14 +137,16 @@ const MapsManager: React.FC<MapsManagerProps> = ({
         worldMapName={currentMap?.name || ''}
         mindMapId={currentMindMapId}
         mindMapName={currentMindMap?.name || ''}
+        mindMapReadOnly={viewingMindMap}
         characterMapId={currentCharacterMapId}
         characterMapName={currentCharacterMap?.name || ''}
+        characterMapReadOnly={viewingCharacterMap}
         onBackFromWorldMap={() => { setCurrentMapId(null); onMapSelect?.(null); }}
         onBackFromMindMap={() => { setCurrentMindMapId(null); onMindMapSelect?.(null); }}
         onBackFromCharacterMap={() => { setCurrentCharacterMapId(null); onCharacterMapSelect?.(null); }}
         onRenameWorldMap={(name) => currentMapId && renameMap(currentMapId, name)}
-        onRenameMindMap={(name) => currentMindMapId && renameMindMap(currentMindMapId, name)}
-        onRenameCharacterMap={(name) => currentCharacterMapId && renameCharacterMap(currentCharacterMapId, name)}
+        onRenameMindMap={(name) => !viewingMindMap && currentMindMapId && renameMindMap(currentMindMapId, name)}
+        onRenameCharacterMap={(name) => !viewingCharacterMap && currentCharacterMapId && renameCharacterMap(currentCharacterMapId, name)}
         navigation={<MapsNavigation activeTab={activeTab} onChange={switchTab} embedded />}
       />
 
@@ -143,6 +156,10 @@ const MapsManager: React.FC<MapsManagerProps> = ({
         )}
         {activeTab === 'characterDiagram' ? (
           <CharacterMapsWorkspace
+            bookId={activeBookId}
+            showGuide={showCharacterGuide}
+            viewingMap={viewingCharacterMap}
+            onChangeViewingMap={viewing => setViewerKey(viewing ? characterMapKey : undefined)}
             maps={effectiveCharacterMaps}
             currentMapId={currentCharacterMapId}
             characters={characters}
@@ -162,6 +179,10 @@ const MapsManager: React.FC<MapsManagerProps> = ({
           />
         ) : activeTab === 'mindMaps' ? (
           <MindMapsWorkspace
+            bookId={activeBookId}
+            showIdeas={showCharacterGuide}
+            viewingMap={viewingMindMap}
+            onChangeViewingMap={viewing => setMindViewerKey(viewing ? mindMapKey : undefined)}
             maps={mindMaps}
             currentMapId={currentMindMapId}
             onSelectMap={(id) => { setCurrentMindMapId(id); onMindMapSelect?.(id); }}

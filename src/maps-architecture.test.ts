@@ -86,4 +86,40 @@ describe('maps architecture', () => {
     expect(characterMap).toContain('כל הדמויות בספר כבר נמצאות במפה הזאת.');
     expect(workspace).toContain('onAddExistingCharacters={addExistingCharacters}');
   });
+
+  it('takes the same selected-map data, membership and placement into the mobile guide and desktop map', () => {
+    const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
+    const desktop = read('components/CharacterMap.tsx');
+    const guide = read('components/maps/CharacterGuide.tsx');
+    expect(workspace).toContain("guideQuery = '(max-width: 1023px)'");
+    expect(workspace).toMatch(/currentMap && showGuide \? \(\s+<CharacterGuide[\s\S]+?\) : currentMap \? \(\s+<CharacterMap/);
+    expect(workspace.match(/onAddNewCharacter=\{addNewCharacter\}/g)).toHaveLength(2);
+    expect(workspace.match(/characters=\{mapCharacters\}/g)).toHaveLength(3);
+    expect(workspace.match(/connections=\{currentMap.connections\}/g)).toHaveLength(3);
+    expect(workspace).toContain('findCharacterMapPosition(');
+    expect(workspace).toContain('addExistingCharactersToMap(currentMap, characterIds, rootFontSize)');
+    expect(workspace).toContain('removeCharacterFromMap(currentMap, characterId)');
+    expect(workspace).toContain('onUpdateCharacters(characters.map');
+    expect(guide).toContain('readCharacterMapImage(input)');
+    expect(desktop).toContain('readCharacterMapImage(input)');
+    expect(guide).not.toMatch(/autoFocus|onTouch|onDoubleClick/);
+  });
+
+  it('scopes the viewer to an explicit mobile choice and leaves edits in the guide and desktop map', () => {
+    const manager = read('components/MapsManager.tsx');
+    const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
+    const header = read('components/maps/SelectedMapHeader.tsx');
+    expect(manager).toContain('const [viewerKey, setViewerKey] = useState<string>()');
+    expect(manager).toContain("showCharacterGuide && activeTab === 'characterDiagram'");
+    expect(manager).toContain('setViewerKey(viewing ? characterMapKey : undefined)');
+    expect(manager).toContain('!viewingCharacterMap && currentCharacterMapId && renameCharacterMap');
+    expect(header).toContain('isCharacterMap && props.characterMapReadOnly');
+    expect(header).toMatch(/readOnly \? \(\s*<span/);
+    const viewer = workspace.match(/<CharacterMapViewer\b[\s\S]*?\/>/)?.[0];
+    expect(viewer).toContain('onBack={() => onChangeViewingMap(false)}');
+    expect(viewer).not.toMatch(/onUpdate|onEdit|onRemove|onAdd/);
+    const desktop = workspace.match(/<CharacterMap\s[\s\S]*?\/>/)?.[0];
+    expect(desktop).toContain('onUpdateCharacters={updateCharacters}');
+    expect(desktop).toContain('onUpdateConnections={connections => updateCurrentMap({ connections })}');
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CharacterDiagram, CharacterEntry } from '../../types';
+import { getCharacterMapCardFootprint, getCharacterMapPosition } from './characterMapPlacement';
 import {
   addExistingCharactersToMap,
   getAvailableCharactersForMap,
@@ -45,6 +46,29 @@ describe('character map membership', () => {
     const serializedPositions = map.characterIds!.map(id => JSON.stringify(map.positions[id]));
 
     expect(new Set(serializedPositions).size).toBe(4);
+  });
+
+  it('reserves each batch position around existing cards and leaves membership, positions and links intact', () => {
+    const connections = Object.freeze([{ id: 'linked', fromId: 'a', toId: 'b', description: 'Friends' }]);
+    const original = diagram({
+      characterIds: ['a', 'b', 'legacy'],
+      positions: { a: { x: 240, y: 220 }, b: { x: 240, y: 220 } },
+      connections: [...connections],
+    });
+    const next = addExistingCharactersToMap(original, ['c', 'd', 'e', 'd']);
+    const { width, height, gap } = getCharacterMapCardFootprint();
+    const positions = next.characterIds!.map(id => getCharacterMapPosition(next.positions[id]));
+    expect(next.characterIds).toEqual(['a', 'b', 'legacy', 'c', 'd', 'e']);
+    expect(next.connections).toBe(original.connections);
+    expect(next.positions.a).toBe(original.positions.a);
+    expect(next.positions.b).toBe(original.positions.b);
+    expect(next.positions.legacy).toBeUndefined();
+    expect(Object.keys(original.positions)).toEqual(['a', 'b']);
+    positions.slice(3).forEach((point, index) => {
+      expect(positions.slice(0, 3 + index).every(other =>
+        Math.abs(point.x - other.x) >= width + gap || Math.abs(point.y - other.y) >= height + gap,
+      )).toBe(true);
+    });
   });
 
   it('does not add an existing or repeated id twice and preserves stable order', () => {

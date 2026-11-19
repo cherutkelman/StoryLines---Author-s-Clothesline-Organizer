@@ -3,17 +3,20 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QuestionnaireEntry, CharacterMapConnection } from '../types';
 import { Plus, Trash2, User, UserPlus, Check, Image as ImageIcon, X, Move, Edit2, Download, ZoomIn, ZoomOut, RotateCcw, ChevronDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { isElectron, openDesktopImageDialog } from '../src/platform';
-import { compressImageFile } from '../src/image-utils';
-import { createCharacterEntry } from '../src/characters/characterFactory';
+import { isElectron } from '../src/platform';
+import { getCharacterMapRootFontSize } from '../src/characters/characterMapPlacement';
+import { readCharacterMapImage } from '../src/characters/characterMapImage';
+import { canConnectCharacters } from '../src/characters/characterMapConnections';
+import { getConnectionLabelPoint, getConnectionPath } from '../src/characters/characterMapGeometry';
 
 interface CharacterMapProps {
   characters: QuestionnaireEntry[];
   bookCharacters: QuestionnaireEntry[];
   connections: CharacterMapConnection[];
   onUpdateCharacters: (chars: QuestionnaireEntry[]) => void;
+  onAddNewCharacter: (rootFontSize?: number) => string;
   onUpdateConnections: (connections: CharacterMapConnection[]) => void;
-  onAddExistingCharacters: (characterIds: string[]) => void;
+  onAddExistingCharacters: (characterIds: string[], rootFontSize?: number) => void;
   onRemoveCharacterFromMap: (characterId: string) => void;
 }
 
@@ -22,6 +25,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   bookCharacters,
   connections,
   onUpdateCharacters,
+  onAddNewCharacter,
   onUpdateConnections,
   onAddExistingCharacters,
   onRemoveCharacterFromMap,
@@ -120,23 +124,6 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     });
   };
 
-  const getConnectionLabelPoint = (conn: CharacterMapConnection, fromNode: QuestionnaireEntry, toNode: QuestionnaireEntry) => {
-    const t = conn.labelPosition ?? 0.5;
-    const x1 = fromNode.x ?? 0;
-    const y1 = fromNode.y ?? 0;
-    const x2 = toNode.x ?? 0;
-    const y2 = toNode.y ?? 0;
-    const baseX = x1 + (x2 - x1) * t;
-    const baseY = y1 + (y2 - y1) * t;
-
-    return {
-      x: baseX + (conn.labelOffset?.x ?? 0),
-      y: baseY + (conn.labelOffset?.y ?? 0),
-      baseX,
-      baseY
-    };
-  };
-
   const moveConnectionLabelToPoint = (id: string, clientX: number, clientY: number) => {
     const point = getCanvasPoint(clientX, clientY);
     setLocalConnections(prev => {
@@ -198,10 +185,9 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
   };
 
   const addNode = () => {
-    const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });
-    onUpdateCharacters([...characters, newNode]);
-    setSelectedNodeId(newNode.id);
-    setMovingNodeId(newNode.id);
+    const id = onAddNewCharacter(getCharacterMapRootFontSize(canvasRef.current));
+    setSelectedNodeId(id);
+    setMovingNodeId(id);
     setIsAddCharacterMenuOpen(false);
   };
 
@@ -213,8 +199,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     }
 
     if (selectedNodeId && selectedNodeId !== id) {
-      const exists = connections.find(c => (c.fromId === selectedNodeId && c.toId === id) || (c.fromId === id && c.toId === selectedNodeId));
-      if (!exists) {
+      if (canConnectCharacters(connections, selectedNodeId, id)) {
         const newConn: CharacterMapConnection = {
           id: `conn-${Date.now()}`,
           fromId: selectedNodeId,
@@ -461,41 +446,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
     onUpdateConnections(connections.filter(c => c.id !== id));
   };
 
-  const handleImageUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('Renderer: handleImageUpload triggered for node:', id);
-    
-    if (isElectron) {
-      console.log('Renderer: Electron environment detected, using IPC dialog');
-      try {
-        const dataUrl = await openDesktopImageDialog();
-        
-        console.log('Renderer: IPC dialog returned result');
-        if (dataUrl) {
-          console.log('Renderer: Received dataUrl, updating node');
-          updateNode(id, { imageUrl: dataUrl });
-        } else {
-          console.log('Renderer: Dialog was canceled or no file selected');
-        }
-      } catch (error) {
-        console.error('Renderer: Error in Electron image upload:', error);
-      }
-      return;
-    }
-
-    console.log('Renderer: Standard web environment detected, using FileReader');
-    const file = e?.target?.files?.[0];
-    if (file) {
-      console.log('Renderer: File selected:', file.name);
-      try {
-        const { dataUrl } = await compressImageFile(file, 900, 0.76);
-        updateNode(id, { imageUrl: dataUrl });
-      } catch (error) {
-        console.error('Renderer: Image compression failed:', error);
-      } finally {
-        if (e?.target) e.target.value = '';
-      }
-    } else {
-      console.log('Renderer: No file selected in standard input');
+  const handleImageUpload = async (id: string, input?: HTMLInputElement) => {
+    try {
+      const imageUrl = await readCharacterMapImage(input);
+      if (imageUrl) updateNode(id, { imageUrl });
+    } catch (error) {
+      console.error('Character image upload failed:', error);
     }
   };
 
@@ -666,7 +622,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
 
   const confirmExistingCharacters = () => {
     if (selectedExistingCharacterIds.length === 0) return;
-    onAddExistingCharacters(selectedExistingCharacterIds);
+    onAddExistingCharacters(selectedExistingCharacterIds, getCharacterMapRootFontSize(canvasRef.current));
     setIsExistingCharacterDialogOpen(false);
     setSelectedExistingCharacterIds([]);
   };
@@ -895,11 +851,7 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
             const toNode = localCharacters.find(n => n.id === conn.toId);
             if (!fromNode || !toNode) return null;
             const labelPoint = getConnectionLabelPoint(conn, fromNode, toNode);
-            const x1 = fromNode.x ?? 0;
-            const y1 = fromNode.y ?? 0;
-            const x2 = toNode.x ?? 0;
-            const y2 = toNode.y ?? 0;
-            const curvePath = `M ${x1} ${y1} C ${labelPoint.x} ${labelPoint.y}, ${labelPoint.x} ${labelPoint.y}, ${x2} ${y2}`;
+            const curvePath = getConnectionPath(fromNode, toNode, labelPoint);
 
             return (
               <g key={conn.id}>
@@ -1038,12 +990,12 @@ const CharacterMap: React.FC<CharacterMapProps> = ({
                   onClick={(e) => {
                     if (isElectron) {
                       e.preventDefault();
-                      handleImageUpload(node.id, null as any);
+                      void handleImageUpload(node.id);
                     }
                   }}
                 >
                   <ImageIcon size={16} />
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(node.id, e)} />
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => void handleImageUpload(node.id, e.currentTarget)} />
                 </label>
                 {node.imageUrl && (
                   <button 

@@ -9,12 +9,13 @@ describe('character identity infrastructure wiring', () => {
   it('routes every current character creation path through the factory', () => {
     const questionnaires = read('components/Questionnaires.tsx');
     const characterMap = read('components/CharacterMap.tsx');
+    const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
     const relationshipDynamics = read('components/plot-planning/RelationshipDynamicsTable.tsx');
     const relationshipArc = read('components/plot-planning/RelationshipArcEditor.tsx');
     const mapImporter = read('components/maps/MapsImportDialog.tsx');
 
     expect(questionnaires).toContain('const newEntry = createCharacterEntry();');
-    expect(characterMap).toContain("const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });");
+    expect(workspace).toContain("const newNode = createCharacterEntry({ questionnaireVisibility: 'hidden' });");
     expect(relationshipDynamics).toContain('createCharacterEntry({ name })');
     expect(relationshipArc).toContain('createPlanningCharacter(newName)');
     expect(mapImporter).toContain('prepareCharactersForImportedMaps(');
@@ -22,6 +23,7 @@ describe('character identity infrastructure wiring', () => {
     const characterCreationSources = [
       questionnaires,
       characterMap,
+      workspace,
       relationshipDynamics,
       relationshipArc,
       mapImporter,
@@ -33,7 +35,8 @@ describe('character identity infrastructure wiring', () => {
     const characterMap = read('components/CharacterMap.tsx');
     const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
 
-    expect(characterMap).toContain('onUpdateCharacters([...characters, newNode])');
+    expect(characterMap).toContain('onAddNewCharacter(getCharacterMapRootFontSize(canvasRef.current))');
+    expect(workspace).toContain('updateCharacters([...mapCharacters, { ...newNode, ...position }])');
     expect(characterMap).toContain('onRemoveCharacterFromMap(id)');
     expect(characterMap).not.toContain('onUpdateCharacters(characters.filter(n => n.id !== id))');
     expect(characterMap).toContain("updateNode(node.id, { name: e.target.value })");

@@ -105,6 +105,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
   const selectedSourceBook = allBooks.find(book => book.id === importSourceBookId);
   const availableSourceItems = getBookMaps(selectedSourceBook, importCategory);
+  const compactMindMapImport = category === 'mindMaps';
 
   useEffect(() => {
     if (isOpen) setImportCategory(category);
@@ -163,10 +164,12 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
 
   return isOpen ? (
   <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-    <div className="bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
-      <div className="p-8 border-b border-[var(--theme-border)]/30 flex items-center justify-between bg-[var(--theme-secondary)]/30">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-2xl shadow-lg">
+    <div role={compactMindMapImport ? 'dialog' : undefined} aria-modal={compactMindMapImport || undefined}
+      aria-label={compactMindMapImport ? 'ייבוא מפות מספר אחר' : undefined}
+      className={`bg-[var(--theme-card)] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-[var(--theme-border)]/50 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${compactMindMapImport ? 'max-lg:max-h-[90dvh]' : ''}`}>
+      <div className={`border-b border-[var(--theme-border)]/30 flex items-center justify-between bg-[var(--theme-secondary)]/30 ${compactMindMapImport ? 'shrink-0 gap-2 p-3 lg:p-8' : 'p-8'}`}>
+        <div className={`flex items-center gap-4 ${compactMindMapImport ? 'min-w-0' : ''}`}>
+          <div className={`p-3 bg-[var(--theme-primary)] text-[var(--theme-card)] rounded-2xl shadow-lg ${compactMindMapImport ? 'hidden sm:block' : ''}`}>
             <CopyPlus size={24} />
           </div>
           <div>
@@ -176,14 +179,15 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
         </div>
         <button 
           onClick={() => onClose()}
-          className="p-2 hover:bg-[var(--theme-secondary)] rounded-xl transition-colors text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)]"
+          aria-label={compactMindMapImport ? 'סגירת ייבוא מפות' : undefined}
+          className={`p-2 hover:bg-[var(--theme-secondary)] rounded-xl transition-colors text-[var(--theme-primary)]/40 hover:text-[var(--theme-primary)] ${compactMindMapImport ? 'shrink-0 max-lg:min-h-11 max-lg:min-w-11' : ''}`}
         >
           <X size={24} />
         </button>
       </div>
 
-      <div className="p-8 overflow-y-auto space-y-8">
-        <div className="grid grid-cols-2 gap-6">
+      <div className={`overflow-y-auto ${compactMindMapImport ? 'min-h-0 p-3 space-y-4 lg:p-8 lg:space-y-8' : 'p-8 space-y-8'}`}>
+        <div className={`grid ${compactMindMapImport ? 'grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-6' : 'grid-cols-2 gap-6'}`}>
           <div className="space-y-2">
             <label className="text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest px-1">ספר מקור</label>
             <select 
@@ -192,7 +196,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
                 setImportSourceBookId(e.target.value);
                 setSelectedImportIds([]);
               }}
-              className="w-full bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm font-bold focus:ring-4 focus:ring-[var(--theme-primary)]/10 outline-none transition-all"
+              className={`w-full bg-[var(--theme-secondary)]/50 border border-[var(--theme-border)]/50 rounded-2xl p-4 text-sm font-bold focus:ring-4 focus:ring-[var(--theme-primary)]/10 outline-none transition-all ${compactMindMapImport ? 'max-lg:min-w-0' : ''}`}
             >
               <option value="">בחר ספר...</option>
               {allBooks.filter(b => b.id !== activeBookId).map(book => (
@@ -224,12 +228,12 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
               <label className="text-xs font-black text-[var(--theme-primary)]/40 uppercase tracking-widest">בחר מפות (השאר ריק לייבוא הכל)</label>
               <button 
                 onClick={() => setSelectedImportIds([])}
-                className="text-[10px] font-bold text-[var(--theme-accent)] hover:underline"
+                className={`text-[10px] font-bold text-[var(--theme-accent)] hover:underline ${compactMindMapImport ? 'max-lg:min-h-11 max-lg:min-w-11' : ''}`}
               >
                 נקה בחירה
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1 scrollbar-hide">
+            <div className={`grid gap-3 p-1 scrollbar-hide ${compactMindMapImport ? 'grid-cols-1 lg:grid-cols-2 lg:max-h-60 lg:overflow-y-auto' : 'grid-cols-2 max-h-60 overflow-y-auto'}`}>
               {availableSourceItems.map((item: any) => (
                 <button
                   key={item.id}
@@ -247,7 +251,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
                 </button>
               ))}
               {availableSourceItems.length === 0 && (
-                <div className="col-span-2 py-8 text-center text-[var(--theme-text)]/30 text-sm font-bold bg-[var(--theme-secondary)]/20 rounded-3xl border-2 border-dashed border-[var(--theme-border)]/30">
+                <div className="col-span-full py-8 text-center text-[var(--theme-text)]/30 text-sm font-bold bg-[var(--theme-secondary)]/20 rounded-3xl border-2 border-dashed border-[var(--theme-border)]/30">
                   אין מפות מסוג זה בספר הנבחר
                 </div>
               )}
@@ -256,7 +260,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
         )}
       </div>
 
-      <div className="p-8 border-t border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/30 flex gap-4">
+      <div className={`border-t border-[var(--theme-border)]/30 bg-[var(--theme-secondary)]/30 flex ${compactMindMapImport ? 'shrink-0 flex-wrap gap-2 p-3 lg:gap-4 lg:p-8' : 'gap-4 p-8'}`}>
         <button 
           onClick={handleImport}
           disabled={!importSourceBookId || availableSourceItems.length === 0}
@@ -267,7 +271,7 @@ const MapsImportDialog: React.FC<MapsImportDialogProps> = ({
         </button>
         <button 
           onClick={() => onClose()}
-          className="px-8 bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)]/50 rounded-2xl font-bold text-sm hover:bg-[var(--theme-secondary)] transition-all"
+          className={`bg-[var(--theme-card)] text-[var(--theme-primary)] border border-[var(--theme-border)]/50 rounded-2xl font-bold text-sm hover:bg-[var(--theme-secondary)] transition-all ${compactMindMapImport ? 'min-h-11 px-3 lg:px-8' : 'px-8'}`}
         >
           ביטול
         </button>

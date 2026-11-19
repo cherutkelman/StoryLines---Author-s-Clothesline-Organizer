@@ -1,0 +1,12 @@
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .mind-map-gallery-card .mind-map-gallery-delete {
+    width: 2rem;
+    height: 2rem;
+    opacity: 0;
+  }
+
+  .mind-map-gallery-card:hover .mind-map-gallery-delete,
+  .mind-map-gallery-card:focus-within .mind-map-gallery-delete {
+    opacity: 1;
+  }
+}

@@ -1,4 +1,5 @@
 import type { CharacterDiagram, CharacterEntry } from '../../types';
+import { findCharacterMapPosition, getCharacterMapPosition } from './characterMapPlacement';
 
 export const getCharacterMapMemberIds = (map: CharacterDiagram): string[] => {
   const inferredIds = [
@@ -37,7 +38,8 @@ export const getAvailableCharactersForMap = (
 
 export const addExistingCharactersToMap = (
   map: CharacterDiagram,
-  characterIds: string[]
+  characterIds: string[],
+  rootFontSize?: number,
 ): CharacterDiagram => {
   const existingIds = getCharacterMapMemberIds(map);
   const existingIdSet = new Set(existingIds);
@@ -45,11 +47,15 @@ export const addExistingCharactersToMap = (
   if (idsToAdd.length === 0) return map;
 
   const positions = { ...(map.positions || {}) };
+  const occupied = existingIds.map(id => getCharacterMapPosition(positions[id]));
   idsToAdd.forEach((characterId, index) => {
-    positions[characterId] = {
+    const preferred = {
       x: 240 + (index % 3) * 150,
       y: 220 + Math.floor(index / 3) * 140,
     };
+    const position = findCharacterMapPosition(preferred, occupied, rootFontSize);
+    positions[characterId] = position;
+    occupied.push(position);
   });
 
   return {

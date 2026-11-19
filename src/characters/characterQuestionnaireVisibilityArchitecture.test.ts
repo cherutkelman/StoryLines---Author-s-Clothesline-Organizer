@@ -8,7 +8,7 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 describe('character questionnaire visibility architecture', () => {
   it('limits questionnaire filtering to the questionnaire coordinator', () => {
     const questionnaires = read('components/Questionnaires.tsx');
-    const characterMap = read('components/CharacterMap.tsx');
+    const characterMap = read('components/CharacterMap.tsx') + read('components/maps/CharacterMapsWorkspace.tsx');
 
     expect(questionnaires).toContain('characters.filter(isCharacterVisibleInQuestionnaire)');
     expect(questionnaires).toContain("activeTab === 'characters' ? questionnaireCharacters");
@@ -16,11 +16,11 @@ describe('character questionnaire visibility architecture', () => {
   });
 
   it('creates map characters hidden and direct questionnaire imports visible', () => {
-    const characterMap = read('components/CharacterMap.tsx');
+    const workspace = read('components/maps/CharacterMapsWorkspace.tsx');
     const mapImport = read('components/maps/MapsImportDialog.tsx');
     const directImport = read('src/characters/characterImport.ts');
 
-    expect(characterMap).toContain("createCharacterEntry({ questionnaireVisibility: 'hidden' })");
+    expect(workspace).toContain("createCharacterEntry({ questionnaireVisibility: 'hidden' })");
     expect(mapImport).toContain('getSourceCharacterIdsForImportedMaps(itemsToImport as CharacterDiagram[])');
     expect(mapImport).toContain('prepareCharactersForImportedMaps(');
     expect(directImport).toContain("questionnaireVisibility: 'hidden'");
