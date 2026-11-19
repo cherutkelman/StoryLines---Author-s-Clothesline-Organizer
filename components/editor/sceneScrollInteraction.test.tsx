@@ -71,6 +71,22 @@ describe('scene pointer and collapse regression', () => {
     expect(article.props.className).not.toContain('transition-all');
   });
 
+  it('closes a search-expanded scene through the shared toggle and preserves the scene data', async () => {
+    const p = props();
+    const original = { ...scene };
+    const tree = await EditorSceneList({ ...p, expandedSceneIds: [], searchExpandedSceneId: scene.id });
+    const close = findElement(tree, element => element.type === 'button')!;
+    close.props.onClick!({ stopPropagation: vi.fn() });
+    expect(p.onSelectScene).toHaveBeenCalledExactlyOnceWith(scene.id);
+    expect(scene).toEqual(original);
+
+    const editor = readFileSync('components/Editor.tsx', 'utf8');
+    const toggle = editor.slice(editor.indexOf('const toggleSceneExpanded'), editor.indexOf('const openHistoryForScene'));
+    expect(toggle).toMatch(/change\.closing \|\| searchExpanded[\s\S]*captureSceneCollapseAnchor[\s\S]*if \(searchExpanded\) setSearchNavigation\(undefined\)/);
+    expect(toggle).not.toMatch(/onUpdateScene|scrollIntoView|\.focus\(/);
+    expect(editor).toContain('[bookId, displayMode, expandedSceneIds, searchExpandedSceneId, cancelCollapseCorrection]');
+  });
+
   it('removes focus-driven centering but preserves native caret, selection and typing/resize handling', () => {
     const editor = readFileSync('components/Editor.tsx', 'utf8');
     const textarea = editor.slice(editor.indexOf('const AutoExpandingTextarea'), editor.indexOf('const DebouncedInput'));
@@ -78,9 +94,14 @@ describe('scene pointer and collapse regression', () => {
     expect(textarea).not.toContain('.scrollIntoView(');
     expect(textarea).not.toContain('.focus(');
     expect(textarea).toContain('onFocus={onFocus}');
-    expect(textarea).toContain('selectionDirection');
-    expect(textarea).toContain('preserveScroll(adjustHeight)');
-    expect(textarea).toContain('[localValue, textScale]');
+    expect(textarea).not.toMatch(/preserveScroll|setSelectionRange|requestAnimationFrame|\.scrollTo\(/);
+    expect(textarea).not.toMatch(/(?:textarea|scrollContainer|event\.currentTarget)\.scrollTop\s*=/);
+    expect(textarea).toContain('setLocalValue(e.target.value)');
+    expect(textarea).toContain('resizeSceneTextarea(textarea, minRows)');
+    expect(textarea).toContain('[localValue, fontSize, minRows]');
+    expect(textarea).toContain('mirror.scrollTop = event.currentTarget.scrollTop');
+    expect(editor).toContain("scene?.querySelector('[data-editor-active-match]')");
+    expect(editor).toContain('focusEditorSceneBody(createdSceneId, document)');
     expect(editor).toContain('scrollToEditorTarget(getEditorSceneTargetId(sceneId), needsExpansion)');
     expect(editor).toContain('scrollToEditorTarget(getEditorChapterTargetId(item.chapterMarker.id))');
     expect(editor).not.toContain('slide-in-from-top-2 duration-300');

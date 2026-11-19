@@ -6,6 +6,8 @@ import { normalizeSceneTimeLabel } from '../../src/scene-time-label';
 import SceneArcMarkers from './SceneArcMarkers';
 
 const INSERTION_SLOT_WIDTH = 40;
+const CHAPTER_ROW_LAYOUT = 'h-24 mb-1 lg:mb-3';
+const PLOTLINE_ROW_LAYOUT = 'h-48 mb-12';
 
 interface PlotlinesBoardViewProps {
   boardColumns: BoardSequenceColumn[];
@@ -43,11 +45,22 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
   onChapterDividerDrop: handleChapterDividerDrop, onSceneSequenceDrop: handleSceneSequenceDrop,
   onSceneRowDrop: handleSceneRowDrop,
 }) => (
-<>
-  <div className="relative flex items-end px-8 mb-1 lg:mb-3 min-h-20">
-    <div className="invisible pointer-events-none flex h-20 shrink-0 items-center pr-12 pl-16 -mr-32">
-      <div className="min-w-[160px]" />
-    </div>
+<div dir="rtl" className="grid grid-cols-[auto_minmax(0,1fr)]">
+  <div data-plotline-label-column className="w-[clamp(5rem,20vw,10rem)] bg-[var(--theme-bg)]">
+    <div aria-hidden="true" className={CHAPTER_ROW_LAYOUT} />
+    {activePlotlines.map(plotline => (
+      <div key={plotline.id} className={`flex flex-col justify-center gap-1 px-2 lg:px-4 ${PLOTLINE_ROW_LAYOUT}`}>
+        <h3 title={plotline.name} className="line-clamp-3 break-words font-black uppercase tracking-tighter text-[var(--theme-primary)] handwritten text-xl lg:text-3xl">
+          {plotline.name}
+        </h3>
+        <div className="h-2.5 rounded-full border border-[var(--theme-border)] shadow-md" style={{ backgroundColor: plotline.color }} />
+      </div>
+    ))}
+  </div>
+  <div data-plotline-scene-scroll role="region" aria-label="סצנות בלוח העלילה" tabIndex={0}
+    className="min-w-0 overflow-x-auto overscroll-x-contain scrollbar-hide">
+  <div className="min-w-full w-max">
+  <div className={`relative flex items-end px-8 ${CHAPTER_ROW_LAYOUT}`}>
     {boardColumns.map((column, index) => (
       <React.Fragment key={`chapter-title-fragment-${column.id}`}>
         <div
@@ -186,7 +199,7 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
 
   {/* Plotline Ropes */}
   {activePlotlines.map((plotline) => (
-    <div key={plotline.id} className="relative h-48 flex items-center mb-12 group/plotline">
+    <div key={plotline.id} className={`relative flex items-center group/plotline ${PLOTLINE_ROW_LAYOUT}`}>
       <div 
         className="absolute inset-x-0 h-0.5 opacity-40 shadow-sm"
         style={{ 
@@ -197,18 +210,7 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
         }}
       />
       
-      <div className="sticky right-0 z-30 flex items-center h-full pr-12 pl-16 bg-gradient-to-l from-[var(--theme-bg)] via-[var(--theme-bg)]/95 to-transparent -mr-32 group/label pointer-events-none">
-        <div className="flex flex-col gap-1 min-w-[160px] pointer-events-auto">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-xl font-black uppercase tracking-tighter text-[var(--theme-primary)] block truncate handwritten text-3xl drop-shadow-sm">
-              {plotline.name}
-            </span>
-          </div>
-          <div className="h-2.5 w-full rounded-full shadow-md border border-white/50" style={{ backgroundColor: plotline.color }} />
-        </div>
-      </div>
-
-      <div className="flex items-center px-8 w-full">
+      <div className="flex items-center px-8">
         {boardColumns.map((column, index) => {
           const sceneInThisSlot = column.type === 'scene' && column.scene.plotlineId === plotline.id
             ? column.scene
@@ -368,7 +370,7 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
                       />
                       <SceneArcMarkers project={boardProject} sceneId={sceneInThisSlot.id} />
                       <div className="mt-auto pt-1 border-t border-amber-50/50 flex flex-col items-center gap-1">
-                        <span className="text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
+                        <span className="max-w-full truncate text-[9px] font-black uppercase tracking-tighter opacity-40 px-2 py-0.5 rounded-full" style={{ backgroundColor: `${plotline.color}20`, color: plotline.color }}>
                           {plotline.name}
                         </span>
                       </div>
@@ -415,7 +417,9 @@ const PlotlinesBoardView: React.FC<PlotlinesBoardViewProps> = ({
       </div>
     </div>
   ))}
-</>
+  </div>
+  </div>
+</div>
 );
 
 export default PlotlinesBoardView;

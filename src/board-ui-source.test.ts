@@ -2,6 +2,34 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('board UI source', () => {
+  it('reserves a right-hand RTL label column beside the horizontal scene scroller', () => {
+    const source = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
+    const labels = source.slice(source.indexOf('data-plotline-label-column'), source.indexOf('data-plotline-scene-scroll'));
+    const scenes = source.slice(source.indexOf('data-plotline-scene-scroll'));
+
+    expect(source).toContain('dir="rtl" className="grid grid-cols-[auto_minmax(0,1fr)]"');
+    expect(labels).toContain('activePlotlines.map');
+    expect(labels).toContain('title={plotline.name}');
+    expect(labels).toContain('line-clamp-3 break-words');
+    expect(labels).toContain('w-[clamp(5rem,20vw,10rem)]');
+    for (const column of [labels, scenes]) {
+      expect(column).toContain('CHAPTER_ROW_LAYOUT');
+      expect(column).toContain('PLOTLINE_ROW_LAYOUT');
+    }
+    expect(scenes).toContain('min-w-0 overflow-x-auto overscroll-x-contain');
+    expect(scenes).toContain('min-w-full w-max');
+    expect(scenes).toContain('draggable={!isPreviewMode}');
+    expect(scenes).toContain('handleSceneSequenceDrop(e, index, plotline.id)');
+  });
+
+  it('keeps the width-constrained plotlines layout separate from zoom in the other views', () => {
+    const board = readFileSync('components/Board.tsx', 'utf8');
+    expect(board).toContain('ref={boardScrollRef} className="flex-1 overflow-auto');
+    expect(board).toContain("const isPlotlinesView = viewMode === 'plotlines'");
+    expect(board).toContain('style={isPlotlinesView ? { zoom: zoomLevel }');
+    expect(board).toContain('transform: `scale(${zoomLevel})`');
+  });
+
   it('does not show the add-chapter button on scene slots while keeping the marker row action', () => {
     const source = readFileSync('components/board/PlotlinesBoardView.tsx', 'utf8');
 

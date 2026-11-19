@@ -61,7 +61,7 @@ describe('text editor architecture', () => {
     expect(sceneList).toContain('id={getEditorSceneTargetId(scene.id)}');
     expect(sceneList.match(/scroll-mt-32/g)).toHaveLength(2);
     expect(editor).toContain('activeSequenceItems.map');
-    expect(editor).toContain('const needsExpansion = displayMode === \'focus\' && !expandedSceneIds.includes(sceneId)');
+    expect(editor).toContain('const needsExpansion = displayMode === \'focus\' && searchExpandedSceneId !== sceneId && !expandedSceneIds.includes(sceneId)');
     expect(editor).toContain('toggleSceneExpanded(sceneId)');
     expect(editor).toContain('window.requestAnimationFrame(() => window.requestAnimationFrame(scroll))');
     expect(editor).toContain('setShowChaptersInNav(current => !current)');

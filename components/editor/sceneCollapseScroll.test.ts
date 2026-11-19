@@ -1,38 +1,60 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureSceneCollapseAnchor, getSceneExpansionChange } from './sceneCollapseScroll';
 
 // Layout harness: content positions are independent of scrollTop; writes clamp as in a browser.
-function layout({ viewportHeight = 600, toolbarHeight = 80, articleTop = 2000, scrollTop = 1900 } = {}) {
+function layout({ viewportHeight = 600, toolbarHeight = 80, articleTop = 2000, scrollTop = 1900, keyboard = false } = {}) {
   let scroll = scrollTop;
   let maximumScroll = 12000;
-  let articleHeight = 8000;
   const viewportTop = 60;
-  const scroller = {
+  let expanded = true;
+  let titleOffset = 0;
+  const viewport = Object.assign(new EventTarget(), { height: viewportHeight, scale: 1 });
+  const doc = Object.assign(new EventTarget(), {
+    documentElement: { classList: { contains: () => keyboard }, clientHeight: 800 },
+    defaultView: { visualViewport: viewport, setTimeout, clearTimeout },
+  });
+  const scroller = Object.assign(new EventTarget(), {
     isConnected: true,
     clientTop: 0,
     clientHeight: viewportHeight,
-    get scrollTop() { return scroll; },
-    set scrollTop(value: number) { scroll = Math.max(0, Math.min(maximumScroll, value)); },
     getBoundingClientRect: () => ({ top: viewportTop }),
     querySelector: () => ({ getBoundingClientRect: () => ({ bottom: viewportTop + toolbarHeight }) }),
-  };
+  });
+  Object.defineProperties(scroller, {
+    scrollHeight: { get: () => maximumScroll + scroller.clientHeight },
+    scrollTop: { get: () => scroll, set: (value: number) => { scroll = Math.max(0, Math.min(maximumScroll, value)); } },
+  });
+  const titleRect = () => ({ top: viewportTop + articleTop - scroll + titleOffset, height: 48 });
   const article = {
     isConnected: true,
+    ownerDocument: doc,
     closest: () => scroller,
-    getBoundingClientRect: () => ({ top: viewportTop + articleTop - scroll, height: articleHeight }),
+    querySelector: (selector: string) => selector === '[data-editor-collapse-title]'
+      ? { getBoundingClientRect: titleRect } : expanded ? {} : null,
   };
   return {
-    scroller, article,
+    scroller: scroller as typeof scroller & { scrollTop: number }, article, doc, viewport,
     capture: () => captureSceneCollapseAnchor(article as unknown as HTMLElement)!,
     collapse: (max = maximumScroll) => {
-      articleHeight = 90;
+      expanded = false;
       maximumScroll = max;
-      scroller.scrollTop = scroll;
+      scroll = Math.min(scroll, max);
     },
-    moveScroll: (value: number) => { scroller.scrollTop = value; },
-    relativeTop: () => article.getBoundingClientRect().top - viewportTop,
+    reopen: () => { expanded = true; },
+    moveScroll: (value: number) => { scroll = value; scroller.dispatchEvent(new Event('scroll')); },
+    resize: (height: number, offset: number, max = maximumScroll) => {
+      scroller.clientHeight = viewport.height = height;
+      titleOffset = offset;
+      maximumScroll = max;
+      scroll = Math.min(scroll, max);
+      viewport.dispatchEvent(new Event('resize'));
+      scroller.dispatchEvent(new Event('scroll'));
+    },
+    relativeTop: () => titleRect().top - viewportTop,
   };
 }
+
+afterEach(() => vi.useRealTimers());
 
 describe('scene collapse focus policy', () => {
   it('closes the active scene without activating the last remaining open scene', () => {
@@ -103,5 +125,66 @@ describe('scene collapse visual anchor', () => {
     h.collapse(0);
     restore();
     expect(h.scroller.scrollTop).toBe(0);
+  });
+
+  function collapseWithKeyboard() {
+    vi.useFakeTimers();
+    const h = layout({ viewportHeight: 320, keyboard: true });
+    const restore = h.capture();
+    h.collapse();
+    return { ...h, cancel: restore() };
+  }
+
+  it('corrects once after keyboard dismissal settles, including a changed scroll limit', () => {
+    const h = collapseWithKeyboard();
+    h.resize(450, -15);
+    vi.advanceTimersByTime(70);
+    h.resize(700, -40, 1890);
+    vi.advanceTimersByTime(99);
+    expect(h.scroller.scrollTop).toBe(1890);
+    vi.advanceTimersByTime(1);
+    expect(h.relativeTop()).toBe(100);
+    h.resize(750, -50);
+    vi.advanceTimersByTime(550);
+    expect(h.relativeTop()).toBe(90);
+  });
+
+  it.each(['touchmove', 'wheel', 'pointerdown', 'keydown', 'focusin', 'beforeinput'])(
+    'cancels a pending correction on %s', event => {
+      const h = collapseWithKeyboard();
+      h.resize(700, -40);
+      h.doc.dispatchEvent(new Event(event));
+      vi.advanceTimersByTime(550);
+      expect(h.scroller.scrollTop).toBe(1900);
+    },
+  );
+
+  it('preserves scrolling not explained by the new scroll range', () => {
+    const h = collapseWithKeyboard();
+    h.resize(700, -40);
+    h.moveScroll(1700);
+    vi.advanceTimersByTime(550);
+    expect(h.scroller.scrollTop).toBe(1700);
+  });
+
+  it.each(['navigation', 'another collapse', 'reopening', 'removal'])(
+    'skips the pending correction after %s', reason => {
+      const h = collapseWithKeyboard();
+      h.resize(700, -40);
+      if (reason === 'reopening') h.reopen();
+      else if (reason === 'removal') h.article.isConnected = false;
+      else h.cancel?.();
+      vi.advanceTimersByTime(550);
+      expect(h.scroller.scrollTop).toBe(1900);
+    },
+  );
+
+  it('ignores viewport panning alone and a resize after the deadline', () => {
+    const h = collapseWithKeyboard();
+    h.viewport.dispatchEvent(new Event('scroll'));
+    vi.advanceTimersByTime(550);
+    h.resize(700, -40);
+    vi.advanceTimersByTime(550);
+    expect(h.scroller.scrollTop).toBe(1900);
   });
 });

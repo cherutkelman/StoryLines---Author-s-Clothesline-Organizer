@@ -287,6 +287,7 @@ const Board: React.FC<BoardProps> = ({
   const boardColumns = useMemo(() => getBoardSequenceColumns(boardProject), [boardProject]);
 
   const chapters = buildBoardChapters(boardProject, effectiveVisiblePlotlines);
+  const isPlotlinesView = viewMode === 'plotlines';
 
   const renderBoardView = () => {
     switch (viewMode) {
@@ -397,8 +398,9 @@ const Board: React.FC<BoardProps> = ({
         )}
         <div 
           ref={boardRef}
-          className="p-32 pb-64 transition-transform duration-200 origin-top-right"
-          style={{ 
+          className={isPlotlinesView ? 'pt-32 pb-64' : 'p-32 pb-64 transition-transform duration-200 origin-top-right'}
+          // Layout zoom keeps the plotline scene scrollport bounded at every scale.
+          style={isPlotlinesView ? { zoom: zoomLevel } : {
             transform: `scale(${zoomLevel})`,
             width: `${100 / zoomLevel}%`,
             minWidth: 'max-content'

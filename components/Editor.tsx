@@ -54,7 +54,6 @@ const AutoExpandingTextarea: React.FC<{
   sceneId, searchRanges, activeSearchStart, onSearchDraftChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
-  const previousTextScaleRef = useRef(textScale);
   const [localValue, setLocalValue] = useState(value);
   const fontSize = `${1.125 * textScale / 100}rem`;
 
@@ -65,39 +64,6 @@ const AutoExpandingTextarea: React.FC<{
   useLayoutEffect(() => () => {
     onSearchDraftChange?.(sceneId);
   }, [onSearchDraftChange, sceneId]);
-
-  const getScrollContainer = () => {
-    const textarea = textareaRef.current;
-    let parent = textarea?.parentElement || null;
-    while (parent) {
-      const overflowY = window.getComputedStyle(parent).overflowY;
-      if (overflowY === 'auto' || overflowY === 'scroll') return parent;
-      parent = parent.parentElement;
-    }
-    return null;
-  };
-
-  const preserveScroll = (callback: () => void) => {
-    const textarea = textareaRef.current;
-    const scrollContainer = getScrollContainer();
-    const previousScrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
-    const selectionStart = textarea?.selectionStart;
-    const selectionEnd = textarea?.selectionEnd;
-    const selectionDirection = textarea?.selectionDirection;
-
-    callback();
-
-    window.requestAnimationFrame(() => {
-      if (scrollContainer) {
-        scrollContainer.scrollTop = previousScrollTop;
-      } else {
-        window.scrollTo({ top: previousScrollTop });
-      }
-      if (textarea && document.activeElement === textarea && selectionStart !== undefined && selectionEnd !== undefined) {
-        textarea.setSelectionRange(selectionStart, selectionEnd, selectionDirection ?? 'none');
-      }
-    });
-  };
 
   // Update local value when prop changes (e.g. on scene switch)
   useEffect(() => {
@@ -116,22 +82,10 @@ const AutoExpandingTextarea: React.FC<{
     return () => clearTimeout(timeoutId);
   }, [localValue, onChange, value]);
 
-  const adjustHeight = () => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      resizeSceneTextarea(textarea, minRows);
-    }
-  };
-
   useLayoutEffect(() => {
-    const scaleChanged = previousTextScaleRef.current !== textScale;
-    previousTextScaleRef.current = textScale;
-    if (scaleChanged || document.activeElement === textareaRef.current) {
-      preserveScroll(adjustHeight);
-      return;
-    }
-    adjustHeight();
-  }, [localValue, textScale]);
+    const textarea = textareaRef.current;
+    if (textarea) resizeSceneTextarea(textarea, minRows);
+  }, [localValue, fontSize, minRows]);
 
   return (
     <div className="storylines-editor-search-body">
@@ -147,7 +101,7 @@ const AutoExpandingTextarea: React.FC<{
         placeholder={placeholder}
         onChange={(e) => {
           onDraftChange?.(e.target.value);
-          preserveScroll(() => setLocalValue(e.target.value));
+          setLocalValue(e.target.value);
         }}
         onFocus={onFocus}
         onScroll={event => {
@@ -184,6 +138,7 @@ const DebouncedInput: React.FC<{
 
   return (
     <input
+      data-editor-collapse-title
       className={className}
       value={localValue}
       placeholder={placeholder}
@@ -200,12 +155,12 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const { textScale, setTextScale } = useEditorTextScale();
   const [focusedSceneId, setFocusedSceneId] = useState<string | null>(initialFocusedSceneId || null);
   const [expandedSceneIds, setExpandedSceneIds] = useState<string[]>(initialExpandedSceneIds ?? (initialFocusedSceneId ? [initialFocusedSceneId] : []));
-  const pendingCollapseAnchorRef = useRef<(() => void) | null>(null);
-  useLayoutEffect(() => {
-    const restore = pendingCollapseAnchorRef.current;
-    pendingCollapseAnchorRef.current = null;
-    restore?.();
-  }, [expandedSceneIds]);
+  const pendingCollapseAnchorRef = useRef<ReturnType<typeof captureSceneCollapseAnchor>>(null);
+  const cancelCollapseCorrectionRef = useRef<(() => void) | undefined>(undefined);
+  const cancelCollapseCorrection = useCallback(() => {
+    cancelCollapseCorrectionRef.current?.();
+    cancelCollapseCorrectionRef.current = undefined;
+  }, []);
   const [bridgeType, setBridgeType] = useState<'characters' | 'relationships' | 'places' | 'periods' | 'twists' | 'fantasyWorlds' | 'backgrounds' | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,6 +193,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const renameInFlightVersionIdRef = useRef<string | null>(null);
   const activeSearchQuery = externalSearchQuery ?? searchQuery;
   const updateSearchQuery = (query: string) => {
+    cancelCollapseCorrection();
     setSearchNavigation(undefined);
     (onExternalSearchQueryChange ?? setSearchQuery)(query);
   };
@@ -253,6 +209,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   }, [bookId]);
 
   const handleDisplayModeChange = (mode: 'full' | 'focus') => {
+    cancelCollapseCorrection();
     setDisplayMode(mode);
     onDisplayModeChange?.(mode);
     if (mode === 'focus') {
@@ -304,16 +261,17 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const toggleSceneExpanded = (id: string) => {
-    if (id === searchExpandedSceneId && !expandedSceneIds.includes(id)) {
-      setSearchNavigation(undefined);
-      return;
-    }
-    lastInteractedSceneIdRef.current = id;
+    cancelCollapseCorrection();
+    const searchExpanded = id === searchExpandedSceneId;
     const change = getSceneExpansionChange(expandedSceneIds, focusedSceneId, id);
-    if (change.closing && lastWritingSceneRef.current?.sceneId === id) lastWritingSceneRef.current = null;
-    pendingCollapseAnchorRef.current = change.closing
+    const closing = change.closing || searchExpanded;
+    pendingCollapseAnchorRef.current = closing
       ? captureSceneCollapseAnchor(document.getElementById(getEditorSceneTargetId(id)))
       : null;
+    if (searchExpanded) setSearchNavigation(undefined);
+    if (searchExpanded && !change.closing) return;
+    lastInteractedSceneIdRef.current = id;
+    if (closing && lastWritingSceneRef.current?.sceneId === id) lastWritingSceneRef.current = null;
     handleExpandedScenesChange(change.expandedSceneIds);
     setDisplayedSceneId(id);
     if (!change.closing || change.focusedSceneId !== focusedSceneId) {
@@ -518,15 +476,24 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   const searchExpandedSceneId = activeSearchMatch?.sceneId === navigation?.sceneId
     ? navigation?.sceneId : undefined;
 
+  useLayoutEffect(() => {
+    const restore = pendingCollapseAnchorRef.current;
+    pendingCollapseAnchorRef.current = null;
+    cancelCollapseCorrectionRef.current = restore?.() || undefined;
+    return cancelCollapseCorrection;
+  }, [bookId, displayMode, expandedSceneIds, searchExpandedSceneId, cancelCollapseCorrection]);
+
   const navigateSearch = (step: -1 | 1) => {
     const index = nextSearchMatchIndex(navigation?.index, searchMatches.length, step);
     if (index === undefined) return;
+    cancelCollapseCorrection();
     setSearchNavigation({ bookId, query, index, sceneId: searchMatches[index].sceneId });
   };
 
   useEffect(() => {
     if (!navigation) return;
     const frame = window.requestAnimationFrame(() => {
+      cancelCollapseCorrection();
       const scene = document.getElementById(getEditorSceneTargetId(navigation.sceneId));
       const target = scene?.querySelector('[data-editor-active-match]') ?? scene;
       const scroller = scene?.closest('.storylines-editor-scroll');
@@ -539,7 +506,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [navigation]);
+  }, [navigation, cancelCollapseCorrection]);
 
   const keepSearchSceneOpenForEditing = (sceneId: string) => {
     if (searchExpandedSceneId === sceneId && displayMode === 'focus' && !expandedSceneIds.includes(sceneId)) {
@@ -548,6 +515,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const handleAddSceneAfter = () => {
+    cancelCollapseCorrection();
     const writing = lastWritingSceneRef.current;
     if (!writing || writing.bookId !== bookId || !activeScenes.some(scene => scene.id === writing.sceneId)
       || (displayMode === 'focus' && !expandedSceneIds.includes(writing.sceneId))) {
@@ -570,7 +538,9 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const scrollToEditorTarget = (targetId: string, waitForRender = false) => {
+    cancelCollapseCorrection();
     const scroll = () => {
+      cancelCollapseCorrection();
       document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -583,7 +553,7 @@ const Editor: React.FC<EditorProps> = ({ project, bookId, user, visiblePlotlines
   };
 
   const handleQuickNavSceneClick = (sceneId: string) => {
-    const needsExpansion = displayMode === 'focus' && !expandedSceneIds.includes(sceneId);
+    const needsExpansion = displayMode === 'focus' && searchExpandedSceneId !== sceneId && !expandedSceneIds.includes(sceneId);
 
     if (needsExpansion) {
       toggleSceneExpanded(sceneId);

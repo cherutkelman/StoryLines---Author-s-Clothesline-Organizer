@@ -69,7 +69,7 @@ const EditorSceneList: React.FC<EditorSceneListProps> = ({ items, plotlines, dis
                 <div className="flex items-center gap-4">
                   <span className="text-lg font-black text-[var(--theme-primary)]/10 handwritten w-6">{idx + 1}</span>
                   <div className="flex flex-col">
-                    <h3 className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
+                    <h3 data-editor-collapse-title className="font-bold text-[var(--theme-primary)] truncate max-w-xs">{scene.title || 'ללא כותרת'}</h3>
                     {scene.summary && (
                       <p className="mt-0.5 max-w-md truncate text-[11px] font-medium text-[var(--theme-primary)]/40">
                         {scene.summary}
